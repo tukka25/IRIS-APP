@@ -1,0 +1,39 @@
+# Android / Gradle
+.gradle/
+build/
+**/build/
+local.properties
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Build artifacts
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# Native model assets
+*.gguf
+*.safetensors
+*.bin
+app/src/main/assets/models/*
+!app/src/main/assets/models/.gitkeep
+
+# Local dependency checkouts
+llama.cpp/
+llama.cpp-*/
+
+# Secrets and local tool state
+.env
+.env.*
+*.keystore
+*.jks
+*.p12
+*.pem
+skills-lock.json
+
+# IDE / OS
+.idea/
+.DS_Store
+

@@ -107,9 +107,14 @@ The app should prove three things:
 
 ```text
 app/src/main/java/com/gemmaworkflow/
-+-- GemmaWorkflowApp.kt
-+-- di/
++-- app/
+|   +-- GemmaWorkflowApp.kt
 |   +-- AppContainer.kt
++-- core/
+|   +-- catalog/
+|   +-- error/
+|   +-- model/
+|   +-- permissions/
 +-- ui/
 |   +-- MainActivity.kt
 |   +-- navigation/
@@ -123,6 +128,7 @@ app/src/main/java/com/gemmaworkflow/
 |   |   +-- WorkflowDetailScreen.kt
 |   +-- triggers/
 |   |   +-- TriggerSetupScreen.kt
+|   +-- history/
 |   +-- components/
 |   |   +-- PromptInput.kt
 |   |   +-- WorkflowCard.kt
@@ -131,25 +137,16 @@ app/src/main/java/com/gemmaworkflow/
 |   +-- theme/
 +-- data/
 |   +-- local/
-|   |   +-- AppDatabase.kt
-|   |   +-- WorkflowDao.kt
-|   |   +-- ExecutionHistoryDao.kt
-|   +-- model/
-|   |   +-- PlannedWorkflow.kt
-|   |   +-- WorkflowEntity.kt
-|   |   +-- WorkflowStep.kt
-|   |   +-- TriggerConfig.kt
-|   |   +-- ExecutionResult.kt
+|   |   +-- database/
+|   |   +-- dao/
+|   |   +-- entity/
 |   +-- repository/
-|       +-- WorkflowRepository.kt
+|   +-- settings/
 +-- domain/
 |   +-- planner/
 |   |   +-- PlannerService.kt
 |   |   +-- PlannerEngine.kt
-|   |   +-- MockPlannerEngine.kt
-|   |   +-- LlamaCppEngine.kt
 |   |   +-- PromptBuilder.kt
-|   |   +-- ModelAssetManager.kt
 |   +-- parser/
 |   |   +-- WorkflowJsonParser.kt
 |   +-- safety/
@@ -157,28 +154,45 @@ app/src/main/java/com/gemmaworkflow/
 |   |   +-- SafeActionRouter.kt
 |   +-- runner/
 |       +-- WorkflowRunner.kt
-|       +-- IntentDispatcher.kt
-|       +-- UrlDispatcher.kt
 |       +-- RunnerResultMapper.kt
-+-- automation/
+|   +-- triggers/
++-- platform/
+|   +-- dispatch/
+|   |   +-- IntentDispatcher.kt
+|   |   +-- UrlDispatcher.kt
+|   +-- inference/
+|   |   +-- llama/
+|   |       +-- LlamaCppEngine.kt
+|   |       +-- ModelAssetManager.kt
+|   +-- logging/
 |   +-- nfc/
 |   |   +-- NfcTriggerWriter.kt
 |   |   +-- NfcWorkflowReceiver.kt
 |   +-- tasker/
 |       +-- TaskerPluginEditActivity.kt
 |       +-- TaskerPluginFireReceiver.kt
-+-- native/
-    +-- NativeLog.kt
 
 app/src/main/cpp/
-+-- CMakeLists.txt
-+-- llama_android.cpp
-+-- llama_android.h
++-- llama/
+|   +-- CMakeLists.txt
+|   +-- llama_android.cpp
+|   +-- llama_android.h
 
 app/src/main/assets/
-+-- planner-json.gbnf
++-- grammars/
+|   +-- planner-json.gbnf
 +-- models/
-    +-- gemma-planner.Q4_K_M.gguf
+|   +-- gemma-planner.Q4_K_M.gguf
+
+app/src/test/java/com/gemmaworkflow/
++-- domain/
+|   +-- parser/
+|   +-- runner/
+|   +-- safety/
+
+app/src/androidTest/java/com/gemmaworkflow/
++-- data/local/
++-- ui/
 ```
 
 ## Data Contracts
