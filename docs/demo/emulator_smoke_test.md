@@ -1,55 +1,61 @@
-# Emulator Smoke Test
+# Emulator / Device Smoke Test
 
-This branch is for the first Gemma GGUF load/query test on Android.
+This doc covers the LiteRT-LM GPU smoke-test flow on Android emulator or physical device.
 
-## Local Files
+## Model
 
-The GGUF model lives outside Git:
+LiteRT-LM uses `.litertlm` files. Pre-converted Gemma models are on HuggingFace:
+
+  https://huggingface.co/litert-community
+
+The model lives outside Git:
 
 ```text
-local-models/gemma-planner-dev.Q4_K_M.gguf
+local-models/gemma3-1b-it.litertlm
 ```
 
-The app expects the model on the emulator/device at:
+Push to device:
 
-```text
-/sdcard/Android/data/com.gemmaworkflow/files/models/gemma-planner-dev.Q4_K_M.gguf
+```bash
+adb push local-models/gemma3-1b-it.litertlm \
+  /sdcard/Android/data/com.gemmaworkflow/files/models/
 ```
 
 ## Setup
 
-Clone llama.cpp next to this repo:
+Clone LiteRT-LM next to this repo for GPU native libs and CLI tools:
 
 ```bash
-scripts/setup_llama_cpp.sh
+scripts/setup_litert_lm.sh
 ```
 
-Open this repo in Android Studio and sync the Gradle project. The native build expects:
+This clones `https://github.com/google-ai-edge/LiteRT-LM` into:
 
 ```text
-../llama.cpp
+../LiteRT-LM
 ```
 
-## Push The Model
+## Build
 
-After an emulator or phone is attached:
+The app uses LiteRT-LM's Kotlin AAR from Google Maven — no CMake, no NDK, no native build.
 
 ```bash
-scripts/push_model_to_emulator.sh
+./gradlew installDebug
 ```
 
-If the package directory does not exist yet, install or run the app once, then run the script again.
+## Smoke Test
 
-## App Flow
+1. Open the app on device
+2. Verify the model path shows correctly
+3. Tap "Load model" — status should show "Loaded — GPU (LiteRT-LM)"
+4. Enter a prompt and tap "Generate"
+5. Verify response is non-empty and coherent
 
-1. Launch GemmaWorkflow.
-2. Tap `Load model`.
-3. Enter a short prompt.
-4. Tap `Generate`.
-5. Check the response text and Logcat tag `GemmaLlama`.
+## Troubleshooting
 
-## Notes
-
-- The model is not packaged into the APK because it is too large for fast hackathon iteration.
-- This branch intentionally runs the model through the CPU backend for predictable emulator testing.
-- The first goal is a successful load and one short response, not workflow planning quality.
+| Symptom | Likely cause | Fix |
+|---------|-------------|-----|
+| Model not found | `.litertlm` not pushed | Check path, re-push with adb |
+| GPU fallback to CPU | OpenCL/Vulkan missing | Verify device supports GPU; check AndroidManifest lib declarations |
+| Engine init timeout | Model too large | Use smaller model (1B param) |
+| Gradle sync fails | LiteRT-LM AAR not found | Check `google()` in repositories; sync again |

@@ -57,9 +57,9 @@ private fun LlamaSmokeScreen(viewModel: LlamaSmokeViewModel) {
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text("Gemma model smoke test", style = MaterialTheme.typography.headlineSmall)
+        Text("Gemma LiteRT-LM GPU Smoke Test", style = MaterialTheme.typography.headlineSmall)
         Text(
-            text = "Push the GGUF to the path below, load it, then send a short prompt.",
+            text = "Push a .litertlm model to the path below, load it, then send a short prompt.",
             style = MaterialTheme.typography.bodyMedium
         )
 
@@ -117,4 +117,3 @@ private fun LlamaSmokeScreen(viewModel: LlamaSmokeViewModel) {
         Spacer(modifier = Modifier.height(24.dp))
     }
 }
-

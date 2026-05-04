@@ -14,17 +14,6 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0"
-
-        ndk {
-            abiFilters += "arm64-v8a"
-        }
-
-        externalNativeBuild {
-            cmake {
-                cppFlags += listOf("-std=c++17")
-                arguments += listOf("-DLLAMA_CPP_DIR=${rootDir.parentFile.resolve("llama.cpp").absolutePath}")
-            }
-        }
     }
 
     buildFeatures {
@@ -37,10 +26,14 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    externalNativeBuild {
-        cmake {
-            path = file("src/main/cpp/llama/CMakeLists.txt")
-            version = "3.22.1"
+    // LiteRT-LM requires packaging native libs uncompressed
+    androidResources {
+        noCompress += listOf("litertlm")
+    }
+
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
         }
     }
 }
@@ -61,6 +54,10 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
+
+    // LiteRT-LM: on-device LLM inference with GPU acceleration
+    // Pin 0.10.0 (latest stable on Google Maven as of May 2026)
+    implementation("com.google.ai.edge.litertlm:litertlm-android:0.10.0")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

@@ -1,5 +1,10 @@
 package com.gemmaworkflow.ui.home
 
+/**
+ * UI state for the LiteRT-LM GPU smoke-test screen.
+ *
+ * Holds model path, prompt, generated response, and load/error state.
+ */
 data class LlamaSmokeUiState(
     val modelPath: String = "",
     val prompt: String = "Write one sentence about why local AI on Android is useful.",
@@ -12,4 +17,3 @@ data class LlamaSmokeUiState(
     val canGenerate: Boolean
         get() = isLoaded && !isBusy && prompt.isNotBlank()
 }
-

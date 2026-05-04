@@ -3,8 +3,9 @@ package com.gemmaworkflow.ui.home
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.gemmaworkflow.platform.inference.llama.LlamaCppEngine
-import com.gemmaworkflow.platform.inference.llama.ModelFileLocator
+import com.google.ai.edge.litertlm.Backend
+import com.gemmaworkflow.platform.inference.litert.LitertLmEngine
+import com.gemmaworkflow.platform.inference.litert.ModelFileLocator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -12,9 +13,16 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+/**
+ * ViewModel for the LiteRT-LM GPU smoke-test screen.
+ *
+ * Replaces the previous llama.cpp smoke test with LiteRT-LM's
+ * Kotlin API using GPU acceleration (OpenCL/Vulkan).
+ */
 class LlamaSmokeViewModel(application: Application) : AndroidViewModel(application) {
+
     private val modelFileLocator = ModelFileLocator(application)
-    private val engine = LlamaCppEngine()
+    private val engine = LitertLmEngine()
 
     private val _uiState = MutableStateFlow(
         LlamaSmokeUiState(modelPath = modelFileLocator.defaultModelPath)
@@ -27,18 +35,21 @@ class LlamaSmokeViewModel(application: Application) : AndroidViewModel(applicati
 
     fun loadModel() {
         viewModelScope.launch(Dispatchers.Default) {
-            _uiState.update { it.copy(isBusy = true, error = null, loadStatus = "Loading") }
+            _uiState.update { it.copy(isBusy = true, error = null, loadStatus = "Loading\u2026") }
             runCatching {
                 modelFileLocator.requireDefaultModel()
-                engine.load(
+                engine.initialize(
                     modelPath = modelFileLocator.defaultModelPath,
-                    contextSize = 512,
-                    maxTokens = 16,
-                    gpuLayers = GPU_LAYERS
+                    cacheDir = getApplication<Application>().cacheDir.absolutePath,
+                    backend = Backend.GPU()
                 )
             }.onSuccess {
                 _uiState.update {
-                    it.copy(isBusy = false, isLoaded = true, loadStatus = "Loaded, CPU emulator mode")
+                    it.copy(
+                        isBusy = false,
+                        isLoaded = true,
+                        loadStatus = "Loaded \u2014 GPU (LiteRT-LM)"
+                    )
                 }
             }.onFailure { throwable ->
                 _uiState.update {
@@ -77,9 +88,5 @@ class LlamaSmokeViewModel(application: Application) : AndroidViewModel(applicati
     override fun onCleared() {
         engine.close()
         super.onCleared()
-    }
-
-    private companion object {
-        const val GPU_LAYERS = 0
     }
 }

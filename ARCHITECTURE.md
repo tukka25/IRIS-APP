@@ -10,16 +10,17 @@ User prompt -> on-device planner -> validated JSON workflow -> save -> run now o
 
 The app should prove three things:
 
-- A small local model can convert plain English into structured automation.
+- A small local model (LiteRT-LM with GPU acceleration) can convert plain English into structured automation.
 - The generated plan can be validated before execution.
 - Android can execute useful cross-app actions through intents, URL schemes, and triggers.
+- On-device inference runs on phone GPU via LiteRT-LM, not CPU-bound llama.cpp.
 
 ## Hackathon Scope
 
 ### MVP
 
 - Android app built with Kotlin and Jetpack Compose.
-- Prompt input screen with a mock planner and a llama.cpp planner option.
+- Prompt input screen with a mock planner and a LiteRT-LM GPU planner option.
 - JSON workflow preview.
 - Workflow parser and allowlist validator.
 - Workflow library using local persistence.
@@ -65,9 +66,9 @@ The app should prove three things:
 | +------+------+  +---------------+              +--------------+  |
 |        |                                                         |
 | +------v------+                                                  |
-| | JNI bridge  |                                                  |
-| | llama.cpp   |                                                  |
-| | GGUF model  |                                                  |
+| | LitertLmEngine |                                                  |
+| | LiteRT-LM API  |                                                  |
+| | .litertlm model|                                                  |
 | +-------------+                                                  |
 +------------------------------------------------------------------+
 ```
@@ -76,7 +77,7 @@ The app should prove three things:
 
 1. User enters a request on the Home screen.
 2. `PromptBuilder` creates a compact system prompt containing the JSON schema, supported actions, and trigger types.
-3. `PlannerService` calls either `MockPlannerEngine` or `LlamaCppEngine`.
+3. `PlannerService` calls either `MockPlannerEngine` or `LitertLmEngine`.
 4. `WorkflowJsonParser` extracts and decodes the returned JSON into typed Kotlin models.
 5. `SafeActionRouter` validates every app, action, parameter, URL, and package name against an allowlist.
 6. The UI shows the workflow preview and raw JSON.
@@ -96,10 +97,10 @@ The app should prove three things:
 | Persistence | Room | Reliable local storage for workflows and history. |
 | Preferences | DataStore | Store selected backend, model path, and demo settings. |
 | JSON | kotlinx.serialization | Typed decoding for workflow data and planner output. |
-| Inference | llama.cpp through JNI/NDK | Runs GGUF models locally on Android. |
-| Model format | GGUF | Supported by llama.cpp and suitable for quantized edge inference. |
-| Model target | Gemma 3 1B instruction GGUF, Q4_K_M or faster fallback | Small enough for phone demo, stronger than a pure rule mock. |
-| Build | Gradle Kotlin DSL + CMake | Standard Android + native build path. |
+|| Inference | LiteRT-LM Kotlin API (Google) | On-device LLM inference with first-class GPU acceleration via OpenCL/Vulkan. No JNI bridge needed. |
+|| Model format | .litertlm | LiteRT-LM native model format. Convert from HuggingFace or use pre-converted models from litert-community. |
+|| Model target | Gemma 3 1B IT .litertlm | Small enough for phone demo, GPU-accelerated via LiteRT-LM. |
+|| Build | Gradle Kotlin DSL (no CMake) | Pure Kotlin build — LiteRT-LM ships as an AAR from Google Maven. |
 | Primary actions | Android intents and URL schemes | Best chance of working across installed apps. |
 | Triggers | Manual run, NFC, optional Tasker plugin | Keeps demo focused and avoids heavy permissions early. |
 
@@ -160,10 +161,10 @@ app/src/main/java/com/gemmaworkflow/
 |   +-- dispatch/
 |   |   +-- IntentDispatcher.kt
 |   |   +-- UrlDispatcher.kt
-|   +-- inference/
-|   |   +-- llama/
-|   |       +-- LlamaCppEngine.kt
-|   |       +-- ModelAssetManager.kt
+||   +-- inference/
+||   |   +-- litert/
+||   |       +-- LitertLmEngine.kt
+||   |       +-- ModelFileLocator.kt
 |   +-- logging/
 |   +-- nfc/
 |   |   +-- NfcTriggerWriter.kt
@@ -172,17 +173,14 @@ app/src/main/java/com/gemmaworkflow/
 |       +-- TaskerPluginEditActivity.kt
 |       +-- TaskerPluginFireReceiver.kt
 
-app/src/main/cpp/
-+-- llama/
-|   +-- CMakeLists.txt
-|   +-- llama_android.cpp
-|   +-- llama_android.h
-
 app/src/main/assets/
 +-- grammars/
 |   +-- planner-json.gbnf
 +-- models/
-|   +-- gemma-planner.Q4_K_M.gguf
+|   +-- gemma3-1b-it.litertlm
+
+LiteRT-LM/                (cloned sibling repo for GPU libs & tools)
++-- prebuilt/android_arm64/
 
 app/src/test/java/com/gemmaworkflow/
 +-- domain/
@@ -307,57 +305,49 @@ class PlannerService(
 
 The mock planner is required, not optional. It gives the team a stable demo while JNI and model performance are still moving.
 
-### llama.cpp Planner
+### LiteRT-LM Planner
 
-Use the llama.cpp path after the mock flow works end to end:
+Use the LiteRT-LM path after the mock flow works end to end:
 
-- Copy the GGUF and grammar from assets to app-private files on first run.
-- Load the model once and reuse the native handle.
-- Generate on `Dispatchers.Default`.
+- Push a `.litertlm` model to the device (pre-converted Gemma models available on HuggingFace litert-community).
+- Use `LitertLmEngine` which wraps LiteRT-LM's Kotlin API — no JNI bridge needed.
+- GPU acceleration via OpenCL/Vulkan through `Backend.GPU()`.
+- Generate on `Dispatchers.Default` with coroutines.
 - Keep prompt and output small.
-- Start with context size 512 or 1024.
-- Cap generation around 128 tokens for the demo.
-- Use grammar-constrained JSON generation.
+- Cap generation with sampler config (topK, topP, temperature).
 - Show model load and generation errors in the UI.
 
-## Native Layer
+## Inference Layer
 
-JNI contract:
+LiteRT-LM uses a pure Kotlin API — no CMake, no JNI, no NDK. The `Engine` class
+handles model loading, GPU backend selection, and conversation management.
 
-```cpp
-extern "C" JNIEXPORT jlong JNICALL
-Java_com_gemmaworkflow_domain_planner_LlamaCppEngine_nativeInit(
-    JNIEnv* env,
-    jobject thiz,
-    jstring modelPath,
-    jstring grammarPath,
-    jint contextSize,
-    jint maxTokens,
-    jint gpuLayers
-);
+Engine initialization (call on background thread):
 
-extern "C" JNIEXPORT jstring JNICALL
-Java_com_gemmaworkflow_domain_planner_LlamaCppEngine_nativeGenerate(
-    JNIEnv* env,
-    jobject thiz,
-    jlong handle,
-    jstring prompt
-);
-
-extern "C" JNIEXPORT void JNICALL
-Java_com_gemmaworkflow_domain_planner_LlamaCppEngine_nativeFree(
-    JNIEnv* env,
-    jobject thiz,
-    jlong handle
-);
+```kotlin
+val engine = LitertLmEngine()
+engine.initialize(
+    modelPath = "/path/to/model.litertlm",
+    cacheDir = context.cacheDir.absolutePath,
+    backend = Backend.GPU()
+)
 ```
 
-Native rules:
+Generation:
 
-- Return clear error strings or throw Java exceptions for model load failures.
-- Free native resources from ViewModel/application shutdown paths.
-- Do not reload the model for every prompt.
-- Log token timing to Logcat for demo tuning.
+```kotlin
+val response = engine.generate("Your prompt here")
+// or streaming:
+engine.generateStream(prompt).collect { token -> ... }
+```
+
+LiteRT-LM rules:
+
+- Always close the engine (`engine.close()`) in ViewModel `onCleared()`.
+- Cache directory (`cacheDir`) speeds up subsequent model loads.
+- GPU requires `<uses-native-library>` entries in AndroidManifest.xml for OpenCL and Vulkan.
+- Do not reload the model for every prompt — reuse the engine instance.
+- Log timing to Logcat for demo tuning.
 
 ## Trigger Architecture
 
@@ -406,7 +396,7 @@ If profile creation/import is attempted, it should be a separate spike because i
 Use two planner modes:
 
 - `mock`: no native model required; stable for UI and runner demos.
-- `llama`: loads llama.cpp and GGUF assets.
+- `llama`: loads LiteRT-LM with GPU acceleration.
 
 This can be a runtime setting first. A dedicated Gradle flavor is useful later if model assets make builds too large.
 
@@ -420,7 +410,7 @@ This can be a runtime setting first. A dedicated Gradle flavor is useful later i
 | `WorkflowRepository` | Room instrumentation or Robolectric | Save/load/delete works. |
 | `WorkflowRunner` | Fake dispatchers | Steps run in order and errors are captured. |
 | UI | Manual device pass | Demo path is smooth. |
-| Native | Device smoke test | Model loads and returns valid JSON. |
+| Native | Device smoke test | Model loads on GPU and returns valid JSON. |
 
 ## Demo Reliability Rules
 
