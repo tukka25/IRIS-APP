@@ -17,12 +17,15 @@ captures/
 *.gguf
 *.safetensors
 *.bin
+local-models/
+models/
 app/src/main/assets/models/*
 !app/src/main/assets/models/.gitkeep
 
 # Local dependency checkouts
 llama.cpp/
 llama.cpp-*/
+third_party/
 
 # Secrets and local tool state
 .env
@@ -32,8 +35,8 @@ llama.cpp-*/
 *.p12
 *.pem
 skills-lock.json
+.kotlin/
 
 # IDE / OS
 .idea/
 .DS_Store
-
