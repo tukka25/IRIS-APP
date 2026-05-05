@@ -171,7 +171,7 @@ LiteRT-LM provides a first-class Kotlin API — no JNI bridge, no CMake, no NDK 
 ```gradle
 // app/build.gradle.kts
 dependencies {
-    implementation("com.google.ai.edge.litertlm:litertlm-android:latest.release")
+    implementation("com.google.ai.edge.litertlm:litertlm-android:0.10.0")
 }
 ```
 
@@ -187,7 +187,8 @@ dependencies {
 ### 5.3 Kotlin Engine Wrapper
 
 ```kotlin
-class LitertLmEngine : AutoCloseable {
+class LitertLmEngine {
+
     private var engine: Engine? = null
 
     suspend fun initialize(
@@ -196,17 +197,35 @@ class LitertLmEngine : AutoCloseable {
         backend: Backend = Backend.GPU()
     ) = withContext(Dispatchers.Default) {
         close()
-        val config = EngineConfig(modelPath = modelPath, backend = backend, cacheDir = cacheDir)
+        val config = EngineConfig(
+            modelPath = modelPath,
+            backend = backend,
+            cacheDir = cacheDir
+        )
         engine = Engine(config).also { it.initialize() }
     }
 
     suspend fun generate(prompt: String): String = withContext(Dispatchers.Default) {
-        requireEngine().createConversation().use { conv ->
-            conv.sendMessage(prompt)
+        val currentEngine = engine
+            ?: throw IllegalStateException("Engine not initialized.")
+
+        currentEngine.createConversation(
+            ConversationConfig(
+                samplerConfig = SamplerConfig(
+                    topK = 40,
+                    topP = 0.95,
+                    temperature = 0.7
+                )
+            )
+        ).use { conv ->
+            conv.sendMessage(prompt).toString()
         }
     }
 
-    override fun close() { engine?.close(); engine = null }
+    fun close() {
+        engine?.close()
+        engine = null
+    }
 }
 ```
 
@@ -219,7 +238,7 @@ LiteRT-LM uses `.litertlm` files. Pre-converted Gemma models are on HuggingFace:
 Push to device:
 
 ```bash
-adb push gemma3-1b-it.litertlm \
+adb push gemma-4-E2B-it.litertlm \
   /sdcard/Android/data/com.gemmaworkflow/files/models/
 ```
 
@@ -278,13 +297,15 @@ sealed class WorkflowStep {
 
 ---
 
-## 7-12. Planner, Runner, Triggers, UI (unchanged)
+## 7. Planner, Runner, Triggers & UI
 
-Sections 7-12 from the original README remain valid. Refer to ARCHITECTURE.md for the full design doc.
+See `ARCHITECTURE.md` for the full design doc covering:
+- System prompt construction and JSON schema
+- WorkflowRunner and Intent/URL dispatchers
+- NFC, Tasker, and native trigger paths
+- Compose screen layouts and navigation
 
----
-
-## 13. Build & Run (Quickstart)
+## 8. Build & Run (Quickstart)
 
 ```bash
 # 1. Clone LiteRT-LM for GPU native libs and tools (optional)
@@ -293,8 +314,8 @@ scripts/setup_litert_lm.sh
 # 2. Build the Android app
 ./gradlew installDebug
 
-# 3. Push a model
-adb push gemma3-1b-it.litertlm \
+# 3. Push the model (Gemma 4 E2B IT, 2.4 GB)
+adb push local_models/gemma-4-E2B-it.litertlm \
   /sdcard/Android/data/com.gemmaworkflow/files/models/
 
 # 4. Open the app, tap "Load model", enter a prompt, tap "Generate"
@@ -305,14 +326,14 @@ adb push gemma3-1b-it.litertlm \
 | Tool | Purpose |
 |------|---------|
 | Android Studio (Hedgehog+) | IDE + SDK manager |
-| Android SDK 35 + NDK (optional) | Compile SDK |
-| Kotlin 2.0+ | Language |
+| Android SDK 35 | Compile SDK |
+| Kotlin 2.3.20 | Language, Compose compiler plugin |
 | LiteRT-LM (clone) | GPU native libs (optional: scripts/setup_litert_lm.sh) |
 | Gemma .litertlm model | Download from HuggingFace litert-community |
 
 ---
 
-## 14. Key Differences from llama.cpp
+## 9. Key Differences from llama.cpp
 
 | Concern | llama.cpp (old) | LiteRT-LM (new) |
 |---------|----------------|-----------------|
