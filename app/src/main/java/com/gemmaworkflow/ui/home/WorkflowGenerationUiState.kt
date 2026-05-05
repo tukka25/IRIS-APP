@@ -10,6 +10,8 @@ data class WorkflowGenerationUiState(
     val isModelReady: Boolean = false,
     val isBusy: Boolean = false,
     val stage: String = "",
+    val stageTimeline: List<StageProgress> = emptyList(),
+    val elapsedSeconds: Long = 0,
     val error: String? = null,
     val workflowPreview: PlannedWorkflow? = null,
     val rawJson: String? = null,
@@ -19,10 +21,15 @@ data class WorkflowGenerationUiState(
 ) {
     val canGenerate: Boolean
         get() = isModelReady && !isBusy && prompt.isNotBlank()
-
     val hasWorkflow: Boolean
         get() = workflowPreview != null
-
     val isValid: Boolean
         get() = hasWorkflow && validationErrors.isEmpty()
 }
+
+enum class StageStatus { Pending, Running, Done }
+
+data class StageProgress(
+    val label: String,
+    val status: StageStatus = StageStatus.Pending
+)

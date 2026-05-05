@@ -3,51 +3,50 @@ package com.gemmaworkflow.ui.home
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.gemmaworkflow.domain.model.ExecutionResult
+import com.gemmaworkflow.domain.catalog.ActionCatalog
 import com.gemmaworkflow.domain.model.PlannedWorkflow
-import com.gemmaworkflow.domain.model.WorkflowStatus
-import com.gemmaworkflow.domain.planner.PlannerResult
-import com.gemmaworkflow.domain.planner.PlannerService
+import com.gemmaworkflow.domain.parser.WorkflowJsonParser
+import com.gemmaworkflow.domain.planner.PlannerAgents
+import com.gemmaworkflow.domain.planner.PromptBuilder
 import com.gemmaworkflow.domain.runner.IntentDispatcher
 import com.gemmaworkflow.domain.runner.UrlDispatcher
 import com.gemmaworkflow.domain.runner.WorkflowRunner
+import com.gemmaworkflow.domain.safety.WorkflowValidator
 import com.gemmaworkflow.platform.capability.PackageCapabilityScanner
 import com.gemmaworkflow.platform.inference.InferenceManager
 import com.gemmaworkflow.platform.inference.InferenceState
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 
 class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(application) {
 
     private val capabilityScanner = PackageCapabilityScanner(application)
-    private val json = Json { encodeDefaults = true; prettyPrint = true }
-
-    // Saved workflows (in-memory for MVP)
     private val savedWorkflows = mutableMapOf<String, PlannedWorkflow>()
+    private var timerJob: Job? = null
 
     private val _uiState = MutableStateFlow(WorkflowGenerationUiState())
     val uiState: StateFlow<WorkflowGenerationUiState> = _uiState.asStateFlow()
 
+    private val timelineStages = listOf(
+        "Request analysis",
+        "Capability grounding",
+        "Action plan",
+        "Final JSON"
+    )
+
     init {
         viewModelScope.launch {
             InferenceManager.inferenceState.collect { state ->
-                _uiState.update {
-                    it.copy(
-                        inferenceState = state,
-                        isModelReady = state is InferenceState.Ready
-                    )
-                }
+                _uiState.update { it.copy(inferenceState = state, isModelReady = state is InferenceState.Ready) }
             }
         }
-        viewModelScope.launch {
-            InferenceManager.initialize(application)
-        }
+        viewModelScope.launch { InferenceManager.initialize(application) }
     }
 
     fun updatePrompt(prompt: String) {
@@ -62,24 +61,99 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
                 return@launch
             }
 
+            // Reset state + start timer
+            val startTime = System.currentTimeMillis()
+            timerJob = startTimer(startTime)
+
+            val timeline = timelineStages.map { StageProgress(label = it) }
             _uiState.update {
-                it.copy(isBusy = true, error = null, stage = "Analysing request\u2026",
-                    workflowPreview = null, rawJson = null, validationErrors = emptyList())
+                it.copy(isBusy = true, error = null, stage = "", workflowPreview = null,
+                    rawJson = null, validationErrors = emptyList(), stageTimeline = timeline,
+                    elapsedSeconds = 0)
             }
 
-            val plannerService = PlannerService(engine, capabilityScanner)
-            when (val result = plannerService.plan(prompt)) {
-                is PlannerResult.Success -> _uiState.update {
-                    it.copy(isBusy = false, stage = "Done", workflowPreview = result.workflow,
-                        rawJson = result.workflow.rawModelOutput, validationErrors = emptyList())
-                }
-                is PlannerResult.Failure -> _uiState.update {
-                    it.copy(isBusy = false, stage = "Validation failed",
-                        workflowPreview = result.workflow, rawJson = result.workflow.rawModelOutput,
-                        validationErrors = result.errors)
+            val agents = PlannerAgents(engine)
+            val resolvableIds = capabilityScanner.resolvableActions(ActionCatalog.allIds)
+            val availableActions = ActionCatalog.all.filter { it.id in resolvableIds }
+            val capabilitySummary = buildString {
+                appendLine("Available actions (ONLY pick from this list):")
+                for (a in availableActions) {
+                    appendLine("- ${a.id}: ${a.description}")
                 }
             }
+
+            try {
+                // Stage 1: Request analysis
+                markStage(0, StageStatus.Running)
+                _uiState.update { it.copy(stage = "Analysing request\u2026") }
+                val analysisRaw = agents.requestAnalysis(PromptBuilder.buildRequestAnalysisPrompt(prompt))
+                val triggerHint = extractTriggerHint(analysisRaw)
+                markStage(0, StageStatus.Done)
+
+                // Stage 2: Capability grounding (deterministic)
+                markStage(1, StageStatus.Running)
+                _uiState.update { it.copy(stage = "Grounding capabilities\u2026") }
+                markStage(1, StageStatus.Done)
+
+                // Stage 3: Action plan
+                markStage(2, StageStatus.Running)
+                _uiState.update { it.copy(stage = "Planning actions\u2026") }
+                val actionPlanRaw = agents.actionPlan(
+                    PromptBuilder.buildActionPlanPrompt(prompt, triggerHint, capabilitySummary))
+                markStage(2, StageStatus.Done)
+
+                // Stage 4: Final JSON
+                markStage(3, StageStatus.Running)
+                _uiState.update { it.copy(stage = "Generating JSON\u2026") }
+                val jsonRaw = agents.workflowJson(
+                    PromptBuilder.buildWorkflowJsonPrompt(prompt, actionPlanRaw, capabilitySummary))
+                markStage(3, StageStatus.Done)
+
+                // Parse + validate
+                _uiState.update { it.copy(stage = "Validating\u2026") }
+                val workflow = WorkflowJsonParser.parse(jsonRaw)
+                val errors = WorkflowValidator.validate(workflow)
+
+                timerJob?.cancel()
+                val elapsed = (System.currentTimeMillis() - startTime) / 1000
+
+                _uiState.update {
+                    if (errors.isEmpty()) {
+                        it.copy(isBusy = false, stage = "Done", elapsedSeconds = elapsed,
+                            workflowPreview = workflow, rawJson = jsonRaw, validationErrors = emptyList())
+                    } else {
+                        it.copy(isBusy = false, stage = "Validation failed", elapsedSeconds = elapsed,
+                            workflowPreview = workflow, rawJson = jsonRaw, validationErrors = errors)
+                    }
+                }
+            } catch (e: Exception) {
+                timerJob?.cancel()
+                _uiState.update { it.copy(isBusy = false, error = e.message, stage = "Failed") }
+            }
         }
+    }
+
+    private fun startTimer(startTime: Long): Job {
+        return viewModelScope.launch {
+            while (true) {
+                delay(1000)
+                _uiState.update { it.copy(elapsedSeconds = (System.currentTimeMillis() - startTime) / 1000) }
+            }
+        }
+    }
+
+    private fun markStage(index: Int, status: StageStatus) {
+        _uiState.update { state ->
+            val timeline = state.stageTimeline.toMutableList()
+            if (index in timeline.indices) {
+                timeline[index] = timeline[index].copy(status = status)
+            }
+            state.copy(stageTimeline = timeline)
+        }
+    }
+
+    private fun extractTriggerHint(json: String): String {
+        return Regex("\"trigger_hint\"\\s*:\\s*\"(\\w+)\"").find(json)?.groupValues?.getOrNull(1) ?: "manual"
     }
 
     fun saveWorkflow() {
@@ -92,23 +166,21 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
         viewModelScope.launch(Dispatchers.Default) {
             val workflow = uiState.value.workflowPreview ?: return@launch
             _uiState.update { it.copy(isBusy = true, runResults = emptyList()) }
-
             val runner = WorkflowRunner(
                 context = getApplication(),
                 intentDispatcher = IntentDispatcher(getApplication()),
                 urlDispatcher = UrlDispatcher(getApplication())
             )
-
             val results = runner.run(workflow)
             _uiState.update {
                 it.copy(isBusy = false, saved = true, runResults = results,
-                    stage = if (results.all { r -> r.success }) "All steps completed"
-                            else "Some steps failed")
+                    stage = if (results.all { r -> r.success }) "All steps completed" else "Some steps failed")
             }
         }
     }
 
     override fun onCleared() {
+        timerJob?.cancel()
         super.onCleared()
     }
 }

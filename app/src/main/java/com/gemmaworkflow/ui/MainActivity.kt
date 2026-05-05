@@ -37,6 +37,7 @@ import com.gemmaworkflow.domain.model.ExecutionResult
 import com.gemmaworkflow.domain.model.SetupState
 import com.gemmaworkflow.platform.inference.InferenceState
 import com.gemmaworkflow.ui.home.WorkflowGenerationViewModel
+import com.gemmaworkflow.ui.home.StageStatus
 import com.gemmaworkflow.ui.theme.GemmaWorkflowTheme
 
 class MainActivity : ComponentActivity() {
@@ -91,7 +92,48 @@ private fun WorkflowGenerationScreen(viewModel: WorkflowGenerationViewModel) {
 
         if (state.isBusy) {
             LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-            Text(state.stage, style = MaterialTheme.typography.bodySmall)
+
+            // Timer + stage
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(state.stage, style = MaterialTheme.typography.bodySmall)
+                Text(
+                    "${state.elapsedSeconds}s",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            // Stage timeline
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                state.stageTimeline.forEach { stage ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        val icon = when (stage.status) {
+                            StageStatus.Done -> "\u2713"
+                            StageStatus.Running -> "\u25B6"
+                            StageStatus.Pending -> "\u25CB"
+                        }
+                        val color = when (stage.status) {
+                            StageStatus.Done -> MaterialTheme.colorScheme.primary
+                            StageStatus.Running -> MaterialTheme.colorScheme.tertiary
+                            StageStatus.Pending -> MaterialTheme.colorScheme.outline
+                        }
+                        Text(icon, color = color, style = MaterialTheme.typography.bodyMedium)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            stage.label,
+                            color = color,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            }
         }
 
         // --- Error ---
