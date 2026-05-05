@@ -18,6 +18,7 @@ import com.gemmaworkflow.platform.inference.InferenceState
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.yield
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -86,31 +87,40 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
                 // Stage 1: Request analysis
                 markStage(0, StageStatus.Running)
                 _uiState.update { it.copy(stage = "Analysing request\u2026") }
+                yield()
                 val analysisRaw = agents.requestAnalysis(PromptBuilder.buildRequestAnalysisPrompt(prompt))
                 val triggerHint = extractTriggerHint(analysisRaw)
                 markStage(0, StageStatus.Done)
+                yield()
 
                 // Stage 2: Capability grounding (deterministic)
                 markStage(1, StageStatus.Running)
                 _uiState.update { it.copy(stage = "Grounding capabilities\u2026") }
+                yield()
                 markStage(1, StageStatus.Done)
+                yield()
 
                 // Stage 3: Action plan
                 markStage(2, StageStatus.Running)
                 _uiState.update { it.copy(stage = "Planning actions\u2026") }
+                yield()
                 val actionPlanRaw = agents.actionPlan(
                     PromptBuilder.buildActionPlanPrompt(prompt, triggerHint, capabilitySummary))
                 markStage(2, StageStatus.Done)
+                yield()
 
                 // Stage 4: Final JSON
                 markStage(3, StageStatus.Running)
                 _uiState.update { it.copy(stage = "Generating JSON\u2026") }
+                yield()
                 val jsonRaw = agents.workflowJson(
                     PromptBuilder.buildWorkflowJsonPrompt(prompt, actionPlanRaw, capabilitySummary))
                 markStage(3, StageStatus.Done)
+                yield()
 
                 // Parse + validate
                 _uiState.update { it.copy(stage = "Validating\u2026") }
+                yield()
                 val workflow = WorkflowJsonParser.parse(jsonRaw)
                 val errors = WorkflowValidator.validate(workflow)
 
