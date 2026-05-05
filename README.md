@@ -333,10 +333,12 @@ adb push local_models/gemma-4-E2B-it.litertlm \
 
 ---
 
-## 9. Key Differences from llama.cpp
+## 9. What Changed — llama.cpp REMOVED, LiteRT-LM added
 
-| Concern | llama.cpp (old) | LiteRT-LM (new) |
-|---------|----------------|-----------------|
+Everything in the left column has been **deleted** from the project. Zero C++, zero CMake, zero NDK remain.
+
+| Concern | llama.cpp (REMOVED) | LiteRT-LM (ACTIVE) |
+|---------|--------------------|--------------------|
 | Integration | JNI bridge + CMake + NDK | Pure Kotlin AAR from Google Maven |
 | Model format | `.gguf` | `.litertlm` |
 | GPU support | Vulkan (manual config) | OpenCL/Vulkan (auto-selected) |
