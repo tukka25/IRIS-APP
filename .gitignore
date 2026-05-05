@@ -1,5 +1,6 @@
 # Android / Gradle
 .gradle/
+.agents/
 build/
 **/build/
 local.properties
@@ -13,16 +14,23 @@ captures/
 *.ap_
 *.dex
 
-# Native model assets
+# Native model assets (LiteRT-LM)
 *.gguf
+*.litertlm
 *.safetensors
 *.bin
+local-models/
+local_models/
+models/
 app/src/main/assets/models/*
 !app/src/main/assets/models/.gitkeep
 
-# Local dependency checkouts
+# Local LiteRT-LM checkout (cloned for GPU libs and tools)
 llama.cpp/
 llama.cpp-*/
+LiteRT-LM/
+LiteRT-LM-*/
+third_party/
 
 # Secrets and local tool state
 .env
@@ -32,8 +40,8 @@ llama.cpp-*/
 *.p12
 *.pem
 skills-lock.json
+.kotlin/
 
 # IDE / OS
 .idea/
 .DS_Store
-
