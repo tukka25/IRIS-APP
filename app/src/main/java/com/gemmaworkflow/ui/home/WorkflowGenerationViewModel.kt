@@ -115,6 +115,8 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
                         )
                     )
                 }
+                // Yield to main thread so Compose can render
+                delay(16)
                 appendDebug("AI output: request analysis", analysisRaw)
                 val analysis = RequestAnalysisParser.parse(analysisRaw)
                 val triggerHint = analysis.normalizedTriggerHint
@@ -126,6 +128,7 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
                 appendDebug("Candidate categories", analysis.candidateAppCategories.joinToString().ifBlank { "none" })
                 appendDebug("Missing info", analysis.missingInfo.joinToString().ifBlank { "none" })
                 markStage(0, StageStatus.Done)
+                delay(16)
 
                 // Stage 2 (deterministic, no model call)
                 markStage(1, StageStatus.Running)
@@ -151,8 +154,10 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
                         )
                     )
                 }
+                delay(16)
                 appendDebug("AI output: action plan", actionPlanRaw)
                 markStage(2, StageStatus.Done)
+                delay(16)
 
                 // Stage 4
                 markStage(3, StageStatus.Running)
@@ -161,8 +166,10 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
                     agents.workflowJson(
                         PromptBuilder.buildWorkflowJsonPrompt(prompt, actionPlanRaw, capabilitySummary))
                 }
+                delay(16)
                 appendDebug("AI output: final workflow JSON", jsonRaw)
                 markStage(3, StageStatus.Done)
+                delay(16)
 
                 // Parse + validate
                 _uiState.update { it.copy(stage = "Validating...") }
