@@ -1,6 +1,8 @@
 package com.gemmaworkflow.domain.model
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
 
 /** The fully validated workflow produced by the planner pipeline. */
 @Serializable
@@ -17,7 +19,7 @@ data class PlannedWorkflow(
 @Serializable
 data class WorkflowStep(
     val id: String,                     // e.g. "browser.open_url"
-    val params: Map<String, String> = emptyMap(),
+    val params: JsonObject = buildJsonObject { },
     val requiresConfirmation: Boolean = false
 )
 

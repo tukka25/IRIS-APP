@@ -50,13 +50,13 @@ object InferenceManager {
 
                 val config = EngineConfig(
                     modelPath = modelFile.absolutePath,
-                    backend = Backend.GPU(),
+                    backend = Backend.CPU(),
                     cacheDir = context.cacheDir.absolutePath
                 )
 
                 engine = Engine(config).also { it.initialize() }
 
-                Log.i(TAG, "Model loaded successfully on GPU")
+                Log.i(TAG, "Model loaded successfully on CPU")
                 _state.value = InferenceState.Ready
             }
         }.onFailure { throwable ->

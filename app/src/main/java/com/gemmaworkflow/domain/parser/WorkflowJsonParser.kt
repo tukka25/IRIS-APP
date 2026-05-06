@@ -41,9 +41,7 @@ object WorkflowJsonParser {
             val id = obj["id"]?.jsonPrimitive?.content
                 ?: throw IllegalArgumentException("Missing action id")
 
-            val params = obj["params"]?.jsonObject?.mapValues {
-                it.value.jsonPrimitive.content
-            } ?: emptyMap()
+            val params = obj["params"]?.jsonObject ?: JsonObject(emptyMap())
 
             val requiresConfirmation = obj["requires_confirmation"]?.jsonPrimitive?.content?.toBooleanStrictOrNull() ?: false
 

@@ -251,6 +251,38 @@ private fun WorkflowGenerationScreen(viewModel: WorkflowGenerationViewModel) {
             }
         }
 
+        if (state.debugMessages.isNotEmpty()) {
+            HorizontalDivider()
+            Text("Debug Trace", style = MaterialTheme.typography.titleMedium)
+            SelectionContainer {
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        state.debugMessages.forEach { message ->
+                            Column {
+                                Text(
+                                    message.label,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    message.message,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         Spacer(modifier = Modifier.height(32.dp))
     }
 }

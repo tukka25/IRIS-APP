@@ -5,7 +5,7 @@ import com.gemmaworkflow.domain.model.PlannedWorkflow
 import com.gemmaworkflow.platform.inference.InferenceState
 
 data class WorkflowGenerationUiState(
-    val prompt: String = "When I arrive at the gym, play my focus playlist on Spotify and save a note with today's workout plan.",
+    val prompt: String = "send message to +971556778872 saying hi, and invite him to meeting on 6 oclock on next friday and then add it to my calender.",
     val inferenceState: InferenceState = InferenceState.Idle,
     val isModelReady: Boolean = false,
     val isBusy: Boolean = false,
@@ -17,7 +17,8 @@ data class WorkflowGenerationUiState(
     val rawJson: String? = null,
     val validationErrors: List<String> = emptyList(),
     val saved: Boolean = false,
-    val runResults: List<ExecutionResult> = emptyList()
+    val runResults: List<ExecutionResult> = emptyList(),
+    val debugMessages: List<DebugMessage> = emptyList()
 ) {
     val canGenerate: Boolean
         get() = isModelReady && !isBusy && prompt.isNotBlank()
@@ -32,4 +33,10 @@ enum class StageStatus { Pending, Running, Done }
 data class StageProgress(
     val label: String,
     val status: StageStatus = StageStatus.Pending
+)
+
+data class DebugMessage(
+    val label: String,
+    val message: String,
+    val timestampMillis: Long = System.currentTimeMillis()
 )

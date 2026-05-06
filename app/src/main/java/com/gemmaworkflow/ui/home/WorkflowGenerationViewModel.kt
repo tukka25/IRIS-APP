@@ -1,17 +1,18 @@
 package com.gemmaworkflow.ui.home
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.gemmaworkflow.domain.catalog.ActionCatalog
+import com.gemmaworkflow.domain.catalog.ActionSpecRegistry
 import com.gemmaworkflow.domain.model.PlannedWorkflow
 import com.gemmaworkflow.domain.parser.WorkflowJsonParser
 import com.gemmaworkflow.domain.planner.PlannerAgents
 import com.gemmaworkflow.domain.planner.PromptBuilder
-import com.gemmaworkflow.domain.runner.IntentDispatcher
-import com.gemmaworkflow.domain.runner.UrlDispatcher
+import com.gemmaworkflow.domain.planner.RequestAnalysisParser
 import com.gemmaworkflow.domain.runner.WorkflowRunner
 import com.gemmaworkflow.domain.safety.WorkflowValidator
+import com.gemmaworkflow.platform.capability.IntentDiscoveryEngine
 import com.gemmaworkflow.platform.capability.PackageCapabilityScanner
 import com.gemmaworkflow.platform.inference.InferenceManager
 import com.gemmaworkflow.platform.inference.InferenceState
@@ -41,10 +42,15 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
         "Final JSON"
     )
 
+    private companion object {
+        const val TAG = "WorkflowGeneration"
+    }
+
     init {
         viewModelScope.launch {
             InferenceManager.inferenceState.collect { state ->
                 _uiState.update { it.copy(inferenceState = state, isModelReady = state is InferenceState.Ready) }
+                appendDebug("Model", state.toString())
             }
         }
         viewModelScope.launch { InferenceManager.initialize(application) }
@@ -73,32 +79,63 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
             _uiState.update {
                 it.copy(isBusy = true, error = null, stage = "", workflowPreview = null,
                     rawJson = null, validationErrors = emptyList(), stageTimeline = timeline,
-                    elapsedSeconds = 0)
+                    elapsedSeconds = 0, debugMessages = emptyList())
             }
+            appendDebug("User request", prompt)
 
             val agents = PlannerAgents(engine)
-            val resolvableIds = capabilityScanner.resolvableActions(ActionCatalog.allIds)
-            val availableActions = ActionCatalog.all.filter { it.id in resolvableIds }
-            val capabilitySummary = buildString {
-                appendLine("Available actions (ONLY pick from this list):")
-                for (a in availableActions) {
-                    appendLine("- ${a.id}: ${a.description}")
-                }
+            val installedAppsSummary = capabilityScanner.installedAppsPromptSummary()
+            val resolvableIds = capabilityScanner.resolvableActions(ActionSpecRegistry.allIds)
+            val availableActions = ActionSpecRegistry.all.filter { it.id in resolvableIds }
+            val capabilitySummary = ActionSpecRegistry.toPromptSummary(availableActions)
+
+            // Load curated intent catalog + runtime discovery
+            val intentCatalog = IntentDiscoveryEngine.loadCatalog(getApplication())
+            val intentSummary = IntentDiscoveryEngine.buildSlmPromptSummary(getApplication())
+            val combinedCapabilities = buildString {
+                appendLine(intentSummary)
+                appendLine()
+                appendLine("=== High-level Actions (ONLY pick from these IDs) ===")
+                append(capabilitySummary)
             }
+
+            appendDebug("Available tools", availableActions.joinToString { it.id })
+            appendDebug("Installed app list sent to AI", installedAppsSummary)
+            appendDebug("Intent catalog", "${intentCatalog.apps.size} apps, ${intentCatalog.standardIntents.size} standard intents loaded")
 
             try {
                 // Stage 1
                 markStage(0, StageStatus.Running)
                 _uiState.update { it.copy(stage = "Analysing request...") }
                 val analysisRaw = withContext(Dispatchers.Default) {
-                    agents.requestAnalysis(PromptBuilder.buildRequestAnalysisPrompt(prompt))
+                    agents.requestAnalysis(
+                        PromptBuilder.buildRequestAnalysisPrompt(
+                            userRequest = prompt,
+                            installedApps = installedAppsSummary
+                        )
+                    )
                 }
-                val triggerHint = extractTriggerHint(analysisRaw)
+                appendDebug("AI output: request analysis", analysisRaw)
+                val analysis = RequestAnalysisParser.parse(analysisRaw)
+                val triggerHint = analysis.normalizedTriggerHint
+                appendDebug("Parsed analysis goal", analysis.goal)
+                appendDebug("Trigger hint", triggerHint)
+                appendDebug("Applications from request", analysis.applications.joinToString {
+                    "${it.requestedName} -> ${it.selectedAppLabel} (${it.packageName}, ${it.confidence})"
+                }.ifBlank { "none" })
+                appendDebug("Candidate categories", analysis.candidateAppCategories.joinToString().ifBlank { "none" })
+                appendDebug("Missing info", analysis.missingInfo.joinToString().ifBlank { "none" })
                 markStage(0, StageStatus.Done)
 
                 // Stage 2 (deterministic, no model call)
                 markStage(1, StageStatus.Running)
                 _uiState.update { it.copy(stage = "Grounding capabilities...") }
+                val nativeDiscovery = capabilityScanner.nativeDiscoverySummary(
+                    requestedApplications = analysis.applicationSearchTerms,
+                    availableActionIds = resolvableIds
+                )
+                appendDebug("Native discovery", nativeDiscovery)
+                appendDebug("Full capabilities sent to AI", combinedCapabilities.take(200) + "...")
                 markStage(1, StageStatus.Done)
 
                 // Stage 3
@@ -106,8 +143,15 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
                 _uiState.update { it.copy(stage = "Planning actions...") }
                 val actionPlanRaw = withContext(Dispatchers.Default) {
                     agents.actionPlan(
-                        PromptBuilder.buildActionPlanPrompt(prompt, triggerHint, capabilitySummary))
+                        PromptBuilder.buildActionPlanPrompt(
+                            goal = prompt,
+                            triggerHint = triggerHint,
+                            availableActions = combinedCapabilities,
+                            nativeDiscovery = nativeDiscovery
+                        )
+                    )
                 }
+                appendDebug("AI output: action plan", actionPlanRaw)
                 markStage(2, StageStatus.Done)
 
                 // Stage 4
@@ -117,12 +161,19 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
                     agents.workflowJson(
                         PromptBuilder.buildWorkflowJsonPrompt(prompt, actionPlanRaw, capabilitySummary))
                 }
+                appendDebug("AI output: final workflow JSON", jsonRaw)
                 markStage(3, StageStatus.Done)
 
                 // Parse + validate
                 _uiState.update { it.copy(stage = "Validating...") }
                 val workflow = WorkflowJsonParser.parse(jsonRaw)
-                val errors = WorkflowValidator.validate(workflow)
+                val errors = WorkflowValidator.validate(workflow, resolvableIds)
+                appendDebug("Parsed workflow", "${workflow.name} with ${workflow.actions.size} actions")
+                if (errors.isEmpty()) {
+                    appendDebug("Validation", "Valid workflow")
+                } else {
+                    appendDebug("Validation errors", errors.joinToString(separator = "\n"))
+                }
 
                 timerJob?.cancel()
                 val elapsed = (System.currentTimeMillis() - startTime) / 1000
@@ -138,6 +189,8 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
                 }
             } catch (e: Exception) {
                 timerJob?.cancel()
+                Log.e(TAG, "Generation failed", e)
+                appendDebug("Generation error", e.stackTraceToString())
                 _uiState.update { it.copy(isBusy = false, error = e.message, stage = "Failed") }
             }
         }
@@ -162,13 +215,10 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
         }
     }
 
-    private fun extractTriggerHint(json: String): String {
-        return Regex("\"trigger_hint\"\\s*:\\s*\"(\\w+)\"").find(json)?.groupValues?.getOrNull(1) ?: "manual"
-    }
-
     fun saveWorkflow() {
         val workflow = uiState.value.workflowPreview ?: return
         savedWorkflows[workflow.name] = workflow
+        appendDebug("Save workflow", "Saved '${workflow.name}' in memory")
         _uiState.update { it.copy(saved = true) }
     }
 
@@ -176,16 +226,25 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
         viewModelScope.launch(Dispatchers.Default) {
             val workflow = uiState.value.workflowPreview ?: return@launch
             _uiState.update { it.copy(isBusy = true, runResults = emptyList()) }
-            val runner = WorkflowRunner(
-                context = getApplication(),
-                intentDispatcher = IntentDispatcher(getApplication()),
-                urlDispatcher = UrlDispatcher(getApplication())
-            )
-            val results = runner.run(workflow)
+            val runner = WorkflowRunner(context = getApplication())
+            appendDebug("Runner", "Running '${workflow.name}' with ${workflow.actions.size} actions")
+            val results = runner.run(workflow) { label, message ->
+                appendDebug(label, message)
+            }
             _uiState.update {
                 it.copy(isBusy = false, saved = true, runResults = results,
                     stage = if (results.all { r -> r.success }) "All steps completed" else "Some steps failed")
             }
+        }
+    }
+
+    private fun appendDebug(label: String, message: String) {
+        Log.d(TAG, "$label: $message")
+        _uiState.update { state ->
+            state.copy(
+                debugMessages = (state.debugMessages + DebugMessage(label = label, message = message))
+                    .takeLast(80)
+            )
         }
     }
 

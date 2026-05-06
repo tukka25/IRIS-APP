@@ -2,7 +2,8 @@ package com.gemmaworkflow.domain.planner
 
 import android.util.Log
 import com.google.ai.edge.litertlm.Engine
-import com.gemmaworkflow.domain.catalog.ActionCatalog
+import com.gemmaworkflow.domain.catalog.ActionSpec
+import com.gemmaworkflow.domain.catalog.ActionSpecRegistry
 import com.gemmaworkflow.domain.model.PlannedWorkflow
 import com.gemmaworkflow.domain.parser.WorkflowJsonParser
 import com.gemmaworkflow.domain.safety.WorkflowValidator
@@ -33,25 +34,35 @@ class PlannerService(
 
         // Stage 1: Request analysis
         Log.d(TAG, "Stage 1: Request analysis")
-        val analysisPrompt = PromptBuilder.buildRequestAnalysisPrompt(userRequest)
+        val installedAppsSummary = capabilityScanner.installedAppsPromptSummary()
+        val analysisPrompt = PromptBuilder.buildRequestAnalysisPrompt(
+            userRequest = userRequest,
+            installedApps = installedAppsSummary
+        )
         val analysisRaw = agents.requestAnalysis(analysisPrompt)
 
         // Extract the trigger hint from analysis
-        val triggerHint = extractTriggerHint(analysisRaw)
+        val analysis = RequestAnalysisParser.parse(analysisRaw)
+        val triggerHint = analysis.normalizedTriggerHint
 
         // Stage 2: Capability grounding (deterministic Kotlin, no model call)
         Log.d(TAG, "Stage 2: Capability grounding")
-        val resolvableIds = capabilityScanner.resolvableActions(ActionCatalog.allIds)
-        val availableActions = ActionCatalog.all
+        val resolvableIds = capabilityScanner.resolvableActions(ActionSpecRegistry.allIds)
+        val availableActions = ActionSpecRegistry.all
             .filter { it.id in resolvableIds }
             .let { buildCapabilityPrompt(it) }
+        val nativeDiscovery = capabilityScanner.nativeDiscoverySummary(
+            requestedApplications = analysis.applicationSearchTerms,
+            availableActionIds = resolvableIds
+        )
 
         // Stage 3: Action plan
         Log.d(TAG, "Stage 3: Action plan")
         val actionPlanPrompt = PromptBuilder.buildActionPlanPrompt(
             goal = userRequest,
             triggerHint = triggerHint,
-            availableActions = availableActions
+            availableActions = availableActions,
+            nativeDiscovery = nativeDiscovery
         )
         val actionPlanRaw = agents.actionPlan(actionPlanPrompt)
 
@@ -67,7 +78,7 @@ class PlannerService(
         // Parse and validate
         Log.d(TAG, "Parsing and validating")
         val workflow = WorkflowJsonParser.parse(jsonRaw)
-        val errors = WorkflowValidator.validate(workflow)
+        val errors = WorkflowValidator.validate(workflow, resolvableIds)
 
         if (errors.isNotEmpty()) {
             Log.w(TAG, "Validation errors: $errors")
@@ -81,22 +92,8 @@ class PlannerService(
         }
     }
 
-    private fun extractTriggerHint(analysisJson: String): String {
-        // Simple extraction: find "trigger_hint" value
-        val match = Regex("\"trigger_hint\"\\s*:\\s*\"(\\w+)\"").find(analysisJson)
-        return match?.groupValues?.getOrNull(1) ?: "manual"
-    }
-
-    private fun buildCapabilityPrompt(actions: List<com.gemmaworkflow.domain.catalog.CatalogAction>): String {
-        return buildString {
-            appendLine("Available actions (ONLY pick from this list):")
-            for (action in actions) {
-                appendLine("- ${action.id}: ${action.description}")
-                if (action.paramSchema.isNotEmpty()) {
-                    appendLine("  Params: ${action.paramSchema.entries.joinToString { (k, v) -> "$k (${v.type}${if (v.required) " required" else ""})" }}")
-                }
-            }
-        }
+    private fun buildCapabilityPrompt(actions: List<ActionSpec>): String {
+        return ActionSpecRegistry.toPromptSummary(actions)
     }
 }
 

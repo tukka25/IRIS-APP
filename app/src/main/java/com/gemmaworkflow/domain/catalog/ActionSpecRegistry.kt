@@ -1,0 +1,290 @@
+package com.gemmaworkflow.domain.catalog
+
+import android.content.Intent
+import android.provider.AlarmClock
+import android.provider.CalendarContract
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+
+/**
+ * Declarative source of truth for every action the model is allowed to pick.
+ *
+ * Android intent constants, extra keys, URI templates, and flags stay here. The
+ * model only receives the prompt-safe summaries produced by this registry.
+ */
+data class ActionSpec(
+    val id: String,
+    val label: String,
+    val description: String,
+    val params: List<ParamSpec>,
+    val execution: ExecutionSpec,
+    val availability: AvailabilitySpec = AvailabilitySpec.IntentResolvable,
+    val triggerCompatible: Set<String>,
+    val requiresConfirmation: Boolean = false,
+    val fallbackActionIds: List<String> = emptyList(),
+    val examples: List<JsonObject> = emptyList()
+)
+
+data class ParamSpec(
+    val name: String,
+    val type: ParamType,
+    val required: Boolean = true,
+    val description: String = "",
+    val enumValues: List<String> = emptyList()
+)
+
+enum class ParamType(val promptName: String) {
+    String("string"),
+    Url("url"),
+    Uri("uri"),
+    Int("int"),
+    Long("long"),
+    Boolean("boolean"),
+    StringArray("string_array"),
+    DateTimeMillis("datetime_millis"),
+    Enum("enum")
+}
+
+sealed interface ExecutionSpec {
+    data class AndroidIntent(
+        val action: String,
+        val dataTemplate: String? = null,
+        val mimeType: String? = null,
+        val extras: List<ExtraSpec> = emptyList(),
+        val flags: List<IntentFlag> = listOf(IntentFlag.NewTask),
+        val packagePolicy: PackagePolicy = PackagePolicy.None,
+        val chooserTitle: String? = null
+    ) : ExecutionSpec
+}
+
+data class ExtraSpec(
+    val paramName: String,
+    val extraKey: String,
+    val type: ParamType
+)
+
+enum class IntentFlag {
+    NewTask,
+    GrantReadUriPermission
+}
+
+sealed interface PackagePolicy {
+    data object None : PackagePolicy
+    data class Exact(val packageName: String) : PackagePolicy
+}
+
+sealed interface AvailabilitySpec {
+    data object IntentResolvable : AvailabilitySpec
+    data object Always : AvailabilitySpec
+    data class RequiredPackage(val packageName: String) : AvailabilitySpec
+}
+
+object ActionSpecRegistry {
+
+    val all: List<ActionSpec> = listOf(
+        ActionSpec(
+            id = "browser.open_url",
+            label = "Open URL",
+            description = "Open a web URL in an installed browser.",
+            params = listOf(
+                ParamSpec("url", ParamType.Url, description = "Full http or https URL to open")
+            ),
+            execution = ExecutionSpec.AndroidIntent(
+                action = Intent.ACTION_VIEW,
+                dataTemplate = "{url}"
+            ),
+            triggerCompatible = setOf("manual", "time", "nfc"),
+            examples = listOf(
+                buildJsonObject {
+                    put("id", "browser.open_url")
+                    put("params", buildJsonObject { put("url", "https://example.com") })
+                }
+            )
+        ),
+        ActionSpec(
+            id = "maps.open_place",
+            label = "Open place",
+            description = "Open a place, address, or search query in a maps app.",
+            params = listOf(
+                ParamSpec("query", ParamType.String, description = "Place name, address, or search query")
+            ),
+            execution = ExecutionSpec.AndroidIntent(
+                action = Intent.ACTION_VIEW,
+                dataTemplate = "geo:0,0?q={query}"
+            ),
+            triggerCompatible = setOf("manual", "nfc"),
+            fallbackActionIds = listOf("browser.open_url"),
+            examples = listOf(
+                buildJsonObject {
+                    put("id", "maps.open_place")
+                    put("params", buildJsonObject { put("query", "coffee shop near me") })
+                }
+            )
+        ),
+        ActionSpec(
+            id = "share.share_text",
+            label = "Share text",
+            description = "Open the Android share sheet with text so the user can choose a target app.",
+            params = listOf(
+                ParamSpec("text", ParamType.String, description = "Text content to share")
+            ),
+            execution = ExecutionSpec.AndroidIntent(
+                action = Intent.ACTION_SEND,
+                mimeType = "text/plain",
+                extras = listOf(ExtraSpec("text", Intent.EXTRA_TEXT, ParamType.String)),
+                chooserTitle = "Share via"
+            ),
+            triggerCompatible = setOf("manual", "time", "share_sheet", "nfc"),
+            requiresConfirmation = true,
+            examples = listOf(
+                buildJsonObject {
+                    put("id", "share.share_text")
+                    put("params", buildJsonObject { put("text", "Meeting notes: ...") })
+                }
+            )
+        ),
+        ActionSpec(
+            id = "share.share_image",
+            label = "Share image",
+            description = "Open the Android share sheet with an image content URI.",
+            params = listOf(
+                ParamSpec("uri", ParamType.Uri, description = "Content URI of the image")
+            ),
+            execution = ExecutionSpec.AndroidIntent(
+                action = Intent.ACTION_SEND,
+                mimeType = "image/*",
+                extras = listOf(ExtraSpec("uri", Intent.EXTRA_STREAM, ParamType.Uri)),
+                flags = listOf(IntentFlag.NewTask, IntentFlag.GrantReadUriPermission),
+                chooserTitle = "Share image via"
+            ),
+            triggerCompatible = setOf("manual", "share_sheet"),
+            requiresConfirmation = true,
+            fallbackActionIds = listOf("share.share_text"),
+            examples = listOf(
+                buildJsonObject {
+                    put("id", "share.share_image")
+                    put("params", buildJsonObject { put("uri", "content://media/external/images/media/1") })
+                }
+            )
+        ),
+        ActionSpec(
+            id = "sms.compose",
+            label = "Compose SMS",
+            description = "Open the SMS app with an optional recipient and a prefilled message.",
+            params = listOf(
+                ParamSpec("phone", ParamType.String, required = false, description = "Optional phone number"),
+                ParamSpec("message", ParamType.String, description = "Message body")
+            ),
+            execution = ExecutionSpec.AndroidIntent(
+                action = Intent.ACTION_SENDTO,
+                dataTemplate = "smsto:{phone}",
+                extras = listOf(ExtraSpec("message", "sms_body", ParamType.String))
+            ),
+            triggerCompatible = setOf("manual", "time", "nfc"),
+            requiresConfirmation = true,
+            fallbackActionIds = listOf("share.share_text"),
+            examples = listOf(
+                buildJsonObject {
+                    put("id", "sms.compose")
+                    put("params", buildJsonObject {
+                        put("phone", "+15551234567")
+                        put("message", "I am on my way.")
+                    })
+                }
+            )
+        ),
+        ActionSpec(
+            id = "alarm.set_alarm",
+            label = "Set alarm",
+            description = "Open the alarm app to create or confirm an alarm.",
+            params = listOf(
+                ParamSpec("hour", ParamType.Int, description = "Hour in 24-hour time, 0-23"),
+                ParamSpec("minutes", ParamType.Int, description = "Minutes, 0-59"),
+                ParamSpec("message", ParamType.String, required = false, description = "Optional alarm label")
+            ),
+            execution = ExecutionSpec.AndroidIntent(
+                action = AlarmClock.ACTION_SET_ALARM,
+                extras = listOf(
+                    ExtraSpec("hour", AlarmClock.EXTRA_HOUR, ParamType.Int),
+                    ExtraSpec("minutes", AlarmClock.EXTRA_MINUTES, ParamType.Int),
+                    ExtraSpec("message", AlarmClock.EXTRA_MESSAGE, ParamType.String)
+                )
+            ),
+            triggerCompatible = setOf("manual", "time", "nfc"),
+            requiresConfirmation = true,
+            examples = listOf(
+                buildJsonObject {
+                    put("id", "alarm.set_alarm")
+                    put("params", buildJsonObject {
+                        put("hour", 7)
+                        put("minutes", 30)
+                        put("message", "Morning workout")
+                    })
+                }
+            )
+        ),
+        ActionSpec(
+            id = "calendar.create_event",
+            label = "Create calendar event",
+            description = "Open the calendar app to create an event with prefilled details.",
+            params = listOf(
+                ParamSpec("title", ParamType.String, description = "Event title"),
+                ParamSpec("begin_time_millis", ParamType.DateTimeMillis, description = "Start time in epoch milliseconds"),
+                ParamSpec("end_time_millis", ParamType.DateTimeMillis, required = false, description = "End time in epoch milliseconds"),
+                ParamSpec("location", ParamType.String, required = false, description = "Event location"),
+                ParamSpec("description", ParamType.String, required = false, description = "Event notes")
+            ),
+            execution = ExecutionSpec.AndroidIntent(
+                action = Intent.ACTION_INSERT,
+                dataTemplate = CalendarContract.Events.CONTENT_URI.toString(),
+                mimeType = "vnd.android.cursor.item/event",
+                extras = listOf(
+                    ExtraSpec("title", CalendarContract.Events.TITLE, ParamType.String),
+                    ExtraSpec("begin_time_millis", CalendarContract.EXTRA_EVENT_BEGIN_TIME, ParamType.DateTimeMillis),
+                    ExtraSpec("end_time_millis", CalendarContract.EXTRA_EVENT_END_TIME, ParamType.DateTimeMillis),
+                    ExtraSpec("location", CalendarContract.Events.EVENT_LOCATION, ParamType.String),
+                    ExtraSpec("description", CalendarContract.Events.DESCRIPTION, ParamType.String)
+                )
+            ),
+            triggerCompatible = setOf("manual", "time", "nfc"),
+            requiresConfirmation = true,
+            fallbackActionIds = listOf("share.share_text"),
+            examples = listOf(
+                buildJsonObject {
+                    put("id", "calendar.create_event")
+                    put("params", buildJsonObject {
+                        put("title", "Gym session")
+                        put("begin_time_millis", 1770000000000L)
+                        put("end_time_millis", 1770003600000L)
+                        put("location", "Local gym")
+                    })
+                }
+            )
+        )
+    )
+
+    val allIds: Set<String> = all.map { it.id }.toSet()
+
+    fun find(id: String): ActionSpec? = all.find { it.id == id }
+
+    fun toPromptSummary(actions: List<ActionSpec> = all): String = buildString {
+        appendLine("Available actions (ONLY pick from this list):")
+        for (action in actions) {
+            appendLine("- ${action.id}: ${action.description}")
+            appendLine("  Params: ${action.params.joinToString { it.toPromptString() }}")
+            appendLine("  Triggers: ${action.triggerCompatible.joinToString()}")
+            if (action.requiresConfirmation) {
+                appendLine("  Requires confirmation: true")
+            }
+            action.examples.firstOrNull()?.let { appendLine("  Example: $it") }
+        }
+    }
+
+    private fun ParamSpec.toPromptString(): String {
+        val requiredLabel = if (required) "required" else "optional"
+        val enumLabel = if (enumValues.isNotEmpty()) " one of ${enumValues.joinToString(prefix = "[", postfix = "]")}" else ""
+        return "$name (${type.promptName}, $requiredLabel$enumLabel)"
+    }
+}

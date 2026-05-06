@@ -1,8 +1,19 @@
 package com.gemmaworkflow.domain.safety
 
-import com.gemmaworkflow.domain.catalog.ActionCatalog
+import com.gemmaworkflow.domain.catalog.ActionSpecRegistry
+import com.gemmaworkflow.domain.catalog.ParamSpec
+import com.gemmaworkflow.domain.catalog.ParamType
 import com.gemmaworkflow.domain.model.PlannedWorkflow
+import com.gemmaworkflow.domain.model.TriggerConfig
 import com.gemmaworkflow.domain.model.WorkflowStep
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
 
 /**
  * Validates a parsed workflow against the action allowlist.
@@ -10,15 +21,19 @@ import com.gemmaworkflow.domain.model.WorkflowStep
  */
 object WorkflowValidator {
 
-    /** Allowed URL schemes. */
-    private val allowedSchemes = setOf("https", "http", "geo", "spotify")
+    private val allowedUrlSchemes = setOf("https", "http")
+    private val allowedUriSchemes = setOf("content", "file", "geo", "smsto")
 
     /**
      * Validate a workflow. Returns a list of error messages.
      * An empty list means the workflow is valid and safe to run.
      */
-    fun validate(workflow: PlannedWorkflow): List<String> {
+    fun validate(
+        workflow: PlannedWorkflow,
+        availableActionIds: Set<String> = ActionSpecRegistry.allIds
+    ): List<String> {
         val errors = mutableListOf<String>()
+        val triggerType = workflow.trigger.typeId()
 
         if (workflow.name.isBlank()) {
             errors.add("Workflow name is empty")
@@ -29,34 +44,39 @@ object WorkflowValidator {
             val prefix = "Action $index (${step.id})"
 
             // Check action exists in catalog
-            val catalogAction = ActionCatalog.find(step.id)
-            if (catalogAction == null) {
+            val actionSpec = ActionSpecRegistry.find(step.id)
+            if (actionSpec == null) {
                 errors.add("$prefix: unknown action id — not in allowlist")
                 continue
             }
 
-            // Check required params
-            for ((paramName, paramInfo) in catalogAction.paramSchema) {
-                if (paramInfo.required && step.params[paramName].isNullOrBlank()) {
-                    errors.add("$prefix: missing required param '$paramName'")
-                }
+            if (step.id !in availableActionIds) {
+                errors.add("$prefix: action is not available on this device")
             }
 
-            // Validate URL params
-            if (step.id == "browser.open_url" || step.id == "maps.open_place") {
-                step.params["url"]?.let { url ->
-                    val scheme = url.substringBefore("://")
-                    if (scheme !in allowedSchemes && !url.startsWith("geo:")) {
-                        errors.add("$prefix: unsupported URL scheme '$scheme'")
-                    }
+            if (triggerType !in actionSpec.triggerCompatible) {
+                errors.add("$prefix: action is not compatible with trigger '$triggerType'")
+            }
+
+            // Check required params
+            for (param in actionSpec.params) {
+                val value = step.params[param.name]
+                if (param.required && (value == null || value is JsonNull)) {
+                    errors.add("$prefix: missing required param '${param.name}'")
+                } else if (value != null && value !is JsonNull) {
+                    validateParam(prefix, param, value)?.let(errors::add)
                 }
             }
 
             // Check for params not in the catalog (model hallucination)
             for (paramName in step.params.keys) {
-                if (paramName !in catalogAction.paramSchema) {
+                if (actionSpec.params.none { it.name == paramName }) {
                     errors.add("$prefix: unknown param '$paramName' (not in catalog)")
                 }
+            }
+
+            if (actionSpec.requiresConfirmation && !step.requiresConfirmation) {
+                errors.add("$prefix: requires_confirmation must be true")
             }
         }
 
@@ -68,7 +88,53 @@ object WorkflowValidator {
      */
     fun confirmationActions(steps: List<WorkflowStep>): Set<String> {
         return steps.filter { step ->
-            ActionCatalog.find(step.id)?.needsConfirmation == true
+            ActionSpecRegistry.find(step.id)?.requiresConfirmation == true
         }.map { it.id }.toSet()
+    }
+
+    private fun validateParam(prefix: String, param: ParamSpec, value: JsonElement): String? {
+        val primitive = runCatching { value.jsonPrimitive }.getOrNull()
+        return when (param.type) {
+            ParamType.String -> if (primitive?.contentOrNull != null) null else "$prefix: param '${param.name}' must be a string"
+            ParamType.Url -> validateStringScheme(prefix, param.name, primitive?.contentOrNull, allowedUrlSchemes)
+            ParamType.Uri -> validateStringScheme(prefix, param.name, primitive?.contentOrNull, allowedUriSchemes)
+            ParamType.Int -> if (primitive?.intOrNull != null) null else "$prefix: param '${param.name}' must be an int"
+            ParamType.Long,
+            ParamType.DateTimeMillis -> if (primitive?.longOrNull != null) null else "$prefix: param '${param.name}' must be a long"
+            ParamType.Boolean -> if (primitive?.booleanOrNull != null) null else "$prefix: param '${param.name}' must be a boolean"
+            ParamType.StringArray -> {
+                val array = value as? JsonArray
+                if (array != null && array.all { runCatching { it.jsonPrimitive.content }.isSuccess }) {
+                    null
+                } else {
+                    "$prefix: param '${param.name}' must be an array of strings"
+                }
+            }
+            ParamType.Enum -> {
+                val content = primitive?.contentOrNull
+                if (content != null && content in param.enumValues) null else {
+                    "$prefix: param '${param.name}' must be one of ${param.enumValues.joinToString()}"
+                }
+            }
+        }
+    }
+
+    private fun validateStringScheme(
+        prefix: String,
+        paramName: String,
+        value: String?,
+        allowedSchemes: Set<String>
+    ): String? {
+        if (value.isNullOrBlank()) return "$prefix: param '$paramName' must be a non-empty string"
+        val scheme = value.substringBefore(":", missingDelimiterValue = "")
+        return if (scheme in allowedSchemes) null else "$prefix: unsupported scheme '$scheme' for param '$paramName'"
+    }
+
+    private fun TriggerConfig.typeId(): String = when (this) {
+        TriggerConfig.Manual -> "manual"
+        is TriggerConfig.Time -> "time"
+        is TriggerConfig.Nfc -> "nfc"
+        is TriggerConfig.ShareSheet -> "share_sheet"
+        is TriggerConfig.TaskerRequired -> "tasker_setup_required"
     }
 }
