@@ -1,6 +1,6 @@
 {
-  "version": 1,
-  "description": "Curated Android intent catalog with known actions, data URIs, and extras for popular apps. Feed this to the SLM so it can select specific intents.",
+  "version": 2,
+  "description": "Curated Android intent catalog — 18 apps + standard intents. Extras, URI templates, and examples documented from official sources and community research. Feed to the SLM so it can select specific intents with correct parameters.",
   "apps": [
     {
       "package": "com.spotify.music",
@@ -10,23 +10,12 @@
         {
           "id": "spotify.search_and_play",
           "action": "android.media.action.MEDIA_PLAY_FROM_SEARCH",
-          "description": "Search Spotify and start playing the top result. Use when user wants to play a specific song, artist, album, or playlist by name.",
+          "description": "Search Spotify and start playing the top result.",
           "params": [
-            { "name": "query", "key": "android.intent.extra.QUERY", "type": "string", "required": true, "description": "Search query — song name, artist, album, or playlist" },
-            { "name": "media_focus", "key": "android.media.extra.MEDIA_FOCUS", "type": "enum", "required": false, "values": ["vnd.android.cursor.item/playlist", "vnd.android.cursor.item/artist", "vnd.android.cursor.item/album", "vnd.android.cursor.item/audio"], "description": "What to search for. Use 'vnd.android.cursor.item/playlist' when requesting a playlist." }
+            { "name": "query", "key": "android.intent.extra.QUERY", "type": "string", "required": true },
+            { "name": "media_focus", "key": "android.media.extra.MEDIA_FOCUS", "type": "enum", "required": false, "values": ["vnd.android.cursor.item/playlist", "vnd.android.cursor.item/artist", "vnd.android.cursor.item/album", "vnd.android.cursor.item/audio"] }
           ],
-          "example": { "query": "focus playlist", "media_focus": "vnd.android.cursor.item/playlist" },
-          "uri_scheme_fallback": "spotify:search:{query}"
-        },
-        {
-          "id": "spotify.open_playlist",
-          "action": "android.intent.action.VIEW",
-          "description": "Open a specific Spotify playlist, album, or artist by URI.",
-          "params": [
-            { "name": "uri", "key": null, "type": "uri", "required": true, "description": "Spotify URI like spotify:playlist:37i9dQZF1DXcBWIGoYBM5M" }
-          ],
-          "uri_template": "spotify:{type}:{id}",
-          "example": { "uri": "spotify:playlist:37i9dQZF1DXcBWIGoYBM5M" }
+          "example": { "query": "focus playlist", "media_focus": "vnd.android.cursor.item/playlist" }
         }
       ]
     },
@@ -38,13 +27,116 @@
         {
           "id": "whatsapp.send_text",
           "action": "android.intent.action.VIEW",
-          "description": "Open a WhatsApp chat and pre-fill a message to a specific phone number. Use when user wants to send a WhatsApp message.",
+          "description": "Open WhatsApp and pre-fill a message to a phone number.",
           "params": [
-            { "name": "phone", "key": null, "type": "string", "required": true, "description": "Phone number in international format without +, e.g. 971556778872" },
-            { "name": "text", "key": null, "type": "string", "required": false, "description": "Message text to pre-fill" }
+            { "name": "phone", "key": null, "type": "string", "required": true },
+            { "name": "text", "key": null, "type": "string", "required": false }
           ],
           "uri_template": "https://wa.me/{phone}?text={text}",
           "example": { "phone": "971556778872", "text": "Hi, just checking in!" }
+        }
+      ]
+    },
+    {
+      "package": "org.telegram.messenger",
+      "label": "Telegram",
+      "triggers": ["telegram", "message", "send", "chat", "channel"],
+      "intents": [
+        {
+          "id": "telegram.open_profile",
+          "action": "android.intent.action.VIEW",
+          "description": "Open a Telegram user, channel, or bot profile.",
+          "params": [
+            { "name": "username", "key": null, "type": "string", "required": true }
+          ],
+          "uri_template": "tg://resolve?domain={username}",
+          "web_fallback": "https://t.me/{username}",
+          "example": { "username": "durov" }
+        },
+        {
+          "id": "telegram.send_message",
+          "action": "android.intent.action.SEND",
+          "description": "Share text to Telegram. Opens the contact picker, then pre-fills the message.",
+          "params": [
+            { "name": "text", "key": "android.intent.extra.TEXT", "type": "string", "required": true }
+          ],
+          "mime_type": "text/plain",
+          "example": { "text": "Check this out!" }
+        },
+        {
+          "id": "telegram.compose_message",
+          "action": "android.intent.action.VIEW",
+          "description": "Open Telegram compose screen with a pre-filled message.",
+          "params": [
+            { "name": "text", "key": null, "type": "string", "required": true }
+          ],
+          "uri_template": "tg://msg?text={text}",
+          "example": { "text": "Hello from GemmaWorkflow" }
+        },
+        {
+          "id": "telegram.share_url",
+          "action": "android.intent.action.VIEW",
+          "description": "Share a URL to Telegram for forwarding.",
+          "params": [
+            { "name": "url", "key": null, "type": "url", "required": true },
+            { "name": "text", "key": null, "type": "string", "required": false }
+          ],
+          "uri_template": "tg://msg_url?url={url}&text={text}",
+          "example": { "url": "https://example.com", "text": "Thought you'd like this" }
+        }
+      ]
+    },
+    {
+      "package": "com.instagram.android",
+      "label": "Instagram",
+      "triggers": ["instagram", "reel", "story", "profile", "photo", "post"],
+      "intents": [
+        {
+          "id": "instagram.open_profile",
+          "action": "android.intent.action.VIEW",
+          "description": "Open an Instagram user profile.",
+          "params": [
+            { "name": "username", "key": null, "type": "string", "required": true }
+          ],
+          "uri_template": "https://instagram.com/_u/{username}",
+          "example": { "username": "instagram" }
+        },
+        {
+          "id": "instagram.open_camera",
+          "action": "android.intent.action.VIEW",
+          "description": "Open the Instagram camera / post creation screen.",
+          "params": [],
+          "uri_template": "instagram://share",
+          "example": {}
+        }
+      ]
+    },
+    {
+      "package": "com.twitter.android",
+      "label": "X / Twitter",
+      "triggers": ["tweet", "twitter", "x", "post", "share"],
+      "intents": [
+        {
+          "id": "twitter.compose_tweet",
+          "action": "android.intent.action.VIEW",
+          "description": "Open X/Twitter compose screen with pre-filled text.",
+          "params": [
+            { "name": "text", "key": null, "type": "string", "required": true },
+            { "name": "url", "key": null, "type": "url", "required": false },
+            { "name": "via", "key": null, "type": "string", "required": false }
+          ],
+          "uri_template": "https://twitter.com/intent/tweet?text={text}&url={url}&via={via}",
+          "example": { "text": "Check out this app!", "url": "https://example.com" }
+        },
+        {
+          "id": "twitter.open_profile",
+          "action": "android.intent.action.VIEW",
+          "description": "Open an X/Twitter user profile.",
+          "params": [
+            { "name": "username", "key": null, "type": "string", "required": true }
+          ],
+          "uri_template": "https://twitter.com/{username}",
+          "example": { "username": "elonmusk" }
         }
       ]
     },
@@ -58,7 +150,7 @@
           "action": "android.intent.action.VIEW",
           "description": "Search for a place or address in Google Maps.",
           "params": [
-            { "name": "query", "key": null, "type": "string", "required": true, "description": "Place name, address, or category to search" }
+            { "name": "query", "key": null, "type": "string", "required": true }
           ],
           "uri_template": "geo:0,0?q={query}",
           "example": { "query": "coffee shop near me" }
@@ -68,7 +160,7 @@
           "action": "android.intent.action.VIEW",
           "description": "Start turn-by-turn navigation to a destination.",
           "params": [
-            { "name": "destination", "key": null, "type": "string", "required": true, "description": "Destination address or place name" }
+            { "name": "destination", "key": null, "type": "string", "required": true }
           ],
           "uri_template": "google.navigation:q={destination}",
           "example": { "destination": "Dubai Mall" }
@@ -76,10 +168,10 @@
         {
           "id": "maps.directions",
           "action": "android.intent.action.VIEW",
-          "description": "Show directions from one place to another.",
+          "description": "Show directions between two places.",
           "params": [
-            { "name": "origin", "key": null, "type": "string", "required": false, "description": "Starting point (defaults to current location)" },
-            { "name": "destination", "key": null, "type": "string", "required": true, "description": "Destination" }
+            { "name": "origin", "key": null, "type": "string", "required": false },
+            { "name": "destination", "key": null, "type": "string", "required": true }
           ],
           "uri_template": "https://www.google.com/maps/dir/?api=1&origin={origin}&destination={destination}",
           "example": { "origin": "home", "destination": "gym" }
@@ -88,20 +180,20 @@
     },
     {
       "package": "com.google.android.calendar",
-      "label": "Google Calendar",
-      "triggers": ["calendar", "event", "meeting", "schedule", "appointment", "reminder"],
+      "label": "Calendar",
+      "triggers": ["calendar", "event", "meeting", "schedule", "appointment"],
       "intents": [
         {
           "id": "calendar.add_event",
           "action": "android.intent.action.INSERT",
-          "description": "Open the calendar app to create a new event with pre-filled details.",
           "data_uri": "content://com.android.calendar/events",
+          "description": "Open calendar to create a new event with pre-filled details.",
           "params": [
-            { "name": "title", "key": "title", "type": "string", "required": true, "description": "Event title" },
-            { "name": "begin_time", "key": "beginTime", "type": "datetime_millis", "required": true, "description": "Event start time in epoch milliseconds" },
-            { "name": "end_time", "key": "endTime", "type": "datetime_millis", "required": false, "description": "Event end time in epoch milliseconds (defaults to begin+1hr)" },
-            { "name": "location", "key": "eventLocation", "type": "string", "required": false, "description": "Event location or address" },
-            { "name": "description", "key": "description", "type": "string", "required": false, "description": "Event notes or description" }
+            { "name": "title", "key": "title", "type": "string", "required": true },
+            { "name": "begin_time", "key": "beginTime", "type": "datetime_millis", "required": true },
+            { "name": "end_time", "key": "endTime", "type": "datetime_millis", "required": false },
+            { "name": "location", "key": "eventLocation", "type": "string", "required": false },
+            { "name": "description", "key": "description", "type": "string", "required": false }
           ],
           "example": { "title": "Team meeting", "begin_time": 1770000000000, "location": "Office" }
         }
@@ -110,27 +202,26 @@
     {
       "package": "com.google.android.apps.clock",
       "label": "Clock",
-      "triggers": ["alarm", "clock", "wake", "timer", "reminder"],
+      "triggers": ["alarm", "clock", "wake", "timer"],
       "intents": [
         {
           "id": "clock.set_alarm",
           "action": "android.intent.action.SET_ALARM",
-          "description": "Open the clock app to set an alarm with pre-filled values.",
+          "description": "Open clock app to set an alarm.",
           "params": [
-            { "name": "hour", "key": "android.intent.extra.alarm.HOUR", "type": "int", "required": true, "description": "Hour in 24-hour format (0-23)" },
-            { "name": "minutes", "key": "android.intent.extra.alarm.MINUTES", "type": "int", "required": true, "description": "Minutes (0-59)" },
-            { "name": "message", "key": "android.intent.extra.alarm.MESSAGE", "type": "string", "required": false, "description": "Alarm label" },
-            { "name": "days", "key": "android.intent.extra.alarm.DAYS", "type": "int_array", "required": false, "description": "Days of week as bitmask (M=2,T=4,W=8,Th=16,F=32,Sa=64,Su=1)" }
+            { "name": "hour", "key": "android.intent.extra.alarm.HOUR", "type": "int", "required": true },
+            { "name": "minutes", "key": "android.intent.extra.alarm.MINUTES", "type": "int", "required": true },
+            { "name": "message", "key": "android.intent.extra.alarm.MESSAGE", "type": "string", "required": false }
           ],
           "example": { "hour": 7, "minutes": 30, "message": "Morning workout" }
         },
         {
           "id": "clock.set_timer",
           "action": "android.intent.action.SET_TIMER",
-          "description": "Open the clock app to set a timer.",
+          "description": "Open clock app to set a countdown timer.",
           "params": [
-            { "name": "seconds", "key": "android.intent.extra.alarm.LENGTH", "type": "int", "required": true, "description": "Timer length in seconds" },
-            { "name": "message", "key": "android.intent.extra.alarm.MESSAGE", "type": "string", "required": false, "description": "Timer label" }
+            { "name": "seconds", "key": "android.intent.extra.alarm.LENGTH", "type": "int", "required": true },
+            { "name": "message", "key": "android.intent.extra.alarm.MESSAGE", "type": "string", "required": false }
           ],
           "example": { "seconds": 300, "message": "Tea timer" }
         }
@@ -139,19 +230,23 @@
     {
       "package": "com.google.android.gm",
       "label": "Gmail",
-      "triggers": ["email", "gmail", "mail", "compose"],
+      "triggers": ["email", "gmail", "mail"],
       "intents": [
         {
           "id": "gmail.compose",
           "action": "android.intent.action.SENDTO",
-          "description": "Open Gmail to compose an email with pre-filled fields.",
+          "description": "Open Gmail compose with pre-filled fields.",
           "params": [
-            { "name": "to", "key": null, "type": "string", "required": false, "description": "Recipient email address" },
-            { "name": "subject", "key": null, "type": "string", "required": false, "description": "Email subject line" },
-            { "name": "body", "key": null, "type": "string", "required": false, "description": "Email body text" }
+            { "name": "to", "key": null, "type": "string", "required": false },
+            { "name": "subject", "key": null, "type": "string", "required": false },
+            { "name": "body", "key": null, "type": "string", "required": false }
           ],
           "uri_template": "mailto:{to}?subject={subject}&body={body}",
-          "example": { "to": "friend@example.com", "subject": "Meeting notes", "body": "Here are the notes from today" }
+          "extra_params": [
+            { "name": "cc", "key": "android.intent.extra.CC", "type": "string" },
+            { "name": "bcc", "key": "android.intent.extra.BCC", "type": "string" }
+          ],
+          "example": { "to": "friend@example.com", "subject": "Meeting notes", "body": "Here are the notes" }
         }
       ]
     },
@@ -165,16 +260,16 @@
           "action": "android.intent.action.SEARCH",
           "description": "Open YouTube and search for videos.",
           "params": [
-            { "name": "query", "key": "query", "type": "string", "required": true, "description": "Search terms" }
+            { "name": "query", "key": "query", "type": "string", "required": true }
           ],
           "example": { "query": "workout motivation" }
         },
         {
           "id": "youtube.open_video",
           "action": "android.intent.action.VIEW",
-          "description": "Open a specific YouTube video.",
+          "description": "Open a specific YouTube video by ID.",
           "params": [
-            { "name": "video_id", "key": null, "type": "string", "required": true, "description": "YouTube video ID" }
+            { "name": "video_id", "key": null, "type": "string", "required": true }
           ],
           "uri_template": "https://www.youtube.com/watch?v={video_id}",
           "example": { "video_id": "dQw4w9WgXcQ" }
@@ -184,14 +279,14 @@
     {
       "package": "com.android.chrome",
       "label": "Chrome",
-      "triggers": ["browser", "web", "search", "google", "open", "url", "link"],
+      "triggers": ["browser", "web", "search", "google", "url", "link"],
       "intents": [
         {
           "id": "browser.open_url",
           "action": "android.intent.action.VIEW",
           "description": "Open a URL in the web browser.",
           "params": [
-            { "name": "url", "key": null, "type": "url", "required": true, "description": "Full URL to open" }
+            { "name": "url", "key": null, "type": "url", "required": true }
           ],
           "uri_template": "{url}",
           "example": { "url": "https://www.google.com" }
@@ -199,9 +294,9 @@
         {
           "id": "browser.search",
           "action": "android.intent.action.WEB_SEARCH",
-          "description": "Search the web for a query.",
+          "description": "Search the web.",
           "params": [
-            { "name": "query", "key": "query", "type": "string", "required": true, "description": "Search query" }
+            { "name": "query", "key": "query", "type": "string", "required": true }
           ],
           "example": { "query": "best coffee near me" }
         }
@@ -215,22 +310,11 @@
         {
           "id": "phone.dial",
           "action": "android.intent.action.DIAL",
-          "description": "Open the phone dialer with a pre-filled number (does not call automatically).",
+          "description": "Open dialer with a pre-filled number (does not auto-call).",
           "params": [
-            { "name": "phone", "key": null, "type": "string", "required": true, "description": "Phone number to dial" }
+            { "name": "phone", "key": null, "type": "string", "required": true }
           ],
           "uri_template": "tel:{phone}",
-          "example": { "phone": "+971556778872" }
-        },
-        {
-          "id": "phone.call",
-          "action": "android.intent.action.CALL",
-          "description": "Call a phone number directly (requires CALL_PHONE permission).",
-          "params": [
-            { "name": "phone", "key": null, "type": "string", "required": true, "description": "Phone number to call" }
-          ],
-          "uri_template": "tel:{phone}",
-          "requires_permission": "android.permission.CALL_PHONE",
           "example": { "phone": "+971556778872" }
         }
       ]
@@ -238,21 +322,118 @@
     {
       "package": "com.android.mms",
       "label": "Messages",
-      "triggers": ["sms", "text", "message", "send message"],
+      "triggers": ["sms", "text", "message"],
       "intents": [
         {
           "id": "sms.compose",
           "action": "android.intent.action.SENDTO",
-          "description": "Open the SMS app with a pre-filled message.",
+          "description": "Open SMS app with pre-filled message.",
           "params": [
-            { "name": "phone", "key": null, "type": "string", "required": true, "description": "Recipient phone number" },
-            { "name": "message", "key": null, "type": "string", "required": false, "description": "Message text to pre-fill" }
+            { "name": "phone", "key": null, "type": "string", "required": true },
+            { "name": "message", "key": null, "type": "string", "required": false }
           ],
           "uri_template": "smsto:{phone}",
           "extra_params": [
-            { "name": "message", "key": "sms_body", "type": "string", "description": "Message body" }
+            { "name": "message", "key": "sms_body", "type": "string" }
           ],
           "example": { "phone": "+971556778872", "message": "On my way!" }
+        }
+      ]
+    },
+    {
+      "package": "com.netflix.mediaclient",
+      "label": "Netflix",
+      "triggers": ["netflix", "movie", "show", "watch", "play"],
+      "intents": [
+        {
+          "id": "netflix.watch",
+          "action": "android.intent.action.VIEW",
+          "description": "Open Netflix and play a specific movie or show by ID.",
+          "params": [
+            { "name": "id", "key": null, "type": "string", "required": true }
+          ],
+          "uri_template": "https://www.netflix.com/watch/{id}",
+          "alternative_uri": "nflx://www.netflix.com/watch/{id}",
+          "example": { "id": "70202141" }
+        },
+        {
+          "id": "netflix.open_title",
+          "action": "android.intent.action.VIEW",
+          "description": "Open Netflix title page without auto-playing.",
+          "params": [
+            { "name": "id", "key": null, "type": "string", "required": true }
+          ],
+          "uri_template": "https://www.netflix.com/title/{id}",
+          "example": { "id": "80100172" }
+        }
+      ]
+    },
+    {
+      "package": "com.Slack",
+      "label": "Slack",
+      "triggers": ["slack", "channel", "message", "team", "dm"],
+      "intents": [
+        {
+          "id": "slack.open_channel",
+          "action": "android.intent.action.VIEW",
+          "description": "Open a Slack channel by team and channel ID.",
+          "params": [
+            { "name": "team", "key": null, "type": "string", "required": true },
+            { "name": "channel", "key": null, "type": "string", "required": true }
+          ],
+          "uri_template": "slack://channel?team={team}&id={channel}",
+          "example": { "team": "T12345", "channel": "C67890" }
+        },
+        {
+          "id": "slack.open_dm",
+          "action": "android.intent.action.VIEW",
+          "description": "Open a Slack direct message with a user.",
+          "params": [
+            { "name": "team", "key": null, "type": "string", "required": true },
+            { "name": "user", "key": null, "type": "string", "required": true }
+          ],
+          "uri_template": "slack://user?team={team}&id={user}",
+          "example": { "team": "T12345", "user": "U67890" }
+        }
+      ]
+    },
+    {
+      "package": "com.discord",
+      "label": "Discord",
+      "triggers": ["discord", "channel", "server", "dm", "voice"],
+      "intents": [
+        {
+          "id": "discord.open_channel",
+          "action": "android.intent.action.VIEW",
+          "description": "Open a Discord channel or DM by channel ID.",
+          "params": [
+            { "name": "channel_id", "key": null, "type": "string", "required": true }
+          ],
+          "uri_template": "https://discord.com/channels/@me/{channel_id}",
+          "example": { "channel_id": "123456789" }
+        }
+      ]
+    },
+    {
+      "package": "com.ubercab",
+      "label": "Uber",
+      "triggers": ["uber", "ride", "taxi", "pickup", "dropoff"],
+      "intents": [
+        {
+          "id": "uber.request_ride",
+          "action": "android.intent.action.VIEW",
+          "description": "Open Uber to request a ride with pre-filled pickup/dropoff.",
+          "params": [
+            { "name": "pickup_lat", "key": null, "type": "string", "required": false },
+            { "name": "pickup_lng", "key": null, "type": "string", "required": false },
+            { "name": "dropoff_lat", "key": null, "type": "string", "required": false },
+            { "name": "dropoff_lng", "key": null, "type": "string", "required": false },
+            { "name": "dropoff_name", "key": null, "type": "string", "required": false },
+            { "name": "product_id", "key": null, "type": "string", "required": false }
+          ],
+          "uri_template": "uber://riderequest?pickup[latitude]={pickup_lat}&pickup[longitude]={pickup_lng}&dropoff[latitude]={dropoff_lat}&dropoff[longitude]={dropoff_lng}&dropoff[nickname]={dropoff_name}&product_id={product_id}",
+          "web_fallback": "https://m.uber.com/looking",
+          "example": { "pickup_lat": "37.775", "pickup_lng": "-122.418", "dropoff_lat": "37.802", "dropoff_lng": "-122.405", "dropoff_name": "Coit Tower" }
         }
       ]
     },
@@ -274,6 +455,13 @@
           "description": "Open Bluetooth settings.",
           "params": [],
           "example": {}
+        },
+        {
+          "id": "settings.data_usage",
+          "action": "android.settings.DATA_ROAMING_SETTINGS",
+          "description": "Open mobile data settings.",
+          "params": [],
+          "example": {}
         }
       ]
     }
@@ -283,22 +471,34 @@
       "id": "share.text",
       "action": "android.intent.action.SEND",
       "mime_type": "text/plain",
-      "description": "Open the Android share sheet with text. The user picks which app to share to.",
+      "description": "Open Android share sheet with text. User picks which app to share to (WhatsApp, Telegram, Messages, etc.).",
       "params": [
-        { "name": "text", "key": "android.intent.extra.TEXT", "type": "string", "required": true, "description": "Text to share" },
-        { "name": "title", "key": "android.intent.extra.TITLE", "type": "string", "required": false, "description": "Optional title for the share dialog" }
+        { "name": "text", "key": "android.intent.extra.TEXT", "type": "string", "required": true },
+        { "name": "title", "key": "android.intent.extra.TITLE", "type": "string", "required": false }
       ],
-      "example": { "text": "Check out this link!", "title": "Share via" }
+      "example": { "text": "Check out this link!" }
     },
     {
       "id": "share.image",
       "action": "android.intent.action.SEND",
       "mime_type": "image/*",
-      "description": "Open the Android share sheet with an image.",
+      "description": "Open Android share sheet with an image.",
       "params": [
-        { "name": "uri", "key": "android.intent.extra.STREAM", "type": "uri", "required": true, "description": "Content URI of the image to share" }
+        { "name": "uri", "key": "android.intent.extra.STREAM", "type": "uri", "required": true }
       ],
       "example": { "uri": "content://media/external/images/media/1" }
+    },
+    {
+      "id": "email.compose",
+      "action": "android.intent.action.SENDTO",
+      "data_uri": "mailto:",
+      "description": "Open email app to compose with recipients, subject, and body.",
+      "params": [
+        { "name": "to", "key": "android.intent.extra.EMAIL", "type": "string", "required": false },
+        { "name": "subject", "key": "android.intent.extra.SUBJECT", "type": "string", "required": false },
+        { "name": "body", "key": "android.intent.extra.TEXT", "type": "string", "required": false }
+      ],
+      "example": { "to": "friend@example.com", "subject": "Hello", "body": "Just checking in" }
     }
   ]
 }
