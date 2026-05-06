@@ -2,6 +2,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("org.jetbrains.kotlin.plugin.serialization")
 }
 
 android {
@@ -58,6 +59,9 @@ dependencies {
     // LiteRT-LM: on-device LLM inference with GPU acceleration
     // Pin 0.10.0 (latest stable on Google Maven as of May 2026)
     implementation("com.google.ai.edge.litertlm:litertlm-android:0.10.0")
+
+    // Serialization: JSON workflow contracts
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
