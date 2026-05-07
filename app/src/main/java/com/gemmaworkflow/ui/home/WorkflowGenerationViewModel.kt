@@ -4,6 +4,9 @@ import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.gemmaworkflow.data.repository.ExecutionHistoryRepository
+import com.gemmaworkflow.data.repository.WorkflowRepository
+import com.gemmaworkflow.data.seed.DemoWorkflowSeeder
 import com.gemmaworkflow.domain.catalog.ActionSpecRegistry
 import com.gemmaworkflow.domain.model.PlannedWorkflow
 import com.gemmaworkflow.domain.parser.WorkflowJsonParser
@@ -12,7 +15,6 @@ import com.gemmaworkflow.domain.planner.PromptBuilder
 import com.gemmaworkflow.domain.planner.RequestAnalysisParser
 import com.gemmaworkflow.domain.runner.WorkflowRunner
 import com.gemmaworkflow.domain.safety.WorkflowValidator
-import com.gemmaworkflow.platform.capability.IntentDiscoveryEngine
 import com.gemmaworkflow.platform.capability.PackageCapabilityScanner
 import com.gemmaworkflow.platform.inference.InferenceManager
 import com.gemmaworkflow.platform.inference.InferenceState
@@ -29,7 +31,8 @@ import kotlinx.coroutines.withContext
 class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(application) {
 
     private val capabilityScanner = PackageCapabilityScanner(application)
-    private val savedWorkflows = mutableMapOf<String, PlannedWorkflow>()
+    private val workflowRepo = WorkflowRepository(application)
+    private val historyRepo = ExecutionHistoryRepository(application)
     private var timerJob: Job? = null
 
     private val _uiState = MutableStateFlow(WorkflowGenerationUiState())
@@ -54,6 +57,11 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
             }
         }
         viewModelScope.launch { InferenceManager.initialize(application) }
+        viewModelScope.launch(Dispatchers.IO) {
+            DemoWorkflowSeeder.seedIfNeeded(application, workflowRepo)
+            val saved = workflowRepo.loadAll()
+            _uiState.update { it.copy(savedWorkflows = saved) }
+        }
     }
 
     fun updatePrompt(prompt: String) {
@@ -89,19 +97,15 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
             val availableActions = ActionSpecRegistry.all.filter { it.id in resolvableIds }
             val capabilitySummary = ActionSpecRegistry.toPromptSummary(availableActions)
 
-            // Load curated intent catalog + runtime discovery
-            val intentCatalog = IntentDiscoveryEngine.loadCatalog(getApplication())
-            val intentSummary = IntentDiscoveryEngine.buildSlmPromptSummary(getApplication())
             val combinedCapabilities = buildString {
-                appendLine(intentSummary)
+                appendLine("=== Available Android Actions ===")
+                appendLine("You may select these by their exact action ID. Parameters are exactly as listed.")
                 appendLine()
-                appendLine("=== High-level Actions (ONLY pick from these IDs) ===")
                 append(capabilitySummary)
             }
 
             appendDebug("Available tools", availableActions.joinToString { it.id })
             appendDebug("Installed app list sent to AI", installedAppsSummary)
-            appendDebug("Intent catalog", "${intentCatalog.apps.size} apps, ${intentCatalog.standardIntents.size} standard intents loaded")
 
             try {
                 // Stage 1
@@ -115,7 +119,6 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
                         )
                     )
                 }
-                // Yield to main thread so Compose can render
                 delay(16)
                 appendDebug("AI output: request analysis", analysisRaw)
                 val analysis = RequestAnalysisParser.parse(analysisRaw)
@@ -140,6 +143,7 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
                 appendDebug("Native discovery", nativeDiscovery)
                 appendDebug("Full capabilities sent to AI", combinedCapabilities.take(200) + "...")
                 markStage(1, StageStatus.Done)
+                delay(16)
 
                 // Stage 3
                 markStage(2, StageStatus.Running)
@@ -197,6 +201,12 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
             } catch (e: Exception) {
                 timerJob?.cancel()
                 Log.e(TAG, "Generation failed", e)
+                val isSessionError = e.message?.contains("session", ignoreCase = true) == true ||
+                    e.message?.contains("FAILED_PRECONDITION", ignoreCase = true) == true
+                if (isSessionError) {
+                    Log.w(TAG, "Engine session corrupted — will reinit on next generate()")
+                    InferenceManager.close()
+                }
                 appendDebug("Generation error", e.stackTraceToString())
                 _uiState.update { it.copy(isBusy = false, error = e.message, stage = "Failed") }
             }
@@ -224,9 +234,11 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
 
     fun saveWorkflow() {
         val workflow = uiState.value.workflowPreview ?: return
-        savedWorkflows[workflow.name] = workflow
-        appendDebug("Save workflow", "Saved '${workflow.name}' in memory")
-        _uiState.update { it.copy(saved = true) }
+        viewModelScope.launch(Dispatchers.IO) {
+            workflowRepo.save(workflow)
+            appendDebug("Save workflow", "Saved '${workflow.name}' to disk")
+            _uiState.update { it.copy(saved = true) }
+        }
     }
 
     fun runWorkflow() {
@@ -238,10 +250,25 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
             val results = runner.run(workflow) { label, message ->
                 appendDebug(label, message)
             }
+            historyRepo.log(workflow.name, results)
             _uiState.update {
                 it.copy(isBusy = false, saved = true, runResults = results,
                     stage = if (results.all { r -> r.success }) "All steps completed" else "Some steps failed")
             }
+        }
+    }
+
+    fun selectWorkflow(workflow: PlannedWorkflow) {
+        _uiState.update {
+            it.copy(
+                workflowPreview = workflow,
+                rawJson = null,
+                validationErrors = emptyList(),
+                saved = true,
+                runResults = emptyList(),
+                error = null,
+                selectedWorkflowName = workflow.name
+            )
         }
     }
 
