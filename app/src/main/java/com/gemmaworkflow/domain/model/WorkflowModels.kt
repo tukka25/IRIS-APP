@@ -72,3 +72,12 @@ data class ExecutionResult(
     val message: String = "",
     val timestampMillis: Long = System.currentTimeMillis()
 )
+
+/** An entry in the execution history. */
+@Serializable
+data class ExecutionLogEntry(
+    val workflowName: String,
+    val timestampMillis: Long,
+    val results: List<ExecutionResult>,
+    val allSuccess: Boolean
+)
