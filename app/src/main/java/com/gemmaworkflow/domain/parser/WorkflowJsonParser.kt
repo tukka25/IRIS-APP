@@ -98,10 +98,17 @@ object WorkflowJsonParser {
     ).joinToString("|")
 
     private fun repairMalformedJson(json: String): String {
-        val pattern = Regex(""""($UNQUOTED_KEYS)"\s*:\s*([a-zA-Z_][a-zA-Z0-9_\s]*)""")
-        return json.replace(pattern) { result ->
+        // Fix unquoted string values: "key": Value → "key":"Value"
+        val pattern = Regex("""\"($UNQUOTED_KEYS)"\s*:\s*([a-zA-Z_][a-zA-Z0-9_\s]*)""")
+        var repaired = json.replace(pattern) { result ->
             "\"${result.groupValues[1]}\":\"${result.groupValues[2].trim()}\""
         }
+        // Fix unquoted capitalised string values (common LLM mistake): "key": Meeting Invitation" → "key":"Meeting Invitation"
+        val capPattern = Regex("""\"($UNQUOTED_KEYS)"\s*:\s*([A-Z][^\"\n,\}]+)""")
+        repaired = capPattern.replace(repaired) { result ->
+            "\"${result.groupValues[1]}\":\"${result.groupValues[2].trim().trimEnd(',').trimEnd('"').trimEnd(',')}\""
+        }
+        return repaired
     }
 
     private fun extractJsonBlock(text: String): String {
