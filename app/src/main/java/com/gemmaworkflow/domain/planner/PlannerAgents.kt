@@ -1,8 +1,7 @@
 package com.gemmaworkflow.domain.planner
 
 import com.google.ai.edge.litertlm.Engine
-import com.google.ai.edge.litertlm.ConversationConfig
-import com.google.ai.edge.litertlm.SamplerConfig
+import com.gemmaworkflow.platform.tools.ToolAwareGenerator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -10,42 +9,60 @@ import kotlinx.coroutines.withContext
  * Logical planner stages that reuse one loaded LiteRT-LM Engine.
  * Each "agent" is a call to the same model with a different system prompt.
  *
- * This avoids loading multiple model instances and keeps phone memory under control.
+ * v2: Agents can now call tools (resolve_datetime, search_places, etc.)
+ *     via ToolAwareGenerator. Each agent stage receives only its allowed
+ *     tool set to keep context minimal.
  */
 class PlannerAgents(private val engine: Engine) {
 
-    private val sampler = SamplerConfig(topK = 40, topP = 0.95, temperature = 0.2)
-
     /**
      * Stage 1: Analyze the user request.
+     * Allowed: temporal + device tools (6 tools)
      */
-    suspend fun requestAnalysis(prompt: String): String = withContext(Dispatchers.Default) {
-        engine.createConversation(
-            ConversationConfig(samplerConfig = sampler)
-        ).use { conv ->
-            conv.sendMessage(prompt).toString()
-        }
+    suspend fun requestAnalysis(
+        prompt: String,
+        allowedTools: Set<String> = emptySet(),
+        onToolEvent: (ToolAwareGenerator.ToolCallEvent) -> Unit = {}
+    ): String = withContext(Dispatchers.Default) {
+        ToolAwareGenerator(
+            engine = engine,
+            allowedTools = allowedTools,
+            maxToolCalls = 3,
+            onToolCall = onToolEvent
+        ).generate(prompt)
     }
 
     /**
      * Stage 3: Select concrete actions from available capabilities.
+     * Allowed: temporal + search + execution + reasoning (13 tools)
      */
-    suspend fun actionPlan(prompt: String): String = withContext(Dispatchers.Default) {
-        engine.createConversation(
-            ConversationConfig(samplerConfig = sampler)
-        ).use { conv ->
-            conv.sendMessage(prompt).toString()
-        }
+    suspend fun actionPlan(
+        prompt: String,
+        allowedTools: Set<String> = emptySet(),
+        onToolEvent: (ToolAwareGenerator.ToolCallEvent) -> Unit = {}
+    ): String = withContext(Dispatchers.Default) {
+        ToolAwareGenerator(
+            engine = engine,
+            allowedTools = allowedTools,
+            maxToolCalls = 5,
+            onToolCall = onToolEvent
+        ).generate(prompt)
     }
 
     /**
      * Stage 4: Output the final strict JSON workflow contract.
+     * Allowed: validate_json + calculator (2 tools)
      */
-    suspend fun workflowJson(prompt: String): String = withContext(Dispatchers.Default) {
-        engine.createConversation(
-            ConversationConfig(samplerConfig = sampler)
-        ).use { conv ->
-            conv.sendMessage(prompt).toString()
-        }
+    suspend fun workflowJson(
+        prompt: String,
+        allowedTools: Set<String> = emptySet(),
+        onToolEvent: (ToolAwareGenerator.ToolCallEvent) -> Unit = {}
+    ): String = withContext(Dispatchers.Default) {
+        ToolAwareGenerator(
+            engine = engine,
+            allowedTools = allowedTools,
+            maxToolCalls = 2,
+            onToolCall = onToolEvent
+        ).generate(prompt)
     }
 }

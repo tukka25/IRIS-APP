@@ -16,6 +16,9 @@ import com.gemmaworkflow.platform.capability.IntentDiscoveryEngine
 import com.gemmaworkflow.platform.capability.PackageCapabilityScanner
 import com.gemmaworkflow.platform.inference.InferenceManager
 import com.gemmaworkflow.platform.inference.InferenceState
+import com.gemmaworkflow.platform.tools.AgentToolAssignments
+import com.gemmaworkflow.platform.tools.FindSkill
+import com.gemmaworkflow.platform.tools.ToolAwareGenerator
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -104,15 +107,19 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
             appendDebug("Intent catalog", "${intentCatalog.apps.size} apps, ${intentCatalog.standardIntents.size} standard intents loaded")
 
             try {
-                // Stage 1
+                // Stage 1 — RequestAnalysisAgent (temporal + device tools)
                 markStage(0, StageStatus.Running)
                 _uiState.update { it.copy(stage = "Analysing request...") }
+                val analysisTools = AgentToolAssignments.forAgent(AgentToolAssignments.PlannerAgent.RequestAnalysis)
+                val analysisPrompt = PromptBuilder.buildRequestAnalysisPrompt(
+                    userRequest = prompt,
+                    installedApps = installedAppsSummary
+                ) + "\n\n" + FindSkill.schemaFor(analysisTools) + "\n\nYou may call tools using: TOOL: name {params}"
                 val analysisRaw = withContext(Dispatchers.Default) {
                     agents.requestAnalysis(
-                        PromptBuilder.buildRequestAnalysisPrompt(
-                            userRequest = prompt,
-                            installedApps = installedAppsSummary
-                        )
+                        prompt = analysisPrompt,
+                        allowedTools = analysisTools,
+                        onToolEvent = { event -> appendToolDebug(event) }
                     )
                 }
                 // Yield to main thread so Compose can render
@@ -141,17 +148,21 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
                 appendDebug("Full capabilities sent to AI", combinedCapabilities.take(200) + "...")
                 markStage(1, StageStatus.Done)
 
-                // Stage 3
+                // Stage 3 — ActionPlanAgent (temporal + search + execution + reasoning)
                 markStage(2, StageStatus.Running)
                 _uiState.update { it.copy(stage = "Planning actions...") }
+                val actionTools = AgentToolAssignments.forAgent(AgentToolAssignments.PlannerAgent.ActionPlan)
+                val actionPlanPrompt = PromptBuilder.buildActionPlanPrompt(
+                    goal = prompt,
+                    triggerHint = triggerHint,
+                    availableActions = combinedCapabilities,
+                    nativeDiscovery = nativeDiscovery
+                ) + "\n\n" + FindSkill.schemaFor(actionTools) + "\n\nYou may call tools using: TOOL: name {params}"
                 val actionPlanRaw = withContext(Dispatchers.Default) {
                     agents.actionPlan(
-                        PromptBuilder.buildActionPlanPrompt(
-                            goal = prompt,
-                            triggerHint = triggerHint,
-                            availableActions = combinedCapabilities,
-                            nativeDiscovery = nativeDiscovery
-                        )
+                        prompt = actionPlanPrompt,
+                        allowedTools = actionTools,
+                        onToolEvent = { event -> appendToolDebug(event) }
                     )
                 }
                 delay(16)
@@ -159,12 +170,18 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
                 markStage(2, StageStatus.Done)
                 delay(16)
 
-                // Stage 4
+                // Stage 4 — WorkflowJsonAgent (validation only)
                 markStage(3, StageStatus.Running)
                 _uiState.update { it.copy(stage = "Generating JSON...") }
+                val jsonTools = AgentToolAssignments.forAgent(AgentToolAssignments.PlannerAgent.WorkflowJson)
+                val jsonPrompt = PromptBuilder.buildWorkflowJsonPrompt(prompt, actionPlanRaw, capabilitySummary) +
+                    "\n\n" + FindSkill.schemaFor(jsonTools) + "\n\nYou may call tools using: TOOL: name {params}"
                 val jsonRaw = withContext(Dispatchers.Default) {
                     agents.workflowJson(
-                        PromptBuilder.buildWorkflowJsonPrompt(prompt, actionPlanRaw, capabilitySummary))
+                        prompt = jsonPrompt,
+                        allowedTools = jsonTools,
+                        onToolEvent = { event -> appendToolDebug(event) }
+                    )
                 }
                 delay(16)
                 appendDebug("AI output: final workflow JSON", jsonRaw)
@@ -253,6 +270,32 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
                     .takeLast(80)
             )
         }
+    }
+
+    /**
+     * Colored tool call debugging.
+     * Uses emoji prefixes for visual distinction in the debug panel:
+     *   🔧 CALL    — tool is about to be invoked
+     *   ✅ RESULT  — tool succeeded
+     *   ❌ FAILED  — tool returned an error
+     *   🚫 DENIED  — tool not in agent's allowed set
+     */
+    private fun appendToolDebug(event: ToolAwareGenerator.ToolCallEvent) {
+        val (emoji, label, detail) = when (event.type) {
+            ToolAwareGenerator.ToolCallEventType.CALL -> Triple(
+                "\uD83D\uDD27", "CALL", "${event.toolName} ${event.input}"
+            )
+            ToolAwareGenerator.ToolCallEventType.SUCCESS -> Triple(
+                "\u2705", "RESULT", "${event.toolName}\n${event.output.take(200)}"
+            )
+            ToolAwareGenerator.ToolCallEventType.FAILURE -> Triple(
+                "\u274C", "FAILED", "${event.toolName}: ${event.output.take(200)}"
+            )
+            ToolAwareGenerator.ToolCallEventType.DENIED -> Triple(
+                "\uD83D\uDEAB", "DENIED", event.output
+            )
+        }
+        appendDebug(emoji, "$label $detail")
     }
 
     override fun onCleared() {
