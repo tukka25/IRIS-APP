@@ -48,19 +48,31 @@ object InferenceManager {
                 val modelFile = locator.requireDefaultModel()
 
                 Log.i(TAG, "Loading model: ${modelFile.absolutePath}")
+                logMemory("Before load")
 
-                val config = EngineConfig(
-                    modelPath = modelFile.absolutePath,
-                    backend = Backend.CPU(),
-                    cacheDir = context.cacheDir.absolutePath
-                )
+                // Try GPU first — puts model in VRAM, saves system RAM
+                try {
+                    val config = EngineConfig(
+                        modelPath = modelFile.absolutePath,
+                        backend = Backend.GPU(),
+                        cacheDir = context.cacheDir.absolutePath
+                    )
+                    engine = Engine(config).also { it.initialize() }
+                    Log.i(TAG, "Model loaded on GPU")
+                    logMemory("After GPU load")
+                } catch (gpuError: Exception) {
+                    Log.w(TAG, "GPU failed, falling back to CPU", gpuError)
+                    val config = EngineConfig(
+                        modelPath = modelFile.absolutePath,
+                        backend = Backend.CPU(),
+                        cacheDir = context.cacheDir.absolutePath
+                    )
+                    engine = Engine(config).also { it.initialize() }
+                    Log.i(TAG, "Model loaded on CPU (GPU unavailable)")
+                    logMemory("After CPU load")
+                }
 
-                engine = Engine(config).also { it.initialize() }
-
-                Log.i(TAG, "Model loaded successfully on CPU")
                 _state.value = InferenceState.Ready
-
-                // Register all tools once model is ready
                 ToolInitializer.initialize(context)
             }
         }.onFailure { throwable ->
@@ -87,6 +99,14 @@ object InferenceManager {
         engine = null
         _state.value = InferenceState.Idle
         initialized = false
+    }
+
+    /** Log current memory usage. Helps diagnose OOM kills. */
+    private fun logMemory(label: String) {
+        val runtime = Runtime.getRuntime()
+        val used = (runtime.totalMemory() - runtime.freeMemory()) / (1024 * 1024)
+        val max = runtime.maxMemory() / (1024 * 1024)
+        Log.i(TAG, "$label: ${used}MB used, ${max}MB max heap")
     }
 }
 
