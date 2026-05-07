@@ -6,6 +6,7 @@ import com.google.ai.edge.litertlm.Backend
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
 import com.gemmaworkflow.platform.inference.litert.ModelFileLocator
+import com.gemmaworkflow.platform.tools.ToolInitializer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -58,6 +59,9 @@ object InferenceManager {
 
                 Log.i(TAG, "Model loaded successfully on CPU")
                 _state.value = InferenceState.Ready
+
+                // Register all tools once model is ready
+                ToolInitializer.initialize(context)
             }
         }.onFailure { throwable ->
             Log.e(TAG, "Failed to load model", throwable)
