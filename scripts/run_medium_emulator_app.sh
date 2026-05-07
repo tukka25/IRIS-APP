@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Create/use a medium-phone AVD, start it with lighter settings, build/install
-# the debug app, launch GemmaWorkflow, then stream filtered Logcat.
+# the debug app, launch GemmaWorkflow, then stream Logcat.
 #
 # Usage:
 #   scripts/run_medium_emulator_app.sh
@@ -10,6 +10,7 @@ set -euo pipefail
 # Useful overrides:
 #   AVD_NAME=Gemma_Medium_API_35 MEMORY_MB=2048 scripts/run_medium_emulator_app.sh
 #   LOG_FILTER="WorkflowGeneration|WorkflowRunner|InferenceManager|litert|AndroidRuntime" scripts/run_medium_emulator_app.sh
+#   LOG_ALL=1 scripts/run_medium_emulator_app.sh
 
 SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Library/Android/sdk}}"
 EMULATOR="$SDK/emulator/emulator"
@@ -44,7 +45,8 @@ API_LEVEL="${API_LEVEL:-35}"
 DEVICE_ID="${DEVICE_ID:-medium_phone}"
 MEMORY_MB="${MEMORY_MB:-4096}"
 GPU_MODE="${GPU_MODE:-host}"
-# LOG_FILTER="${}"
+LOG_FILTER="${LOG_FILTER:-}"
+LOG_ALL="${LOG_ALL:-1}"
 EMULATOR_LOG="${EMULATOR_LOG:-/tmp/gemmaworkflow-emulator.log}"
 LOCAL_MODEL_PATH="${LOCAL_MODEL_PATH:-local-models/gemma-4-E2B-it.litertlm}"
 DEVICE_MODEL_DIR="${DEVICE_MODEL_DIR:-/sdcard/Android/data/com.gemmaworkflow/files/models}"
@@ -182,7 +184,17 @@ echo "Launching GemmaWorkflow..."
 
 echo ""
 echo "Streaming Logcat. Press Ctrl+C to stop logs."
-echo "Equivalent command:"
-echo "  $ADB logcat | grep -Ei \"$LOG_FILTER\""
 echo ""
-"$ADB" -e logcat | grep -Ei "$LOG_FILTER"
+if [ "$LOG_ALL" = "1" ] || [ -z "$LOG_FILTER" ]; then
+    echo "Showing all logs."
+    echo "Equivalent command:"
+    echo "  $ADB -e logcat"
+    echo ""
+    "$ADB" -e logcat
+else
+    echo "Filtering logs with: $LOG_FILTER"
+    echo "Equivalent command:"
+    echo "  $ADB -e logcat | grep -Ei \"$LOG_FILTER\""
+    echo ""
+    "$ADB" -e logcat | grep -Ei "$LOG_FILTER"
+fi

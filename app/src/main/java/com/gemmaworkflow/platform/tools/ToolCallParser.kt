@@ -18,7 +18,7 @@ object ToolCallParser {
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
     /** Regex to find TOOL: name {params} in text. */
-    private val toolCallRegex = Regex("""TOOL:\s*(\S+)\s*(\{.*?})""", RegexOption.DOT_MATCHES_ALL)
+    private val toolCallRegex = Regex("""TOOL:\s*(\S+)\s*\{([^}]*)\}""", RegexOption.DOT_MATCHES_ALL)
 
     /**
      * Find the first tool call in the given text.
@@ -30,7 +30,9 @@ object ToolCallParser {
         val paramsJson = match.groupValues[2]
 
         return try {
-            val element = json.parseToJsonElement(paramsJson)
+            // Regex captures inner content without braces — add them back for JSON parsing
+            val jsonString = "{${match.groupValues[2]}}"
+            val element = json.parseToJsonElement(jsonString)
             val obj = element as? kotlinx.serialization.json.JsonObject ?: return null
             val params = obj.mapValues { it.value.jsonPrimitive.content }
             ToolCall(name = toolName, params = params, rawMatch = match.value)
