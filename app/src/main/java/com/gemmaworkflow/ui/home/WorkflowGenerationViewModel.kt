@@ -124,6 +124,7 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
                 }
                 // Yield to main thread so Compose can render
                 delay(16)
+                recordTokenUsage("Request Analysis", analysisPrompt.length)
                 appendDebug("AI output: request analysis", analysisRaw)
                 val analysis = RequestAnalysisParser.parse(analysisRaw)
                 val triggerHint = analysis.normalizedTriggerHint
@@ -166,6 +167,7 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
                     )
                 }
                 delay(16)
+                recordTokenUsage("Action Plan", actionPlanPrompt.length)
                 appendDebug("AI output: action plan", actionPlanRaw)
                 markStage(2, StageStatus.Done)
                 delay(16)
@@ -184,6 +186,7 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
                     )
                 }
                 delay(16)
+                recordTokenUsage("JSON Generation", jsonPrompt.length)
                 appendDebug("AI output: final workflow JSON", jsonRaw)
                 markStage(3, StageStatus.Done)
                 delay(16)
@@ -268,6 +271,21 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
             state.copy(
                 debugMessages = (state.debugMessages + DebugMessage(label = label, message = message))
                     .takeLast(80)
+            )
+        }
+    }
+
+    /** Estimate tokens from char count. ~4 chars per token for English text. */
+    private fun estimateTokens(chars: Int): Int = (chars / 4).coerceAtLeast(1)
+
+    private fun recordTokenUsage(stageLabel: String, promptChars: Int) {
+        _uiState.update { state ->
+            state.copy(
+                stageTokenUsage = state.stageTokenUsage + StageTokenUsage(
+                    stageLabel = stageLabel,
+                    inputChars = promptChars,
+                    estimatedTokens = estimateTokens(promptChars)
+                )
             )
         }
     }

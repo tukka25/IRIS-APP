@@ -11,6 +11,7 @@ data class WorkflowGenerationUiState(
     val isBusy: Boolean = false,
     val stage: String = "",
     val stageTimeline: List<StageProgress> = emptyList(),
+    val stageTokenUsage: List<StageTokenUsage> = emptyList(),
     val elapsedSeconds: Long = 0,
     val error: String? = null,
     val workflowPreview: PlannedWorkflow? = null,
@@ -20,12 +21,9 @@ data class WorkflowGenerationUiState(
     val runResults: List<ExecutionResult> = emptyList(),
     val debugMessages: List<DebugMessage> = emptyList()
 ) {
-    val canGenerate: Boolean
-        get() = isModelReady && !isBusy && prompt.isNotBlank()
-    val hasWorkflow: Boolean
-        get() = workflowPreview != null
-    val isValid: Boolean
-        get() = hasWorkflow && validationErrors.isEmpty()
+    val canGenerate: Boolean get() = isModelReady && !isBusy && prompt.isNotBlank()
+    val hasWorkflow: Boolean get() = workflowPreview != null
+    val isValid: Boolean get() = hasWorkflow && validationErrors.isEmpty()
 }
 
 enum class StageStatus { Pending, Running, Done }
@@ -33,6 +31,14 @@ enum class StageStatus { Pending, Running, Done }
 data class StageProgress(
     val label: String,
     val status: StageStatus = StageStatus.Pending
+)
+
+/** Token usage for one agent stage. */
+data class StageTokenUsage(
+    val stageLabel: String,
+    val inputChars: Int = 0,
+    val estimatedTokens: Int = 0,
+    val contextWindow: Int = 8192  // Gemma 4 E2B IT default
 )
 
 data class DebugMessage(

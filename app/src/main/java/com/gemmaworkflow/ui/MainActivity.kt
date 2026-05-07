@@ -107,9 +107,10 @@ private fun WorkflowGenerationScreen(viewModel: WorkflowGenerationViewModel) {
                 )
             }
 
-            // Stage timeline
+            // Stage timeline + token usage
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                state.stageTimeline.forEach { stage ->
+                state.stageTimeline.forEachIndexed { index, stage ->
+                    val tokenInfo = state.stageTokenUsage.getOrNull(index)
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.fillMaxWidth()
@@ -126,11 +127,36 @@ private fun WorkflowGenerationScreen(viewModel: WorkflowGenerationViewModel) {
                         }
                         Text(icon, color = color, style = MaterialTheme.typography.bodyMedium)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            stage.label,
-                            color = color,
-                            style = MaterialTheme.typography.bodySmall
-                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(stage.label, color = color, style = MaterialTheme.typography.bodySmall)
+                            // Token usage bar
+                            if (tokenInfo != null && tokenInfo.estimatedTokens > 0) {
+                                val pct = (tokenInfo.estimatedTokens.toFloat() / tokenInfo.contextWindow).coerceAtMost(1f)
+                                val barColor = when {
+                                    pct > 0.8f -> MaterialTheme.colorScheme.error
+                                    pct > 0.5f -> MaterialTheme.colorScheme.tertiary
+                                    else -> MaterialTheme.colorScheme.primary
+                                }
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    // Mini progress bar
+                                    androidx.compose.material3.LinearProgressIndicator(
+                                        progress = { pct },
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(6.dp),
+                                        color = barColor,
+                                        trackColor = barColor.copy(alpha = 0.15f),
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        "${tokenInfo.estimatedTokens} / ${tokenInfo.contextWindow}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontFamily = FontFamily.Monospace,
+                                        color = barColor
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
