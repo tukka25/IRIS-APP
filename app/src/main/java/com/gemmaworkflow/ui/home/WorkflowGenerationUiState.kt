@@ -5,7 +5,7 @@ import com.gemmaworkflow.domain.model.PlannedWorkflow
 import com.gemmaworkflow.platform.inference.InferenceState
 
 data class WorkflowGenerationUiState(
-    val prompt: String = "send message to +971556778872 saying hi, and invite him to meeting on 6 oclock on next friday and then add it to my calender.",
+    val prompt: String = "send message to +971****8872 saying hi, and invite him to meeting on 6 oclock on next friday and then add it to my calender.",
     val inferenceState: InferenceState = InferenceState.Idle,
     val isModelReady: Boolean = false,
     val isBusy: Boolean = false,
@@ -18,7 +18,9 @@ data class WorkflowGenerationUiState(
     val validationErrors: List<String> = emptyList(),
     val saved: Boolean = false,
     val runResults: List<ExecutionResult> = emptyList(),
-    val debugMessages: List<DebugMessage> = emptyList()
+    val debugMessages: List<DebugMessage> = emptyList(),
+    val savedWorkflows: List<PlannedWorkflow> = emptyList(),
+    val selectedWorkflowName: String? = null
 ) {
     val canGenerate: Boolean
         get() = isModelReady && !isBusy && prompt.isNotBlank()

@@ -34,7 +34,6 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gemmaworkflow.domain.model.ExecutionResult
-import com.gemmaworkflow.domain.model.SetupState
 import com.gemmaworkflow.platform.inference.InferenceState
 import com.gemmaworkflow.ui.home.WorkflowGenerationViewModel
 import com.gemmaworkflow.ui.home.StageStatus
@@ -68,10 +67,26 @@ private fun WorkflowGenerationScreen(viewModel: WorkflowGenerationViewModel) {
     ) {
         Text("GemmaWorkflow", style = MaterialTheme.typography.headlineMedium)
 
-        // --- Model Status ---
         ModelStatusCard(state.inferenceState)
 
-        // --- Prompt ---
+        if (state.savedWorkflows.isNotEmpty()) {
+            Text("Saved", style = MaterialTheme.typography.labelMedium)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                state.savedWorkflows.take(4).forEach { wf ->
+                    OutlinedButton(
+                        onClick = { viewModel.selectWorkflow(wf) },
+                        modifier = Modifier.weight(1f),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp, vertical = 2.dp)
+                    ) {
+                        Text(wf.name, maxLines = 1, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+        }
+
         OutlinedTextField(
             value = state.prompt,
             onValueChange = viewModel::updatePrompt,
@@ -81,7 +96,6 @@ private fun WorkflowGenerationScreen(viewModel: WorkflowGenerationViewModel) {
             supportingText = { Text("e.g. \"When I tap this, open Maps to the nearest coffee shop and share my location\"") }
         )
 
-        // --- Generate ---
         Button(
             enabled = state.canGenerate,
             onClick = viewModel::generate,
@@ -93,7 +107,6 @@ private fun WorkflowGenerationScreen(viewModel: WorkflowGenerationViewModel) {
         if (state.isBusy) {
             LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
 
-            // Timer + stage
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
@@ -107,7 +120,6 @@ private fun WorkflowGenerationScreen(viewModel: WorkflowGenerationViewModel) {
                 )
             }
 
-            // Stage timeline
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 state.stageTimeline.forEach { stage ->
                     Row(
@@ -126,22 +138,15 @@ private fun WorkflowGenerationScreen(viewModel: WorkflowGenerationViewModel) {
                         }
                         Text(icon, color = color, style = MaterialTheme.typography.bodyMedium)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            stage.label,
-                            color = color,
-                            style = MaterialTheme.typography.bodySmall
-                        )
+                        Text(stage.label, color = color, style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
         }
 
-        // --- Error ---
         if (state.error != null) {
             Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.errorContainer
-                )
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
             ) {
                 Text(
                     text = state.error.orEmpty(),
@@ -152,7 +157,6 @@ private fun WorkflowGenerationScreen(viewModel: WorkflowGenerationViewModel) {
             }
         }
 
-        // --- Workflow Preview ---
         val workflow = state.workflowPreview
         if (workflow != null) {
             HorizontalDivider()
@@ -165,11 +169,7 @@ private fun WorkflowGenerationScreen(viewModel: WorkflowGenerationViewModel) {
                     if (workflow.summary.isNotBlank()) {
                         Text(workflow.summary, style = MaterialTheme.typography.bodyMedium)
                     }
-
-                    // Trigger
                     Text("Trigger: ${triggerLabel(workflow)}", style = MaterialTheme.typography.bodySmall)
-
-                    // Actions
                     Text("Actions (${workflow.actions.size}):", style = MaterialTheme.typography.labelMedium)
                     workflow.actions.forEach { step ->
                         Text(
@@ -178,7 +178,6 @@ private fun WorkflowGenerationScreen(viewModel: WorkflowGenerationViewModel) {
                             fontFamily = FontFamily.Monospace
                         )
                     }
-
                     if (workflow.missingSetup.isNotEmpty()) {
                         Text(
                             "Needs setup: ${workflow.missingSetup.joinToString()}",
@@ -189,12 +188,9 @@ private fun WorkflowGenerationScreen(viewModel: WorkflowGenerationViewModel) {
                 }
             }
 
-            // --- Validation Errors ---
             if (state.validationErrors.isNotEmpty()) {
                 Card(
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer
-                    )
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Text("Validation errors:", style = MaterialTheme.typography.labelMedium)
@@ -205,7 +201,6 @@ private fun WorkflowGenerationScreen(viewModel: WorkflowGenerationViewModel) {
                 }
             }
 
-            // --- Action Buttons ---
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedButton(
                     onClick = viewModel::saveWorkflow,
@@ -213,7 +208,6 @@ private fun WorkflowGenerationScreen(viewModel: WorkflowGenerationViewModel) {
                 ) {
                     Text(if (state.saved) "Saved" else "Save")
                 }
-
                 Button(
                     onClick = viewModel::runWorkflow,
                     enabled = state.isValid && !state.isBusy
@@ -222,15 +216,10 @@ private fun WorkflowGenerationScreen(viewModel: WorkflowGenerationViewModel) {
                 }
             }
 
-            // --- Raw JSON ---
             if (state.rawJson != null) {
                 Text("Raw Model Output", style = MaterialTheme.typography.titleSmall)
                 SelectionContainer {
-                    Card(
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant
-                        )
-                    ) {
+                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                         Text(
                             text = state.rawJson.orEmpty(),
                             modifier = Modifier.padding(12.dp),
@@ -242,7 +231,6 @@ private fun WorkflowGenerationScreen(viewModel: WorkflowGenerationViewModel) {
             }
         }
 
-        // --- Run Results ---
         if (state.runResults.isNotEmpty()) {
             HorizontalDivider()
             Text("Execution Results", style = MaterialTheme.typography.titleMedium)
@@ -255,11 +243,7 @@ private fun WorkflowGenerationScreen(viewModel: WorkflowGenerationViewModel) {
             HorizontalDivider()
             Text("Debug Trace", style = MaterialTheme.typography.titleMedium)
             SelectionContainer {
-                Card(
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant
-                    )
-                ) {
+                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                     Column(
                         modifier = Modifier.padding(12.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -297,10 +281,7 @@ private fun ModelStatusCard(state: InferenceState) {
         is InferenceState.GpuUnavailable -> "GPU unavailable: ${state.reason}" to MaterialTheme.colorScheme.error
         is InferenceState.Error -> "Error: ${state.message}" to MaterialTheme.colorScheme.error
     }
-
-    Card(
-        colors = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.1f))
-    ) {
+    Card(colors = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.1f))) {
         Text(
             text = label,
             modifier = Modifier.padding(12.dp),
@@ -318,16 +299,14 @@ private fun RunResultRow(result: ExecutionResult) {
     ) {
         Text(
             text = if (result.success) "\u2713" else "\u2717",
-            color = if (result.success) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.error,
+            color = if (result.success) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
             style = MaterialTheme.typography.titleMedium
         )
         Spacer(modifier = Modifier.width(8.dp))
         Column {
             Text(result.stepId, style = MaterialTheme.typography.bodySmall)
             if (result.message.isNotBlank()) {
-                Text(result.message, style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.outline)
+                Text(result.message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
             }
         }
     }
@@ -338,9 +317,7 @@ private fun triggerLabel(workflow: com.gemmaworkflow.domain.model.PlannedWorkflo
         is com.gemmaworkflow.domain.model.TriggerConfig.Manual -> "Manual"
         is com.gemmaworkflow.domain.model.TriggerConfig.Time -> "Time (${t.hour}:${t.minute})"
         is com.gemmaworkflow.domain.model.TriggerConfig.Nfc -> "NFC"
-        is com.gemmaworkflow.domain.model.TriggerConfig.ShareSheet ->
-            "Share Sheet (${t.setupState})"
-        is com.gemmaworkflow.domain.model.TriggerConfig.TaskerRequired ->
-            "Tasker (${t.setupState})"
+        is com.gemmaworkflow.domain.model.TriggerConfig.ShareSheet -> "Share Sheet (${t.setupState})"
+        is com.gemmaworkflow.domain.model.TriggerConfig.TaskerRequired -> "Tasker (${t.setupState})"
     }
 }
