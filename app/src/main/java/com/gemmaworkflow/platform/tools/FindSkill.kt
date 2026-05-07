@@ -3,71 +3,64 @@ package com.gemmaworkflow.platform.tools
 /**
  * Minimal skill index for the SLM.
  *
- * This is the "find skill" — it lists every available tool name + one-line
- * description in the most compact format possible. The SLM uses this to
- * discover what tools exist without consuming unnecessary context.
+ * Three modes:
+ * - index(): full catalog (discovery)
+ * - indexFor(allowed): only tools that agent can use
+ * - schemaFor(allowed): full parameter details for the agent
  *
- * Total context cost: ~50 tokens per tool × 12 tools = ~600 tokens.
+ * All three read from ToolRegistry dynamically — add a tool, it appears.
  */
 object FindSkill {
 
     /**
-     * Returns the complete tool index as a minimal string.
-     * Each line: "tool_name — one_line_description"
+     * Full catalog — every registered tool, one line each.
+     * Use for: "what tools exist?"
      */
     fun index(): String = buildString {
-        appendLine("=== Available Tools ===")
+        val all = ToolRegistry.all()
+        appendLine("=== Available Tools (${all.size}) ===")
         appendLine()
-        appendLine("-- Temporal --")
-        appendLine("get_current_time — current date, time, timezone, day")
-        appendLine("resolve_datetime — 'next Friday 2pm' → exact timestamp")
-        appendLine("compute_duration — add/subtract time or find duration")
-        appendLine("get_day_of_week — what day is a given date?")
-        appendLine()
-        appendLine("-- Device --")
-        appendLine("list_installed_apps — all launchable apps on device")
-        appendLine("resolve_intent — find apps that handle an action+URI")
-        appendLine("get_device_location — coarse lat/lng (no GPS needed)")
-        appendLine()
-        appendLine("-- Search & Knowledge --")
-        appendLine("web_search — search the web, returns top 3 results")
-        appendLine("search_places — search places/addresses with lat/lng (free OSM)")
-        appendLine("lookup_contact — search device contacts by name")
-        appendLine()
-        appendLine("-- Execution --")
-        appendLine("send_intent — send Android intent, report result")
-        appendLine("open_uri — open a URI (http, geo, tel, spotify://)")
-        appendLine("share_text — open Android share sheet with text")
-        appendLine("set_alarm — open clock to set alarm")
-        appendLine("create_calendar_event — open calendar with pre-filled event")
-        appendLine()
-        appendLine("-- Reasoning --")
-        appendLine("calculator — evaluate simple math expression")
-        appendLine("validate_json — check workflow JSON against allowlist")
+        // Group by category for readability
+        val temporal = all.filter { it.name in setOf("get_current_time", "resolve_datetime", "compute_duration", "get_day_of_week") }
+        val device = all.filter { it.name in setOf("list_installed_apps", "resolve_intent", "get_device_location") }
+        val search = all.filter { it.name in setOf("web_search", "search_places", "lookup_contact") }
+        val execution = all.filter { it.name in setOf("send_intent", "open_uri", "share_text", "set_alarm", "create_calendar_event") }
+        val reasoning = all.filter { it.name in setOf("calculator", "validate_json") }
+
+        if (temporal.isNotEmpty()) { appendLine("-- Temporal --"); temporal.forEach { appendLine("${it.name} — ${it.description}") }; appendLine() }
+        if (device.isNotEmpty()) { appendLine("-- Device --"); device.forEach { appendLine("${it.name} — ${it.description}") }; appendLine() }
+        if (search.isNotEmpty()) { appendLine("-- Search --"); search.forEach { appendLine("${it.name} — ${it.description}") }; appendLine() }
+        if (execution.isNotEmpty()) { appendLine("-- Execution --"); execution.forEach { appendLine("${it.name} — ${it.description}") }; appendLine() }
+        if (reasoning.isNotEmpty()) { appendLine("-- Reasoning --"); reasoning.forEach { appendLine("${it.name} — ${it.description}") } }
     }
 
     /**
-     * Returns only the tools assigned to a specific agent.
+     * Filtered index — only the tools this agent is allowed to use.
+     * Pass AgentToolAssignments.forAgent(role) to get the right set.
+     *
+     * Example:
+     *   FindSkill.indexFor(AgentToolAssignments.forAgent(PlannerAgent.RequestAnalysis))
+     *   → only temporal + device tools
      */
     fun indexFor(allowedTools: Set<String>): String = buildString {
         val registry = ToolRegistry
-        appendLine("=== Tools you can use ===")
-        for (name in allowedTools.sorted()) {
-            val tool = registry.get(name) ?: continue
+        val tools = allowedTools.mapNotNull { registry.get(it) }.sortedBy { it.name }
+        appendLine("=== Tools you can use (${tools.size}) ===")
+        for (tool in tools) {
             val params = if (tool.parameters.isEmpty()) ""
-            else " (params: ${tool.parameters.joinToString { "${it.name}:${it.type}" }})"
+            else " (${tool.parameters.joinToString { "${it.name}:${it.type}" }})"
             appendLine("${tool.name}$params — ${tool.description}")
         }
     }
 
     /**
-     * Full tool schema with parameter details. Use when the SLM
-     * needs to actually CALL a tool (not just discover it).
+     * Full schema — parameter details for each allowed tool.
+     * Use when the SLM needs to actually CALL a tool.
      */
     fun schemaFor(allowedTools: Set<String>): String = buildString {
         val registry = ToolRegistry
-        for (name in allowedTools.sorted()) {
-            val tool = registry.get(name) ?: continue
+        val tools = allowedTools.mapNotNull { registry.get(it) }.sortedBy { it.name }
+        for (tool in tools) {
             appendLine("Tool: ${tool.name}")
             appendLine("  ${tool.description}")
             if (tool.parameters.isNotEmpty()) {
