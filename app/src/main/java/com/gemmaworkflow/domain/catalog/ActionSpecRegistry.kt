@@ -213,7 +213,6 @@ object ActionSpecRegistry {
                 )
             ),
             triggerCompatible = setOf("manual", "time", "nfc"),
-            requiresConfirmation = true,
             examples = listOf(
                 buildJsonObject {
                     put("id", "alarm.set_alarm")
@@ -228,7 +227,7 @@ object ActionSpecRegistry {
         ActionSpec(
             id = "calendar.create_event",
             label = "Create calendar event",
-            description = "Open the calendar app to create an event with prefilled details.",
+            description = "Silently create a calendar event with the given details.",
             params = listOf(
                 ParamSpec("title", ParamType.String, description = "Event title"),
                 ParamSpec("begin_time_millis", ParamType.DateTimeMillis, description = "Start time in epoch milliseconds"),
@@ -249,7 +248,7 @@ object ActionSpecRegistry {
                 )
             ),
             triggerCompatible = setOf("manual", "time", "nfc"),
-            requiresConfirmation = true,
+            requiresConfirmation = false,
             fallbackActionIds = listOf("share.share_text"),
             examples = listOf(
                 buildJsonObject {

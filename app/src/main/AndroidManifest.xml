@@ -1,6 +1,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
+    <!-- Required for AlarmManager.setExactAndAllowWhileIdle().  On Android 12+ the
+         system gates this behind Settings; the app redirects via
+         ACTION_REQUEST_SCHEDULE_EXACT_ALARM when canScheduleExactAlarms() returns false. -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <!-- Required for AlarmReceiver to post a notification when the alarm fires. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Required for reading/writing calendar events silently. -->
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
+    <uses-permission android:name="android.permission.WRITE_CALENDAR" />
 
     <!-- Package visibility for the declarative ActionSpec registry. -->
     <queries>
@@ -39,6 +47,10 @@
             <action android:name="android.intent.action.INSERT" />
             <data android:mimeType="vnd.android.cursor.item/event" />
         </intent>
+        <!-- Required to open Android 12+ exact alarm Settings page. -->
+        <intent>
+            <action android:name="android.intent.action.REQUEST_SCHEDULE_EXACT_ALARM" />
+        </intent>
     </queries>
 
     <application
@@ -62,5 +74,14 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Receives the broadcast from AlarmManager when a silent alarm fires. -->
+        <receiver
+            android:name=".platform.alarm.AlarmReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.gemmaworkflow.platform.alarm.ACTION_ALARM_FIRE" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>
