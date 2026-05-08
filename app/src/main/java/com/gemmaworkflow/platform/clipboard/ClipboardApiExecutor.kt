@@ -3,6 +3,7 @@ package com.gemmaworkflow.platform.clipboard
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.util.Log
 import com.gemmaworkflow.domain.model.ExecutionResult
@@ -90,6 +91,21 @@ class ClipboardApiExecutor(private val context: Context) {
 
         return try {
             val uri = Uri.parse(uriText)
+
+            // For content:// URIs (photos, files, etc.), take persistable read permission
+            // so the clipboard recipient can access the data after paste.
+            if ("content" == uri.scheme) {
+                try {
+                    context.contentResolver.takePersistableUriPermission(
+                        uri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    )
+                } catch (_: SecurityException) {
+                    // Permission not persistable or not held — system grants transient
+                    // read access to clipboard recipients automatically.
+                }
+            }
+
             val clip = ClipData.newUri(context.contentResolver, null, uri)
             clipboardManager.setPrimaryClip(clip)
             Log.i(TAG, "URI copied to clipboard: $uri")
