@@ -1,6 +1,7 @@
 package com.gemmaworkflow.platform.calendar
 
 import android.Manifest
+import android.app.Activity
 import android.content.ContentResolver
 import android.content.ContentValues
 import android.content.Context
@@ -42,15 +43,18 @@ class CalendarApiExecutor(private val context: Context) {
     }
 
     /**
-     * Returns true if the permission should be requested.
-     * (i.e., not granted and not permanently denied).
+     * Returns true if WRITE_CALENDAR can be requested from the provided Activity.
      */
-    fun shouldRequestPermission(): Boolean {
+    fun canRequestPermission(activity: Activity): Boolean {
+        return !hasPermission() && !activity.isFinishing
+    }
+
+    /**
+     * Returns true when the UI should show a rationale before requesting permission.
+     */
+    fun shouldShowPermissionRationale(activity: Activity): Boolean {
         return !hasPermission() &&
-            ActivityCompat.shouldShowRequestPermissionRationale(
-                context as android.app.Activity,
-                PERMISSION_WRITE_CALENDAR
-            )
+            ActivityCompat.shouldShowRequestPermissionRationale(activity, PERMISSION_WRITE_CALENDAR)
     }
 
     /**
