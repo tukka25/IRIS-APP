@@ -1,6 +1,7 @@
 package com.gemmaworkflow.platform.nfc
 
 import android.content.Intent
+import android.net.Uri
 import android.nfc.NdefMessage
 import android.nfc.NdefRecord
 import android.nfc.NfcAdapter
@@ -51,7 +52,12 @@ class NfcTriggerWriter(
         const val MIME_TYPE = "application/com.gemmaworkflow.workflow"
 
         fun buildDeepLinkUri(workflowId: String): String =
-            "$SCHEME://$AUTHORITY/$workflowId"
+            Uri.Builder()
+                .scheme(SCHEME)
+                .authority(AUTHORITY)
+                .appendPath(workflowId)
+                .build()
+                .toString()
 
         fun parseWorkflowIdFromUri(uri: String): String? {
             return try {

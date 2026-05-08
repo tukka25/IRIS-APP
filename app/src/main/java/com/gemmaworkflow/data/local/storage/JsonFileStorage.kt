@@ -48,6 +48,11 @@ class JsonFileStorage<T : Any>(
     fun exists(name: String): Boolean =
         fileFor(name).exists()
 
-    private fun fileFor(name: String): File =
-        File(dir, "$name.json")
+    private fun fileFor(name: String): File {
+        require('/' !in name && '\\' !in name) {
+            "Name cannot contain path separators"
+        }
+
+        return File(dir, "$name.json")
+    }
 }
