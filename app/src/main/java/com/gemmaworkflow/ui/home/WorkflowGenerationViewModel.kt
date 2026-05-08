@@ -9,6 +9,8 @@ import com.gemmaworkflow.data.repository.WorkflowRepository
 import com.gemmaworkflow.data.seed.DemoWorkflowSeeder
 import com.gemmaworkflow.domain.catalog.ActionSpecRegistry
 import com.gemmaworkflow.domain.model.PlannedWorkflow
+import com.gemmaworkflow.domain.model.SharedContent
+import com.gemmaworkflow.domain.model.TriggerConfig
 import com.gemmaworkflow.domain.parser.WorkflowJsonParser
 import com.gemmaworkflow.domain.planner.PlannerAgents
 import com.gemmaworkflow.domain.planner.PromptBuilder
@@ -16,6 +18,9 @@ import com.gemmaworkflow.domain.planner.RequestAnalysisParser
 import com.gemmaworkflow.domain.runner.ConfirmationRequired
 import com.gemmaworkflow.domain.runner.WorkflowRunner
 import com.gemmaworkflow.domain.safety.WorkflowValidator
+import com.gemmaworkflow.domain.triggers.TriggerRegistry
+import com.gemmaworkflow.domain.triggers.TriggerRegistrationResult
+import com.gemmaworkflow.platform.alarm.TimeTriggerScheduler
 import com.gemmaworkflow.platform.capability.PackageCapabilityScanner
 import com.gemmaworkflow.platform.inference.InferenceManager
 import com.gemmaworkflow.platform.inference.InferenceState
@@ -60,6 +65,7 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
             }
         }
         viewModelScope.launch { InferenceManager.initialize(application) }
+        TriggerRegistry.initialize(application)
         viewModelScope.launch(Dispatchers.IO) {
             DemoWorkflowSeeder.seedIfNeeded(application, workflowRepo)
             val saved = workflowRepo.loadAll()
@@ -240,6 +246,22 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
         viewModelScope.launch(Dispatchers.IO) {
             workflowRepo.save(workflow)
             appendDebug("Save workflow", "Saved '${workflow.name}' to disk")
+
+            // Register the trigger (schedules AlarmManager for time triggers).
+            val triggerType = when (workflow.trigger) {
+                is com.gemmaworkflow.domain.model.TriggerConfig.Time -> "time"
+                is com.gemmaworkflow.domain.model.TriggerConfig.Nfc -> "nfc"
+                is com.gemmaworkflow.domain.model.TriggerConfig.ShareSheet -> "share_sheet"
+                is com.gemmaworkflow.domain.model.TriggerConfig.TaskerRequired -> "tasker_setup_required"
+                is com.gemmaworkflow.domain.model.TriggerConfig.Manual -> "manual"
+            }
+            val result = TriggerRegistry.register(workflow.name, triggerType, workflow.trigger)
+            if (result.success) {
+                appendDebug("TriggerRegistry", "Registered '$workflow.name' with trigger '$triggerType'")
+            } else {
+                appendDebug("TriggerRegistry", "Could not register trigger '$triggerType': ${result.message}")
+            }
+
             _uiState.update { it.copy(saved = true) }
         }
     }
@@ -357,6 +379,236 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
 
     fun clearWorkflowDetail() {
         _uiState.update { it.copy(selectedWorkflowDetail = null) }
+    }
+
+    // ── NFC trigger setup ───────────────────────────────────────────────────
+
+    fun openNfcSetup() {
+        _uiState.update {
+            it.copy(
+                showNfcSetup = true,
+                nfcWriteState = NfcWriteState.Idle,
+                nfcWriteWorkflowId = null
+            )
+        }
+    }
+
+    fun closeNfcSetup() {
+        _uiState.update {
+            it.copy(
+                showNfcSetup = false,
+                nfcWriteState = NfcWriteState.Idle,
+                nfcWriteWorkflowId = null
+            )
+        }
+    }
+
+    fun onNfcWorkflowSelected(workflowId: String) {
+        _uiState.update { it.copy(nfcWriteWorkflowId = workflowId) }
+    }
+
+    fun onNfcWriteRequested() {
+        val workflowId = uiState.value.nfcWriteWorkflowId ?: return
+        _uiState.update { it.copy(nfcWriteState = NfcWriteState.AwaitingTag(workflowId)) }
+    }
+
+    fun onNfcTagWritten(workflowId: String) {
+        _uiState.update { it.copy(nfcWriteState = NfcWriteState.Success(workflowId)) }
+    }
+
+    fun onNfcTagWriteError(workflowId: String, message: String) {
+        _uiState.update { it.copy(nfcWriteState = NfcWriteState.Error(workflowId, message)) }
+    }
+
+    /**
+     * Called by MainActivity when an NFC tag scan has been parsed and the
+     * user needs to confirm before running the workflow.
+     */
+    fun onNfcTagScanned(workflowId: String) {
+        val workflow = uiState.value.savedWorkflows.find { it.name == workflowId }
+        if (workflow != null) {
+            _uiState.update {
+                it.copy(nfcScanConfirmation = NfcScanConfirmation(workflowId, workflow.name))
+            }
+        }
+    }
+
+    /**
+     * User confirmed the NFC scan — run the workflow directly without going
+     * through the detail screen.
+     */
+    fun confirmNfcScan() {
+        val confirmation = uiState.value.nfcScanConfirmation ?: return
+        val workflow = uiState.value.savedWorkflows.find { it.name == confirmation.workflowId }
+            ?: return
+        _uiState.update { it.copy(nfcScanConfirmation = null) }
+        runWorkflow(workflow)
+    }
+
+    /**
+     * User dismissed the NFC scan confirmation.
+     */
+    fun dismissNfcScan() {
+        _uiState.update { it.copy(nfcScanConfirmation = null) }
+    }
+
+    /** Show the NFC tag setup screen for a given workflow. */
+    fun showNfcSetup(workflowId: String? = null) {
+        _uiState.update {
+            it.copy(
+                showNfcSetup = true,
+                nfcWriteWorkflowId = workflowId,
+                nfcWriteState = NfcWriteState.Idle
+            )
+        }
+    }
+
+    /** Hide the NFC setup screen and return to the main screen. */
+    fun hideNfcSetup() {
+        _uiState.update { it.copy(showNfcSetup = false) }
+    }
+
+    /** Called by MainActivity after a tag write attempt. */
+    fun onNfcWriteResult(success: Boolean, message: String) {
+        val workflowId = uiState.value.nfcWriteWorkflowId ?: return
+        _uiState.update {
+            it.copy(
+                nfcWriteState = if (success) {
+                    NfcWriteState.Success(workflowId)
+                } else {
+                    NfcWriteState.Error(workflowId, message)
+                }
+            )
+        }
+    }
+
+    /**
+     * Show the time trigger setup screen for a given workflow.
+     */
+    fun showTimeTriggerSetup(workflow: PlannedWorkflow) {
+        _uiState.update {
+            it.copy(
+                timeTriggerSetupWorkflow = workflow,
+                selectedWorkflowDetail = null // Hide detail screen to show setup
+            )
+        }
+    }
+
+    /**
+     * Save a time trigger for the workflow and schedule it via AlarmManager.
+     */
+    fun saveTimeTrigger(workflowName: String, trigger: com.gemmaworkflow.domain.model.TriggerConfig.Time) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val repo = WorkflowRepository(getApplication())
+            val scheduler = TimeTriggerScheduler(getApplication())
+            val workflow = repo.get(workflowName) ?: return@launch
+
+            // Update the workflow's trigger in-place.
+            val updatedWorkflow = workflow.copy(trigger = trigger)
+            repo.save(updatedWorkflow)
+
+            // Schedule the alarm.
+            scheduler.schedule(workflowName, trigger)
+
+            // Refresh saved workflows and clear the setup screen.
+            val saved = repo.loadAll()
+            _uiState.update {
+                it.copy(
+                    savedWorkflows = saved,
+                    selectedWorkflowDetail = if (it.selectedWorkflowDetail?.name == workflowName) {
+                        updatedWorkflow
+                    } else {
+                        it.selectedWorkflowDetail
+                    },
+                    timeTriggerSetupWorkflow = null
+                )
+            }
+            appendDebug("Time trigger", "Scheduled for '$workflowName' at %d:%02d".format(trigger.hour, trigger.minute))
+        }
+    }
+
+    /**
+     * Dismiss the time trigger setup screen without saving.
+     */
+    fun cancelTimeTriggerSetup() {
+        _uiState.update { it.copy(timeTriggerSetupWorkflow = null) }
+    }
+
+    /**
+     * Show the share sheet trigger setup screen for a given workflow.
+     */
+    fun showShareSheetSetup(workflow: PlannedWorkflow) {
+        _uiState.update {
+            it.copy(
+                shareSheetSetupWorkflow = workflow,
+                selectedWorkflowDetail = null // Hide detail screen to show setup
+            )
+        }
+    }
+
+    /**
+     * Save a Share Sheet trigger for the workflow and reload the saved list.
+     */
+    fun saveShareSheetTrigger(workflowName: String, trigger: com.gemmaworkflow.domain.model.TriggerConfig.ShareSheet) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val repo = WorkflowRepository(getApplication())
+            val workflow = repo.get(workflowName) ?: return@launch
+
+            val updatedWorkflow = workflow.copy(trigger = trigger)
+            repo.save(updatedWorkflow)
+
+            val saved = repo.loadAll()
+            _uiState.update {
+                it.copy(
+                    savedWorkflows = saved,
+                    selectedWorkflowDetail = if (it.selectedWorkflowDetail?.name == workflowName) {
+                        updatedWorkflow
+                    } else {
+                        it.selectedWorkflowDetail
+                    },
+                    shareSheetSetupWorkflow = null
+                )
+            }
+            appendDebug("ShareSheet trigger", "Enabled for '$workflowName'")
+        }
+    }
+
+    /**
+     * Dismiss the share sheet trigger setup screen without saving.
+     */
+    fun cancelShareSheetSetup() {
+        _uiState.update { it.copy(shareSheetSetupWorkflow = null) }
+    }
+
+    /** Called by MainActivity when the app receives an ACTION_SEND intent. */
+    fun setSharedContent(content: SharedContent) {
+        _uiState.update { it.copy(sharedContent = content) }
+    }
+
+    /** Clears the pending shared content without running anything. */
+    fun clearSharedContent() {
+        _uiState.update { it.copy(sharedContent = null) }
+    }
+
+    /**
+     * Called when the user selects a workflow from the share sheet picker.
+     * Pre-loads the workflow detail and clears the share sheet state so the
+     * main/detail screen renders next.
+     */
+    fun selectWorkflowFromShare(workflow: PlannedWorkflow, sharedContent: SharedContent) {
+        // Inject shared content as prompt context — the detail screen will
+        // then show the workflow so the user can confirm before running.
+        val promptHint = when (sharedContent) {
+            is SharedContent.Text -> sharedContent.text.take(200)
+            is SharedContent.Image -> "[Image: ${sharedContent.uri.lastPathSegment ?: sharedContent.uri}]"
+        }
+        _uiState.update {
+            it.copy(
+                sharedContent = null,
+                selectedWorkflowDetail = workflow,
+                prompt = promptHint
+            )
+        }
     }
 
     private fun appendDebug(label: String, message: String) {

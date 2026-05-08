@@ -1,0 +1,242 @@
+package com.gemmaworkflow.ui.trigger
+
+import android.os.Bundle
+import android.util.Log
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.unit.dp
+import com.gemmaworkflow.data.repository.WorkflowRepository
+import com.gemmaworkflow.domain.model.ExecutionResult
+import com.gemmaworkflow.domain.model.PlannedWorkflow
+import com.gemmaworkflow.domain.runner.WorkflowRunner
+import com.gemmaworkflow.platform.nfc.DeepLinkRouter
+import com.gemmaworkflow.platform.nfc.DeepLink
+import com.gemmaworkflow.ui.theme.GemmaWorkflowTheme
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+
+/**
+ * Activity displayed when a scheduled time trigger fires.
+ *
+ * It is launched via [TimeTriggerNotification.buildConfirmationIntent] from
+ * the notification shown by [TimeTriggerNotification.post], or via
+ * [TimeTriggerNotification.buildRunDirectIntent] for the "Run Now" action.
+ *
+ * This Activity:
+ * - Loads the named workflow from the repository
+ * - Shows a confirmation screen listing the workflow name, trigger type, and steps
+ * - On "Run Now" → executes the workflow via [WorkflowRunner] and shows results
+ * - On "View"   → posts a deep-link event via [DeepLinkRouter] so [com.gemmaworkflow.ui.MainActivity]
+ *                 navigates to the workflow detail screen
+ *
+ * Registered in AndroidManifest.xml for:
+ * - [TimeTriggerNotification.ACTION_SHOW_CONFIRMATION]
+ * - [TimeTriggerNotification.ACTION_RUN_DIRECT]
+ * - [DeepLinkRouter.ACTION_RUN_WORKFLOW] (for direct-run shortcut)
+ */
+class TimeTriggerConfirmationActivity : ComponentActivity() {
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
+    companion object {
+        private const val TAG = "TimeTriggerConfirmation"
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        val workflowName = intent.getStringExtra(TimeTriggerNotification.EXTRA_WORKFLOW_NAME)
+            ?: run {
+                Log.e(TAG, "No workflow name in intent — closing")
+                finish()
+                return
+            }
+
+        val action = intent.action
+
+        // If launched via "Run Now" (direct run shortcut from notification), run immediately.
+        if (action == TimeTriggerNotification.ACTION_RUN_DIRECT) {
+            runWorkflowAndFinish(workflowName)
+            return
+        }
+
+        // Otherwise show the confirmation screen.
+        val workflow = WorkflowRepository(this).get(workflowName)
+        if (workflow == null) {
+            Log.e(TAG, "Workflow not found: '$workflowName'")
+            finish()
+            return
+        }
+
+        setContent {
+            GemmaWorkflowTheme {
+                Surface(modifier = Modifier.fillMaxSize()) {
+                    TimeTriggerConfirmationScreen(
+                        workflow = workflow,
+                        onRun = { runWorkflowAndFinish(workflowName) },
+                        onView = {
+                            // Emit a deep-link event so MainActivity navigates to detail.
+                            DeepLinkRouter.emitDeepLink(
+                                DeepLink.ShowDetail(workflowName)
+                            )
+                            finish()
+                        },
+                        onDismiss = { finish() }
+                    )
+                }
+            }
+        }
+    }
+
+    private fun runWorkflowAndFinish(workflowName: String) {
+        scope.launch(Dispatchers.Default) {
+            val repo = WorkflowRepository(this@TimeTriggerConfirmationActivity)
+            val workflow = repo.get(workflowName)
+            if (workflow == null) {
+                Log.e(TAG, "Workflow not found: '$workflowName'")
+                finish()
+                return@launch
+            }
+            try {
+                val runner = WorkflowRunner(this@TimeTriggerConfirmationActivity)
+                val results = runner.run(workflow) { _, _ -> }
+                val allSuccess = results.all { it.success }
+                Log.i(TAG, "Time trigger workflow '$workflowName' completed — allSuccess=$allSuccess")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to run workflow '$workflowName'", e)
+            }
+            finish()
+        }
+    }
+}
+
+/**
+ * Composable confirmation screen shown when a time trigger fires.
+ */
+@Composable
+private fun TimeTriggerConfirmationScreen(
+    workflow: PlannedWorkflow,
+    onRun: () -> Unit,
+    onView: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Text("Scheduled Workflow", style = MaterialTheme.typography.headlineSmall)
+
+        // Workflow summary card
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(workflow.name, style = MaterialTheme.typography.titleMedium)
+                if (workflow.summary.isNotBlank()) {
+                    Text(workflow.summary, style = MaterialTheme.typography.bodyMedium)
+                }
+                Text(
+                    "Trigger: Scheduled \u2022 ${formatTriggerTime(workflow)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.outline
+                )
+            }
+        }
+
+        // Steps card
+        Text("Steps", style = MaterialTheme.typography.titleSmall)
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                workflow.actions.forEachIndexed { index, step ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "${index + 1}.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontFamily = FontFamily.Monospace
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(step.id, style = MaterialTheme.typography.bodyMedium)
+                            if (step.params.isNotEmpty()) {
+                                Text(
+                                    step.params.entries.joinToString(", ") { "${it.key}=${it.value}" },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = MaterialTheme.colorScheme.outline
+                                )
+                            }
+                        }
+                    }
+                    if (index < workflow.actions.lastIndex) {
+                        HorizontalDivider()
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Action buttons — run after confirming, View navigates to detail, Dismiss closes.
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            OutlinedButton(
+                onClick = onDismiss,
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("Dismiss")
+            }
+            OutlinedButton(
+                onClick = onView,
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("View")
+            }
+            Button(
+                onClick = onRun,
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("Run Now")
+            }
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
+    }
+}
+
+private fun formatTriggerTime(workflow: PlannedWorkflow): String {
+    val t = workflow.trigger
+    return if (t is com.gemmaworkflow.domain.model.TriggerConfig.Time) {
+        "${formatTimeLabel(t.hour, t.minute)} \u2022 ${formatRepeatLabel(t.repeatDays)}"
+    } else {
+        "Scheduled"
+    }
+}

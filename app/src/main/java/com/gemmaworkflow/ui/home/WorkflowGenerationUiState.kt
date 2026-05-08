@@ -2,6 +2,7 @@ package com.gemmaworkflow.ui.home
 
 import com.gemmaworkflow.domain.model.ExecutionResult
 import com.gemmaworkflow.domain.model.PlannedWorkflow
+import com.gemmaworkflow.domain.model.SharedContent
 import com.gemmaworkflow.platform.inference.InferenceState
 
 /**
@@ -14,6 +15,32 @@ data class ConfirmationRequest(
     val stepLabel: String,
     val params: Map<String, String>
 )
+
+/**
+ * Carries the information needed to render a confirmation dialog when an NFC tag
+ * is scanned and the user needs to confirm before running the workflow.
+ */
+data class NfcScanConfirmation(
+    val workflowId: String,
+    val workflowName: String
+)
+
+/**
+ * Represents content received via the Android share sheet that is pending
+ * workflow selection by the user.
+ */
+data class PendingShare(
+    val text: String?,
+    val uri: String?,
+    val sourceLabel: String?
+) {
+    val displaySummary: String
+        get() = when {
+            !text.isNullOrBlank() -> text.take(80).let { if (text.length > 80) "$it…" else it }
+            !uri.isNullOrBlank() -> "Shared file: ${uri.substringAfterLast('/')}"
+            else -> "Shared content"
+        }
+}
 
 data class WorkflowGenerationUiState(
     val prompt: String = "send message to +971****8872 saying hi, and invite him to meeting on 6 oclock on next friday and then add it to my calender.",
@@ -39,7 +66,36 @@ data class WorkflowGenerationUiState(
     /** Non-null when the user has tapped a saved workflow to see its detail. */
     val selectedWorkflowDetail: PlannedWorkflow? = null,
     /** The workflow currently being executed (used to resume after confirmation on the detail screen). */
-    val runningWorkflow: PlannedWorkflow? = null
+    val runningWorkflow: PlannedWorkflow? = null,
+    /** Non-null when the user is setting up a time trigger for a saved workflow. */
+    val timeTriggerSetupWorkflow: PlannedWorkflow? = null,
+    /** Shared content from an incoming share intent. */
+    val sharedContent: SharedContent? = null,
+
+    // ── Share sheet state ──────────────────────────────────────────────────
+    /**
+     * Non-null when the user is setting up a share sheet trigger for a saved workflow.
+     */
+    val shareSheetSetupWorkflow: PlannedWorkflow? = null,
+
+    /**
+     * Non-null when content was shared to the app and the user needs to pick a workflow.
+     */
+    val pendingShare: PendingShare? = null,
+    /**
+     * List of saved workflows that support the share sheet trigger.
+     */
+    val shareSheetWorkflows: List<PlannedWorkflow> = emptyList(),
+
+    // ── NFC trigger state ────────────────────────────────────────────────
+    /** True when the NFC tag setup screen should be shown. */
+    val showNfcSetup: Boolean = false,
+    /** Current write-to-tag state. */
+    val nfcWriteState: NfcWriteState = NfcWriteState.Idle,
+    /** The name of the workflow selected for NFC writing. */
+    val nfcWriteWorkflowId: String? = null,
+    /** Pending NFC scan awaiting user confirmation to run. */
+    val nfcScanConfirmation: NfcScanConfirmation? = null
 ) {
     val canGenerate: Boolean
         get() = isModelReady && !isBusy && prompt.isNotBlank()
