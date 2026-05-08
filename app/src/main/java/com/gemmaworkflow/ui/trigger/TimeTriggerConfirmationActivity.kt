@@ -65,7 +65,7 @@ import kotlinx.coroutines.withContext
  */
 class TimeTriggerConfirmationActivity : ComponentActivity() {
 
-    private val workflowRepository by lazy { WorkflowRepository(this) }
+    private val workflowRepository by lazy { WorkflowRepository(this@TimeTriggerConfirmationActivity) }
 
     companion object {
         private const val TAG = "TimeTriggerConfirmation"

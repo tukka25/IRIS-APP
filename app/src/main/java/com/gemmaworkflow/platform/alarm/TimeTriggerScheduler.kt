@@ -140,15 +140,14 @@ class TimeTriggerScheduler(private val context: Context) {
             return computeNextTriggerTimeMillis(hour, minute, emptyList())
         }
 
+        val candidate = java.util.Calendar.getInstance()
         for (offset in 0..6) {
-            val candidate = java.util.Calendar.getInstance().apply {
-                timeInMillis = now.timeInMillis
-                add(java.util.Calendar.DAY_OF_MONTH, offset)
-                set(java.util.Calendar.HOUR_OF_DAY, hour)
-                set(java.util.Calendar.MINUTE, minute)
-                set(java.util.Calendar.SECOND, 0)
-                set(java.util.Calendar.MILLISECOND, 0)
-            }
+            candidate.timeInMillis = now.timeInMillis
+            candidate.add(java.util.Calendar.DAY_OF_MONTH, offset)
+            candidate.set(java.util.Calendar.HOUR_OF_DAY, hour)
+            candidate.set(java.util.Calendar.MINUTE, minute)
+            candidate.set(java.util.Calendar.SECOND, 0)
+            candidate.set(java.util.Calendar.MILLISECOND, 0)
             val dayOfWeek = candidate.get(java.util.Calendar.DAY_OF_WEEK)
             if (dayOfWeek in validDays && candidate.timeInMillis > now.timeInMillis) {
                 return candidate.timeInMillis
