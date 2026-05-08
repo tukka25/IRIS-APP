@@ -56,7 +56,7 @@ class JsonFileStorage<T : Any>(
         val file = File(dir, "$name.json")
         val canonicalDir = dir.canonicalFile
         val canonicalFile = file.canonicalFile
-        require(canonicalFile.path.startsWith(canonicalDir.path + File.separator)) {
+        require(canonicalFile.toPath().startsWith(canonicalDir.toPath())) {
             "Name resolves outside storage directory"
         }
         return file
