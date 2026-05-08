@@ -141,7 +141,8 @@ class TimeTriggerScheduler(private val context: Context) {
         }
 
         for (offset in 0..6) {
-            val candidate = (now.clone() as java.util.Calendar).apply {
+            val candidate = java.util.Calendar.getInstance().apply {
+                timeInMillis = now.timeInMillis
                 add(java.util.Calendar.DAY_OF_MONTH, offset)
                 set(java.util.Calendar.HOUR_OF_DAY, hour)
                 set(java.util.Calendar.MINUTE, minute)

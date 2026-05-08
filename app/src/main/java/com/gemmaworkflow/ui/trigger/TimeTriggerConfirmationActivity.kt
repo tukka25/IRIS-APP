@@ -65,6 +65,8 @@ import kotlinx.coroutines.withContext
  */
 class TimeTriggerConfirmationActivity : ComponentActivity() {
 
+    private val workflowRepository by lazy { WorkflowRepository(this) }
+
     companion object {
         private const val TAG = "TimeTriggerConfirmation"
     }
@@ -91,7 +93,7 @@ class TimeTriggerConfirmationActivity : ComponentActivity() {
             var state by remember { mutableStateOf<ConfirmationScreenState>(ConfirmationScreenState.Loading) }
             LaunchedEffect(workflowName) {
                 val workflow = withContext(Dispatchers.IO) {
-                    WorkflowRepository(this@TimeTriggerConfirmationActivity).get(workflowName)
+                    workflowRepository.get(workflowName)
                 }
                 state = if (workflow != null) {
                     ConfirmationScreenState.Ready(workflow)
@@ -129,7 +131,7 @@ class TimeTriggerConfirmationActivity : ComponentActivity() {
     private fun runWorkflowAndFinish(workflowName: String) {
         lifecycleScope.launch {
             val workflow = withContext(Dispatchers.IO) {
-                WorkflowRepository(this@TimeTriggerConfirmationActivity).get(workflowName)
+                workflowRepository.get(workflowName)
             }
             if (workflow == null) {
                 Log.e(TAG, "Workflow not found: '$workflowName'")

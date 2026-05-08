@@ -9,6 +9,7 @@ import com.gemmaworkflow.domain.model.WorkflowStep
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
@@ -105,7 +106,7 @@ object WorkflowValidator {
             ParamType.StringArray -> {
                 val array = value as? JsonArray
                 if (array != null && array.all { element ->
-                        runCatching { element.jsonPrimitive.isString }.getOrDefault(false)
+                        (element as? JsonPrimitive)?.isString == true
                     }) {
                     null
                 } else {
