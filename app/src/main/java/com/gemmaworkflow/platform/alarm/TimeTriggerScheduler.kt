@@ -135,28 +135,27 @@ class TimeTriggerScheduler(private val context: Context) {
             .filter { it in java.util.Calendar.SUNDAY..java.util.Calendar.SATURDAY }
             .toSet()
 
-        for (offset in 0..7) {
-            val candidate = (now.clone() as java.util.Calendar).apply {
-                add(java.util.Calendar.DAY_OF_MONTH, offset)
-                set(java.util.Calendar.HOUR_OF_DAY, hour)
-                set(java.util.Calendar.MINUTE, minute)
-                set(java.util.Calendar.SECOND, 0)
-                set(java.util.Calendar.MILLISECOND, 0)
-            }
+        if (validDays.isEmpty()) {
+            Log.w(TAG, "repeatDays contains no valid Calendar.DAY_OF_WEEK values: $repeatDays")
+            return computeNextTriggerTimeMillis(hour, minute, emptyList())
+        }
+
+        val candidate = java.util.Calendar.getInstance()
+        for (offset in 0..6) {
+            candidate.timeInMillis = now.timeInMillis
+            candidate.add(java.util.Calendar.DAY_OF_MONTH, offset)
+            candidate.set(java.util.Calendar.HOUR_OF_DAY, hour)
+            candidate.set(java.util.Calendar.MINUTE, minute)
+            candidate.set(java.util.Calendar.SECOND, 0)
+            candidate.set(java.util.Calendar.MILLISECOND, 0)
             val dayOfWeek = candidate.get(java.util.Calendar.DAY_OF_WEEK)
             if (dayOfWeek in validDays && candidate.timeInMillis > now.timeInMillis) {
                 return candidate.timeInMillis
             }
         }
 
-        val fallback = (now.clone() as java.util.Calendar).apply {
-            add(java.util.Calendar.DAY_OF_MONTH, 7)
-            set(java.util.Calendar.HOUR_OF_DAY, hour)
-            set(java.util.Calendar.MINUTE, minute)
-            set(java.util.Calendar.SECOND, 0)
-            set(java.util.Calendar.MILLISECOND, 0)
-        }
-        return fallback.timeInMillis
+        Log.w(TAG, "No matching repeat day found in next 7 days; defaulting to one-shot scheduling")
+        return computeNextTriggerTimeMillis(hour, minute, emptyList())
     }
 
     private fun formatTime(hour: Int, minute: Int): String =

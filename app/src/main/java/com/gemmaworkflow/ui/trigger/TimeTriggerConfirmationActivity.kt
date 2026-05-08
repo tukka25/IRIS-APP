@@ -24,6 +24,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -64,6 +65,8 @@ import kotlinx.coroutines.withContext
  */
 class TimeTriggerConfirmationActivity : ComponentActivity() {
 
+    private val workflowRepository by lazy { WorkflowRepository(this@TimeTriggerConfirmationActivity) }
+
     companion object {
         private const val TAG = "TimeTriggerConfirmation"
     }
@@ -86,19 +89,19 @@ class TimeTriggerConfirmationActivity : ComponentActivity() {
             return
         }
 
-        var state by mutableStateOf<ConfirmationScreenState>(ConfirmationScreenState.Loading)
-        lifecycleScope.launch {
-            val workflow = withContext(Dispatchers.IO) {
-                WorkflowRepository(this@TimeTriggerConfirmationActivity).get(workflowName)
-            }
-            state = if (workflow != null) {
-                ConfirmationScreenState.Ready(workflow)
-            } else {
-                ConfirmationScreenState.Error("Workflow '$workflowName' not found")
-            }
-        }
-
         setContent {
+            var state by remember { mutableStateOf<ConfirmationScreenState>(ConfirmationScreenState.Loading) }
+            LaunchedEffect(workflowName) {
+                val workflow = withContext(Dispatchers.IO) {
+                    workflowRepository.get(workflowName)
+                }
+                state = if (workflow != null) {
+                    ConfirmationScreenState.Ready(workflow)
+                } else {
+                    ConfirmationScreenState.Error("Workflow '$workflowName' not found")
+                }
+            }
+
             GemmaWorkflowTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     when (val current = state) {
@@ -128,7 +131,7 @@ class TimeTriggerConfirmationActivity : ComponentActivity() {
     private fun runWorkflowAndFinish(workflowName: String) {
         lifecycleScope.launch {
             val workflow = withContext(Dispatchers.IO) {
-                WorkflowRepository(this@TimeTriggerConfirmationActivity).get(workflowName)
+                workflowRepository.get(workflowName)
             }
             if (workflow == null) {
                 Log.e(TAG, "Workflow not found: '$workflowName'")
