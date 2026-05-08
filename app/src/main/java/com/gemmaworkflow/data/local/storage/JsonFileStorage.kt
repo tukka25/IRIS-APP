@@ -53,6 +53,12 @@ class JsonFileStorage<T : Any>(
             "Name cannot contain path separators"
         }
 
-        return File(dir, "$name.json")
+        val file = File(dir, "$name.json")
+        val canonicalDir = dir.canonicalFile
+        val canonicalFile = file.canonicalFile
+        require(canonicalFile.path.startsWith(canonicalDir.path + File.separator)) {
+            "Name resolves outside storage directory"
+        }
+        return file
     }
 }
