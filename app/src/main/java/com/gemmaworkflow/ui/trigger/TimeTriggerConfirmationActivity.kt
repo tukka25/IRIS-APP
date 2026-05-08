@@ -24,6 +24,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -86,19 +87,19 @@ class TimeTriggerConfirmationActivity : ComponentActivity() {
             return
         }
 
-        var state by mutableStateOf<ConfirmationScreenState>(ConfirmationScreenState.Loading)
-        lifecycleScope.launch {
-            val workflow = withContext(Dispatchers.IO) {
-                WorkflowRepository(this@TimeTriggerConfirmationActivity).get(workflowName)
-            }
-            state = if (workflow != null) {
-                ConfirmationScreenState.Ready(workflow)
-            } else {
-                ConfirmationScreenState.Error("Workflow '$workflowName' not found")
-            }
-        }
-
         setContent {
+            var state by remember { mutableStateOf<ConfirmationScreenState>(ConfirmationScreenState.Loading) }
+            LaunchedEffect(workflowName) {
+                val workflow = withContext(Dispatchers.IO) {
+                    WorkflowRepository(this@TimeTriggerConfirmationActivity).get(workflowName)
+                }
+                state = if (workflow != null) {
+                    ConfirmationScreenState.Ready(workflow)
+                } else {
+                    ConfirmationScreenState.Error("Workflow '$workflowName' not found")
+                }
+            }
+
             GemmaWorkflowTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     when (val current = state) {
