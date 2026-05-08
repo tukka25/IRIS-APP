@@ -1,13 +1,16 @@
 package com.gemmaworkflow.platform.share
 
+import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import com.gemmaworkflow.R
 import com.gemmaworkflow.data.repository.WorkflowRepository
 import com.gemmaworkflow.domain.model.PlannedWorkflow
@@ -138,7 +141,12 @@ object ShareSheetTriggerHandler {
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .build()
 
-        notificationManager.notify(NOTIFICATION_ID_BASE, notification)
+        if (!canPostNotifications(context)) return
+        try {
+            notificationManager.notify(NOTIFICATION_ID_BASE, notification)
+        } catch (se: SecurityException) {
+            Log.w(TAG, "Cannot post 'no workflows' notification", se)
+        }
     }
 
     private fun showSelectorNotification(
@@ -194,7 +202,24 @@ object ShareSheetTriggerHandler {
             .addAction(android.R.drawable.ic_menu_manage, "Choose\u2026", openPendingIntent)
             .build()
 
-        notificationManager.notify(NOTIFICATION_ID_BASE, notification)
+        if (!canPostNotifications(context)) return
+        try {
+            notificationManager.notify(NOTIFICATION_ID_BASE, notification)
+        } catch (se: SecurityException) {
+            Log.w(TAG, "Cannot post selector notification", se)
+        }
+    }
+
+    private fun canPostNotifications(context: Context): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return true
+        val granted = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.POST_NOTIFICATIONS
+        ) == PackageManager.PERMISSION_GRANTED
+        if (!granted) {
+            Log.w(TAG, "Cannot post share notification: POST_NOTIFICATIONS permission not granted")
+        }
+        return granted
     }
 
     // ---------------------------------------------------------------------------------------------

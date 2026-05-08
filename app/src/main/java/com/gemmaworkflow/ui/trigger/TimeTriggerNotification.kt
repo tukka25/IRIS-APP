@@ -12,8 +12,6 @@ import androidx.core.content.ContextCompat
 import android.Manifest
 import android.content.pm.PackageManager
 import com.gemmaworkflow.R
-import com.gemmaworkflow.platform.nfc.DeepLinkRouter
-import com.gemmaworkflow.ui.MainActivity
 
 /**
  * Posts a high-priority notification when a time trigger fires.
@@ -23,7 +21,7 @@ import com.gemmaworkflow.ui.MainActivity
  * This mirrors the pattern used by [com.gemmaworkflow.platform.nfc.NfcTriggerHandler].
  *
  * Two action buttons are provided:
- * - "Run Now" — launches directly into the confirmation screen
+ * - "Run Now" — launches [TimeTriggerConfirmationActivity] in direct-run mode
  * - "View"   — opens the workflow detail screen
  *
  * The notification is posted via [postTimeTriggerNotification].
@@ -107,13 +105,13 @@ object TimeTriggerNotification {
     }
 
     /**
-     * Build a PendingIntent that directly runs the named workflow
-     * (bypasses the confirmation screen).
+     * Build a PendingIntent that launches [TimeTriggerConfirmationActivity]
+     * in direct-run mode for the named workflow.
      */
     fun buildRunDirectIntent(context: Context, workflowName: String): PendingIntent {
-        val intent = Intent(context, MainActivity::class.java).apply {
-            action = DeepLinkRouter.ACTION_RUN_WORKFLOW
-            putExtra(DeepLinkRouter.EXTRA_WORKFLOW_ID, workflowName)
+        val intent = Intent(context, TimeTriggerConfirmationActivity::class.java).apply {
+            action = ACTION_RUN_DIRECT
+            putExtra(EXTRA_WORKFLOW_NAME, workflowName)
             flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
         }
         return PendingIntent.getActivity(

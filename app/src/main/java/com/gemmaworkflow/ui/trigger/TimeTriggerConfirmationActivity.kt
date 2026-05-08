@@ -17,6 +17,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -31,16 +32,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.lifecycleScope
 import com.gemmaworkflow.data.repository.WorkflowRepository
-import com.gemmaworkflow.domain.model.ExecutionResult
 import com.gemmaworkflow.domain.model.PlannedWorkflow
 import com.gemmaworkflow.domain.runner.WorkflowRunner
 import com.gemmaworkflow.platform.nfc.DeepLinkRouter
 import com.gemmaworkflow.platform.nfc.DeepLink
 import com.gemmaworkflow.ui.theme.GemmaWorkflowTheme
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -65,8 +64,6 @@ import kotlinx.coroutines.withContext
  */
 class TimeTriggerConfirmationActivity : ComponentActivity() {
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-
     companion object {
         private const val TAG = "TimeTriggerConfirmation"
     }
@@ -89,52 +86,107 @@ class TimeTriggerConfirmationActivity : ComponentActivity() {
             return
         }
 
-        // Otherwise show the confirmation screen.
-        val workflow = WorkflowRepository(this).get(workflowName)
-        if (workflow == null) {
-            Log.e(TAG, "Workflow not found: '$workflowName'")
-            finish()
-            return
+        var state by mutableStateOf<ConfirmationScreenState>(ConfirmationScreenState.Loading)
+        lifecycleScope.launch {
+            val workflow = withContext(Dispatchers.IO) {
+                WorkflowRepository(this@TimeTriggerConfirmationActivity).get(workflowName)
+            }
+            state = if (workflow != null) {
+                ConfirmationScreenState.Ready(workflow)
+            } else {
+                ConfirmationScreenState.Error("Workflow '$workflowName' not found")
+            }
         }
 
         setContent {
             GemmaWorkflowTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    TimeTriggerConfirmationScreen(
-                        workflow = workflow,
-                        onRun = { runWorkflowAndFinish(workflowName) },
-                        onView = {
-                            // Emit a deep-link event so MainActivity navigates to detail.
-                            DeepLinkRouter.emitDeepLink(
-                                DeepLink.ShowDetail(workflowName)
-                            )
-                            finish()
-                        },
-                        onDismiss = { finish() }
-                    )
+                    when (val current = state) {
+                        ConfirmationScreenState.Loading -> LoadingConfirmationScreen()
+                        is ConfirmationScreenState.Error -> ErrorConfirmationScreen(
+                            message = current.message,
+                            onDismiss = { finish() }
+                        )
+                        is ConfirmationScreenState.Ready -> TimeTriggerConfirmationScreen(
+                            workflow = current.workflow,
+                            onRun = { runWorkflowAndFinish(workflowName) },
+                            onView = {
+                                // Emit a deep-link event so MainActivity navigates to detail.
+                                DeepLinkRouter.emitDeepLink(
+                                    DeepLink.ShowDetail(workflowName)
+                                )
+                                finish()
+                            },
+                            onDismiss = { finish() }
+                        )
+                    }
                 }
             }
         }
     }
 
     private fun runWorkflowAndFinish(workflowName: String) {
-        scope.launch(Dispatchers.Default) {
-            val repo = WorkflowRepository(this@TimeTriggerConfirmationActivity)
-            val workflow = repo.get(workflowName)
+        lifecycleScope.launch {
+            val workflow = withContext(Dispatchers.IO) {
+                WorkflowRepository(this@TimeTriggerConfirmationActivity).get(workflowName)
+            }
             if (workflow == null) {
                 Log.e(TAG, "Workflow not found: '$workflowName'")
-                withContext(Dispatchers.Main) { finish() }
+                finish()
                 return@launch
             }
             try {
-                val runner = WorkflowRunner(this@TimeTriggerConfirmationActivity)
-                val results = runner.run(workflow) { _, _ -> }
+                val results = withContext(Dispatchers.Default) {
+                    val runner = WorkflowRunner(this@TimeTriggerConfirmationActivity)
+                    runner.run(workflow) { _, _ -> }
+                }
                 val allSuccess = results.all { it.success }
                 Log.i(TAG, "Time trigger workflow '$workflowName' completed — allSuccess=$allSuccess")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to run workflow '$workflowName'", e)
             }
-            withContext(Dispatchers.Main) { finish() }
+            finish()
+        }
+    }
+}
+
+private sealed interface ConfirmationScreenState {
+    data object Loading : ConfirmationScreenState
+    data class Ready(val workflow: PlannedWorkflow) : ConfirmationScreenState
+    data class Error(val message: String) : ConfirmationScreenState
+}
+
+@Composable
+private fun LoadingConfirmationScreen() {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        CircularProgressIndicator()
+        Spacer(modifier = Modifier.height(12.dp))
+        Text("Loading scheduled workflow…")
+    }
+}
+
+@Composable
+private fun ErrorConfirmationScreen(
+    message: String,
+    onDismiss: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(message, style = MaterialTheme.typography.bodyMedium)
+        Spacer(modifier = Modifier.height(16.dp))
+        OutlinedButton(onClick = onDismiss) {
+            Text("Dismiss")
         }
     }
 }

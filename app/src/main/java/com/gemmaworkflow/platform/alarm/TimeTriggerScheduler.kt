@@ -50,7 +50,11 @@ class TimeTriggerScheduler(private val context: Context) {
         cancel(workflowName)
 
         val requestCode = workflowRequestCode(workflowName)
-        val triggerTimeMillis = computeNextTriggerTimeMillis(trigger.hour, trigger.minute)
+        val triggerTimeMillis = computeNextTriggerTimeMillis(
+            hour = trigger.hour,
+            minute = trigger.minute,
+            repeatDays = trigger.repeatDays
+        )
 
         val intent = Intent(context, TimeTriggerReceiver::class.java).apply {
             action = ACTION_TIME_TRIGGER
@@ -110,18 +114,49 @@ class TimeTriggerScheduler(private val context: Context) {
         return REQUEST_CODE_BASE + workflowName.hashCode()
     }
 
-    private fun computeNextTriggerTimeMillis(hour: Int, minute: Int): Long {
+    private fun computeNextTriggerTimeMillis(hour: Int, minute: Int, repeatDays: List<Int>): Long {
         val now = java.util.Calendar.getInstance()
-        val alarm = java.util.Calendar.getInstance().apply {
+
+        if (repeatDays.isEmpty()) {
+            val alarm = java.util.Calendar.getInstance().apply {
+                set(java.util.Calendar.HOUR_OF_DAY, hour)
+                set(java.util.Calendar.MINUTE, minute)
+                set(java.util.Calendar.SECOND, 0)
+                set(java.util.Calendar.MILLISECOND, 0)
+            }
+            if (alarm.timeInMillis <= now.timeInMillis) {
+                alarm.add(java.util.Calendar.DAY_OF_MONTH, 1)
+            }
+            return alarm.timeInMillis
+        }
+
+        val validDays = repeatDays
+            .distinct()
+            .filter { it in java.util.Calendar.SUNDAY..java.util.Calendar.SATURDAY }
+            .toSet()
+
+        for (offset in 0..7) {
+            val candidate = (now.clone() as java.util.Calendar).apply {
+                add(java.util.Calendar.DAY_OF_MONTH, offset)
+                set(java.util.Calendar.HOUR_OF_DAY, hour)
+                set(java.util.Calendar.MINUTE, minute)
+                set(java.util.Calendar.SECOND, 0)
+                set(java.util.Calendar.MILLISECOND, 0)
+            }
+            val dayOfWeek = candidate.get(java.util.Calendar.DAY_OF_WEEK)
+            if (dayOfWeek in validDays && candidate.timeInMillis > now.timeInMillis) {
+                return candidate.timeInMillis
+            }
+        }
+
+        val fallback = (now.clone() as java.util.Calendar).apply {
+            add(java.util.Calendar.DAY_OF_MONTH, 7)
             set(java.util.Calendar.HOUR_OF_DAY, hour)
             set(java.util.Calendar.MINUTE, minute)
             set(java.util.Calendar.SECOND, 0)
             set(java.util.Calendar.MILLISECOND, 0)
         }
-        if (alarm.timeInMillis <= now.timeInMillis) {
-            alarm.add(java.util.Calendar.DAY_OF_MONTH, 1)
-        }
-        return alarm.timeInMillis
+        return fallback.timeInMillis
     }
 
     private fun formatTime(hour: Int, minute: Int): String =

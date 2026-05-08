@@ -104,7 +104,9 @@ object WorkflowValidator {
             ParamType.Boolean -> if (primitive?.booleanOrNull != null) null else "$prefix: param '${param.name}' must be a boolean"
             ParamType.StringArray -> {
                 val array = value as? JsonArray
-                if (array != null && array.all { runCatching { it.jsonPrimitive.content }.isSuccess }) {
+                if (array != null && array.all { element ->
+                        runCatching { element.jsonPrimitive.isString }.getOrDefault(false)
+                    }) {
                     null
                 } else {
                     "$prefix: param '${param.name}' must be an array of strings"

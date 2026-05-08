@@ -142,7 +142,7 @@ fun TimeTriggerPickerDialog(
                 )
 
                 // Sync timeState back to outer scope hour/minute on user interaction.
-                LaunchedEffect(timeState) {
+                LaunchedEffect(timeState.hour, timeState.minute) {
                     hour = timeState.hour
                     minute = timeState.minute
                 }

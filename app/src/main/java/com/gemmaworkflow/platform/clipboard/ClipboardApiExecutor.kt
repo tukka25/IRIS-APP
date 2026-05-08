@@ -3,6 +3,7 @@ package com.gemmaworkflow.platform.clipboard
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.net.Uri
 import android.util.Log
 import com.gemmaworkflow.domain.model.ExecutionResult
 import kotlinx.serialization.json.JsonObject
@@ -47,7 +48,7 @@ class ClipboardApiExecutor(private val context: Context) {
      */
     fun executeShareImage(params: JsonObject): ExecutionResult {
         val uri = params["uri"]?.let { (it as? JsonPrimitive)?.contentOrNull }
-        return copyText(uri, "share.share_image")
+        return copyUri(uri, "share.share_image")
     }
 
     private fun copyText(text: String?, stepId: String): ExecutionResult {
@@ -74,6 +75,35 @@ class ClipboardApiExecutor(private val context: Context) {
                 stepId = stepId,
                 success = false,
                 message = e.message ?: "Failed to copy to clipboard"
+            )
+        }
+    }
+
+    private fun copyUri(uriText: String?, stepId: String): ExecutionResult {
+        if (uriText.isNullOrBlank()) {
+            return ExecutionResult(
+                stepId = stepId,
+                success = false,
+                message = "Missing or empty 'uri' param"
+            )
+        }
+
+        return try {
+            val uri = Uri.parse(uriText)
+            val clip = ClipData.newUri(context.contentResolver, null, uri)
+            clipboardManager.setPrimaryClip(clip)
+            Log.i(TAG, "URI copied to clipboard: $uri")
+            ExecutionResult(
+                stepId = stepId,
+                success = true,
+                message = "Copied image URI to clipboard"
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to copy URI to clipboard", e)
+            ExecutionResult(
+                stepId = stepId,
+                success = false,
+                message = e.message ?: "Failed to copy URI to clipboard"
             )
         }
     }
