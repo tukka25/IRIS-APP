@@ -5,6 +5,7 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.provider.Settings
 import android.util.Log
 import com.gemmaworkflow.domain.catalog.ActionSpec
@@ -14,6 +15,8 @@ import com.gemmaworkflow.domain.model.PlannedWorkflow
 import com.gemmaworkflow.domain.model.WorkflowStep
 import com.gemmaworkflow.platform.alarm.AlarmApiExecutor
 import com.gemmaworkflow.platform.calendar.CalendarApiExecutor
+import com.gemmaworkflow.platform.capability.ChromeCustomTabOpener
+import com.gemmaworkflow.platform.clipboard.ClipboardApiExecutor
 
 /**
  * Thrown by [WorkflowRunner.executeStep] when a step has [WorkflowStep.requiresConfirmation] set.
@@ -32,10 +35,14 @@ class WorkflowRunner(
     private val context: Context,
     private val intentFactory: IntentFactory = IntentFactory(),
     private val calendarApiExecutor: CalendarApiExecutor = CalendarApiExecutor(context),
-    private val alarmApiExecutor: AlarmApiExecutor = AlarmApiExecutor(context)
+    private val alarmApiExecutor: AlarmApiExecutor = AlarmApiExecutor(context),
+    private val clipboardApiExecutor: ClipboardApiExecutor = ClipboardApiExecutor(context),
+    private val chromeCustomTabOpener: ChromeCustomTabOpener = ChromeCustomTabOpener(context)
 ) {
     private var pendingStep: WorkflowStep? = null
     private var pendingStepIndex: Int = -1
+    /** Step indices the user has already confirmed — skip re-confirmation on resume. */
+    private val confirmedSteps = mutableSetOf<Int>()
 
     suspend fun run(
         workflow: PlannedWorkflow,
@@ -58,6 +65,7 @@ class WorkflowRunner(
     }
 
     fun confirmPendingStep(): WorkflowStep? {
+        pendingStepIndex.let { confirmedSteps.add(it) }
         val step = pendingStep
         pendingStep = null
         pendingStepIndex = -1
@@ -65,6 +73,7 @@ class WorkflowRunner(
     }
 
     fun dismissPendingStep(): WorkflowStep? {
+        pendingStepIndex.let { confirmedSteps.add(it) }
         val step = pendingStep
         pendingStep = null
         pendingStepIndex = -1
@@ -81,9 +90,12 @@ class WorkflowRunner(
 
         // Pause and request user confirmation before executing sensitive steps
         if (spec.requiresConfirmation || step.requiresConfirmation) {
-            pendingStep = step
-            pendingStepIndex = stepIndex
-            throw ConfirmationRequired(step, stepIndex)
+            if (stepIndex !in confirmedSteps) {
+                pendingStep = step
+                pendingStepIndex = stepIndex
+                throw ConfirmationRequired(step, stepIndex)
+            }
+            // stepIndex is in confirmedSteps — user already confirmed; execute without pausing
         }
 
         // Silently execute calendar.create_event via ContentResolver instead of launching an intent
@@ -93,6 +105,16 @@ class WorkflowRunner(
             val result = calendarApiExecutor.execute(step.params)
             onDebug("CalendarApiExecutor", "result=${result.success} message=${result.message}")
             Log.d(TAG, "CalendarApiExecutor result=${result.success} message=${result.message}")
+            return result
+        }
+
+        // Silently execute clipboard.copy_text via ClipboardManager instead of launching the share sheet.
+        if (step.id == "clipboard.copy_text") {
+            onDebug("Tool call", "${step.id} params=${step.params}")
+            Log.d(TAG, "Tool call ${step.id} params=${step.params}")
+            val result = clipboardApiExecutor.execute(step.params)
+            onDebug("ClipboardApiExecutor", "result=${result.success} message=${result.message}")
+            Log.d(TAG, "ClipboardApiExecutor result=${result.success} message=${result.message}")
             return result
         }
 
@@ -118,6 +140,37 @@ class WorkflowRunner(
             val result = alarmApiExecutor.execute(step.params)
             onDebug("AlarmApiExecutor", "result=${result.success} message=${result.message}")
             Log.d(TAG, "AlarmApiExecutor result=${result.success} message=${result.message}")
+            return result
+        }
+
+        // Silently copy text to clipboard instead of launching the share sheet.
+        if (step.id == "share.share_text") {
+            onDebug("Tool call", "${step.id} params=${step.params}")
+            Log.d(TAG, "Tool call ${step.id} params=${step.params}")
+            val result = clipboardApiExecutor.executeShareText(step.params)
+            onDebug("ClipboardApiExecutor", "result=${result.success} message=${result.message}")
+            Log.d(TAG, "ClipboardApiExecutor result=${result.success} message=${result.message}")
+            return result
+        }
+
+        // Silently copy image URI to clipboard instead of launching the share sheet.
+        if (step.id == "share.share_image") {
+            onDebug("Tool call", "${step.id} params=${step.params}")
+            Log.d(TAG, "Tool call ${step.id} params=${step.params}")
+            val result = clipboardApiExecutor.executeShareImage(step.params)
+            onDebug("ClipboardApiExecutor", "result=${result.success} message=${result.message}")
+            Log.d(TAG, "ClipboardApiExecutor result=${result.success} message=${result.message}")
+            return result
+        }
+
+        // Open URL in a Chrome Custom Tab — no app switch, falls back to regular browser.
+        val customTabParams = intentFactory.buildCustomTabParams(spec, step.params)
+        if (customTabParams != null) {
+            onDebug("Tool call", "${step.id} params=${step.params}")
+            Log.d(TAG, "Tool call ${step.id} params=${step.params}")
+            val result = chromeCustomTabOpener.openUrl(customTabParams.url, customTabParams.toolbarColor)
+            onDebug("ChromeCustomTabOpener", "result=${result.success} message=${result.message}")
+            Log.d(TAG, "ChromeCustomTabOpener result=${result.success} message=${result.message}")
             return result
         }
 

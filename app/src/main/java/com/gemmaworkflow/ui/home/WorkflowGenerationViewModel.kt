@@ -13,6 +13,7 @@ import com.gemmaworkflow.domain.parser.WorkflowJsonParser
 import com.gemmaworkflow.domain.planner.PlannerAgents
 import com.gemmaworkflow.domain.planner.PromptBuilder
 import com.gemmaworkflow.domain.planner.RequestAnalysisParser
+import com.gemmaworkflow.domain.runner.ConfirmationRequired
 import com.gemmaworkflow.domain.runner.WorkflowRunner
 import com.gemmaworkflow.domain.safety.WorkflowValidator
 import com.gemmaworkflow.platform.capability.PackageCapabilityScanner
@@ -34,6 +35,8 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
     private val workflowRepo = WorkflowRepository(application)
     private val historyRepo = ExecutionHistoryRepository(application)
     private var timerJob: Job? = null
+    /** The active runner, retained across confirmation pauses. */
+    private var currentRunner: WorkflowRunner? = null
 
     private val _uiState = MutableStateFlow(WorkflowGenerationUiState())
     val uiState: StateFlow<WorkflowGenerationUiState> = _uiState.asStateFlow()
@@ -242,19 +245,94 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
     }
 
     fun runWorkflow() {
+        runWorkflow(uiState.value.workflowPreview ?: return)
+    }
+
+    fun runWorkflow(workflow: PlannedWorkflow) {
         viewModelScope.launch(Dispatchers.Default) {
-            val workflow = uiState.value.workflowPreview ?: return@launch
-            _uiState.update { it.copy(isBusy = true, runResults = emptyList()) }
+            _uiState.update { it.copy(isBusy = true, runResults = emptyList(), runningWorkflow = workflow) }
             val runner = WorkflowRunner(context = getApplication())
+            currentRunner = runner
             appendDebug("Runner", "Running '${workflow.name}' with ${workflow.actions.size} actions")
-            val results = runner.run(workflow) { label, message ->
+            runWorkflowWithRunner(runner, workflow, startIndex = 0)
+        }
+    }
+
+    private suspend fun runWorkflowWithRunner(
+        runner: WorkflowRunner,
+        workflow: PlannedWorkflow,
+        startIndex: Int,
+        initialResults: List<com.gemmaworkflow.domain.model.ExecutionResult> = emptyList()
+    ) {
+        try {
+            val results = initialResults + runner.run(workflow, startIndex) { label, message ->
                 appendDebug(label, message)
             }
             historyRepo.log(workflow.name, results)
+            currentRunner = null
             _uiState.update {
                 it.copy(isBusy = false, saved = true, runResults = results,
+                    pendingConfirmation = null, runningWorkflow = null,
                     stage = if (results.all { r -> r.success }) "All steps completed" else "Some steps failed")
             }
+        } catch (e: ConfirmationRequired) {
+            val spec = ActionSpecRegistry.find(e.step.id)
+            val stepLabel = spec?.label ?: e.step.id
+            val params: Map<String, String> = e.step.params.entries.associate { it.key to it.value.toString() }
+            currentRunner = runner
+            appendDebug("Runner", "Confirmation required for step ${e.stepIndex}: ${e.step.id}")
+            _uiState.update {
+                it.copy(
+                    isBusy = false, // Stop progress bar while waiting for user
+                    pendingConfirmation = ConfirmationRequest(
+                        stepId = e.step.id,
+                        stepLabel = stepLabel,
+                        params = params
+                    ),
+                    resumeStepIndex = e.stepIndex
+                )
+            }
+        }
+    }
+
+    /**
+     * Called when the user confirms the pending step — clears the pending confirmation
+     * and resumes execution from the saved [WorkflowGenerationUiState.resumeStepIndex].
+     */
+    fun confirmPending() {
+        val runner = currentRunner ?: return
+        val workflow = uiState.value.runningWorkflow ?: return
+        val resumeIndex = uiState.value.resumeStepIndex
+        // Mark the step as confirmed so resume doesn't re-throw ConfirmationRequired
+        runner.confirmPendingStep()
+        // Consume the confirmation immediately so the dialog closes right away
+        _uiState.update { it.copy(pendingConfirmation = null, isBusy = true) }
+        viewModelScope.launch(Dispatchers.Default) {
+            runWorkflowWithRunner(runner, workflow, startIndex = resumeIndex)
+        }
+    }
+
+    /**
+     * Called when the user dismisses the pending step — skips that step and continues
+     * with the next one.
+     */
+    fun dismissPending() {
+        val runner = currentRunner ?: return
+        val workflow = uiState.value.runningWorkflow ?: return
+        val resumeIndex = uiState.value.resumeStepIndex
+        // Mark as dismissed so resume skips this step without re-throwing
+        runner.dismissPendingStep()
+        _uiState.update { it.copy(pendingConfirmation = null, isBusy = true) }
+        viewModelScope.launch(Dispatchers.Default) {
+            // Record the skipped step and resume from the next index
+            val skippedResults = listOf(
+                com.gemmaworkflow.domain.model.ExecutionResult(
+                    stepId = workflow.actions.getOrNull(resumeIndex)?.id ?: "",
+                    success = false,
+                    message = "Skipped by user"
+                )
+            )
+            runWorkflowWithRunner(runner, workflow, startIndex = resumeIndex + 1, initialResults = skippedResults)
         }
     }
 
@@ -270,6 +348,15 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
                 selectedWorkflowName = workflow.name
             )
         }
+    }
+
+    fun loadWorkflowDetail(workflowId: String) {
+        val workflow = uiState.value.savedWorkflows.find { it.name == workflowId }
+        _uiState.update { it.copy(selectedWorkflowDetail = workflow) }
+    }
+
+    fun clearWorkflowDetail() {
+        _uiState.update { it.copy(selectedWorkflowDetail = null) }
     }
 
     private fun appendDebug(label: String, message: String) {

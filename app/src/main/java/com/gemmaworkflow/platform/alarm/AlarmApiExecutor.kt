@@ -5,14 +5,14 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
-import android.provider.AlarmClock
+import android.provider.Settings
 import android.util.Log
+import androidx.core.net.toUri
 import com.gemmaworkflow.domain.model.ExecutionResult
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
-import kotlinx.serialization.json.longOrNull
 
 /**
  * Silently schedules alarms via AlarmManager.setExactAndAllowWhileIdle() instead of
@@ -33,7 +33,6 @@ class AlarmApiExecutor(private val context: Context) {
 
     companion object {
         private const val TAG = "AlarmApiExecutor"
-        private const val PERMISSION_SCHEDULE_EXACT_ALARM = "android.permission.SCHEDULE_EXACT_ALARM"
 
         // Intent action matched by AlarmReceiver — must match the manifest registration.
         const val ACTION_ALARM_FIRE =
@@ -79,8 +78,8 @@ class AlarmApiExecutor(private val context: Context) {
      */
     fun buildExactAlarmSettingsIntent(): Intent? {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            Intent(AlarmClock.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
-                data = android.net.Uri.parse("package:${context.packageName}")
+            Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                data = "package:${context.packageName}".toUri()
             }
         } else {
             null
@@ -96,7 +95,7 @@ class AlarmApiExecutor(private val context: Context) {
      * @param requestCode Unique code used to create/deduplicate the PendingIntent so that
      *                    multiple alarms don't overwrite each other.
      *
-     * Returns [ExecutionResult.Success] when the alarm was successfully scheduled,
+     * Returns a success result when the alarm was successfully scheduled,
      * or a failure result when the permission is not yet granted.
      */
     fun scheduleAlarm(hour: Int, minutes: Int, message: String?, requestCode: Int): ExecutionResult {
@@ -104,7 +103,7 @@ class AlarmApiExecutor(private val context: Context) {
             return ExecutionResult(
                 stepId = "alarm.set_alarm",
                 success = false,
-                message = "SCHEDULE_EXACT_ALARM permission not granted; redirect to Settings"
+                message = "SCHEDULE_EXACT_ALARM permission not granted; redirect to Settings",
             )
         }
 

@@ -56,6 +56,9 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
 
+    // Chrome Custom Tabs: in-app browser tab, no app switch
+    implementation("androidx.browser:browser:1.8.0")
+
     // LiteRT-LM: on-device LLM inference with GPU acceleration
     // Pin 0.10.0 (latest stable on Google Maven as of May 2026)
     implementation("com.google.ai.edge.litertlm:litertlm-android:0.10.0")

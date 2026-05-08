@@ -57,6 +57,20 @@ sealed interface ExecutionSpec {
         val packagePolicy: PackagePolicy = PackagePolicy.None,
         val chooserTitle: String? = null
     ) : ExecutionSpec
+
+    /**
+     * Chrome Custom Tabs — opens the URL in an in-app browser tab.
+     * Falls back to [fallbackActionIds] when Chrome is not available.
+     */
+    data class CustomTab(
+        val urlTemplate: String,
+        val toolbarColor: Int? = null
+    ) : ExecutionSpec
+
+    /**
+     * Built-in action handled directly by the app's internal executors.
+     */
+    data object BuiltIn : ExecutionSpec
 }
 
 data class ExtraSpec(
@@ -87,13 +101,12 @@ object ActionSpecRegistry {
         ActionSpec(
             id = "browser.open_url",
             label = "Open URL",
-            description = "Open a web URL in an installed browser.",
+            description = "Open a web URL in a Chrome Custom Tab inside the app (no app switch). Falls back to external browser if Chrome is unavailable.",
             params = listOf(
                 ParamSpec("url", ParamType.Url, description = "Full http or https URL to open")
             ),
-            execution = ExecutionSpec.AndroidIntent(
-                action = Intent.ACTION_VIEW,
-                dataTemplate = "{url}"
+            execution = ExecutionSpec.CustomTab(
+                urlTemplate = "{url}"
             ),
             triggerCompatible = setOf("manual", "time", "nfc"),
             examples = listOf(
@@ -137,7 +150,6 @@ object ActionSpecRegistry {
                 chooserTitle = "Share via"
             ),
             triggerCompatible = setOf("manual", "time", "share_sheet", "nfc"),
-            requiresConfirmation = true,
             examples = listOf(
                 buildJsonObject {
                     put("id", "share.share_text")
@@ -160,7 +172,6 @@ object ActionSpecRegistry {
                 chooserTitle = "Share image via"
             ),
             triggerCompatible = setOf("manual", "share_sheet"),
-            requiresConfirmation = true,
             fallbackActionIds = listOf("share.share_text"),
             examples = listOf(
                 buildJsonObject {
@@ -221,6 +232,23 @@ object ActionSpecRegistry {
                         put("minutes", 30)
                         put("message", "Morning workout")
                     })
+                }
+            )
+        ),
+        ActionSpec(
+            id = "clipboard.copy_text",
+            label = "Copy text to clipboard",
+            description = "Silently copy text to the system clipboard without showing any chooser or share sheet.",
+            params = listOf(
+                ParamSpec("text", ParamType.String, description = "Text content to copy to clipboard")
+            ),
+            execution = ExecutionSpec.BuiltIn,
+            availability = AvailabilitySpec.Always,
+            triggerCompatible = setOf("manual", "time", "nfc"),
+            examples = listOf(
+                buildJsonObject {
+                    put("id", "clipboard.copy_text")
+                    put("params", buildJsonObject { put("text", "https://example.com") })
                 }
             )
         ),

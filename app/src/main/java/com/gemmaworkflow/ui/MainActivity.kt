@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -26,6 +27,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -34,10 +36,13 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gemmaworkflow.domain.model.ExecutionResult
+import com.gemmaworkflow.domain.model.PlannedWorkflow
 import com.gemmaworkflow.platform.inference.InferenceState
+import com.gemmaworkflow.ui.home.ConfirmationRequest
 import com.gemmaworkflow.ui.home.WorkflowGenerationViewModel
 import com.gemmaworkflow.ui.home.StageStatus
 import com.gemmaworkflow.ui.theme.GemmaWorkflowTheme
+import com.gemmaworkflow.domain.catalog.ActionSpecRegistry
 
 class MainActivity : ComponentActivity() {
     private val viewModel: WorkflowGenerationViewModel by viewModels()
@@ -58,6 +63,26 @@ class MainActivity : ComponentActivity() {
 private fun WorkflowGenerationScreen(viewModel: WorkflowGenerationViewModel) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
+    // Show a confirmation dialog whenever a step requires user consent before executing.
+    // This is placed before the early return so it shows even on the detail screen.
+    state.pendingConfirmation?.let { request ->
+        ConfirmationDialog(
+            request = request,
+            onConfirm = viewModel::confirmPending,
+            onDismiss = viewModel::dismissPending
+        )
+    }
+
+    state.selectedWorkflowDetail?.let { detail ->
+        WorkflowDetailScreen(
+            workflow = detail,
+            isBusy = state.isBusy,
+            onBack = viewModel::clearWorkflowDetail,
+            onRun = { viewModel.runWorkflow(detail) }
+        )
+        return
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -77,7 +102,7 @@ private fun WorkflowGenerationScreen(viewModel: WorkflowGenerationViewModel) {
             ) {
                 state.savedWorkflows.take(4).forEach { wf ->
                     OutlinedButton(
-                        onClick = { viewModel.selectWorkflow(wf) },
+                        onClick = { viewModel.loadWorkflowDetail(wf.name) },
                         modifier = Modifier.weight(1f),
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp, vertical = 2.dp)
                     ) {
@@ -152,8 +177,7 @@ private fun WorkflowGenerationScreen(viewModel: WorkflowGenerationViewModel) {
                     text = state.error.orEmpty(),
                     modifier = Modifier.padding(12.dp),
                     color = MaterialTheme.colorScheme.onErrorContainer,
-                    style = MaterialTheme.typography.bodyMedium
-                )
+                    style = MaterialTheme.typography.bodyMedium)
             }
         }
 
@@ -312,6 +336,60 @@ private fun RunResultRow(result: ExecutionResult) {
     }
 }
 
+/**
+ * An AlertDialog that presents a pending [ConfirmationRequest] to the user.
+ * Displays the step label and its parameters, then calls [onConfirm] or [onDismiss]
+ * accordingly.
+ */
+@Composable
+private fun ConfirmationDialog(
+    request: ConfirmationRequest,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val paramsText = if (request.params.isEmpty()) {
+        "No parameters"
+    } else {
+        request.params.entries.joinToString("\n") { (key, value) -> "$key: $value" }
+    }
+    AlertDialog(
+        onDismissRequest = { /* Force explicit action */ },
+        title = { Text("User Consent Required") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    "Action: ${request.stepLabel}",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text("This action requires your confirmation before it can be executed:")
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    shape = MaterialTheme.shapes.small,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = paramsText,
+                        modifier = Modifier.padding(8.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = onConfirm) {
+                Text("Confirm & Run")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Skip Step")
+            }
+        }
+    )
+}
+
 private fun triggerLabel(workflow: com.gemmaworkflow.domain.model.PlannedWorkflow): String {
     return when (val t = workflow.trigger) {
         is com.gemmaworkflow.domain.model.TriggerConfig.Manual -> "Manual"
@@ -319,5 +397,103 @@ private fun triggerLabel(workflow: com.gemmaworkflow.domain.model.PlannedWorkflo
         is com.gemmaworkflow.domain.model.TriggerConfig.Nfc -> "NFC"
         is com.gemmaworkflow.domain.model.TriggerConfig.ShareSheet -> "Share Sheet (${t.setupState})"
         is com.gemmaworkflow.domain.model.TriggerConfig.TaskerRequired -> "Tasker (${t.setupState})"
+    }
+}
+
+/** Returns a unicode icon for an action id, matching the existing text-emoji style used in the UI. */
+private fun stepIcon(actionId: String): String = when {
+    actionId.startsWith("browser.") -> "\uD83C\uDF10"   // globe
+    actionId.startsWith("maps.") -> "\uD83D\uDDFD"       // map
+    actionId.startsWith("share.") -> "\uD83D\uDCE4"       // outbox tray
+    actionId.startsWith("sms.") -> "\uD83D\uDCF7"        // phone
+    actionId.startsWith("alarm.") -> "\u23F0"            // alarm clock
+    actionId.startsWith("calendar.") -> "\uD83D\uDCC5"  // calendar
+    else -> "\u25B6"                                      // play arrow
+}
+
+/**
+ * Detail screen composable shown when the user taps a saved workflow.
+ * Displays the workflow title, summary, trigger, and a scrollable list of steps
+ * with icons and labels looked up from ActionSpecRegistry.
+ */
+@Composable
+private fun WorkflowDetailScreen(
+    workflow: PlannedWorkflow,
+    isBusy: Boolean,
+    onBack: () -> Unit,
+    onRun: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Workflow Detail", style = MaterialTheme.typography.headlineSmall)
+            OutlinedButton(onClick = onBack) {
+                Text("Back")
+            }
+        }
+
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(workflow.name, style = MaterialTheme.typography.titleMedium)
+                if (workflow.summary.isNotBlank()) {
+                    Text(workflow.summary, style = MaterialTheme.typography.bodyMedium)
+                }
+                Text("Trigger: ${triggerLabel(workflow)}", style = MaterialTheme.typography.bodySmall)
+            }
+        }
+
+        Text("Steps", style = MaterialTheme.typography.titleSmall)
+        workflow.actions.forEach { step ->
+            val spec = ActionSpecRegistry.find(step.id)
+            val icon = stepIcon(step.id)
+            val label = spec?.label ?: step.id
+            val params = step.params.entries.joinToString(", ") { "${it.key}=${it.value}" }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(icon, style = MaterialTheme.typography.titleMedium)
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(label, style = MaterialTheme.typography.bodyMedium)
+                    if (params.isNotBlank()) {
+                        Text(
+                            params,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontFamily = FontFamily.Monospace,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                    }
+                }
+                if (step.requiresConfirmation) {
+                    Text(
+                        "\u26A0\uFE0F",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+        }
+
+        Button(
+            onClick = onRun,
+            enabled = !isBusy,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(if (isBusy) "Running\u2026" else "Run")
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
     }
 }
