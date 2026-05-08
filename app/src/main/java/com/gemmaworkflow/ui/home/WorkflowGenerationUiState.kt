@@ -5,7 +5,7 @@ import com.gemmaworkflow.domain.model.PlannedWorkflow
 import com.gemmaworkflow.platform.inference.InferenceState
 
 data class WorkflowGenerationUiState(
-    val prompt: String = "send message to +971556778872 saying hi, and invite him to meeting on 6 oclock on next friday and then add it to my calender.",
+    val prompt: String = "send message to Maya saying hi, and invite him to meeting on 6 oclock on next friday and then add it to my calender.",
     val inferenceState: InferenceState = InferenceState.Idle,
     val isModelReady: Boolean = false,
     val isBusy: Boolean = false,

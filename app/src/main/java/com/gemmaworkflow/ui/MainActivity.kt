@@ -1,9 +1,13 @@
 package com.gemmaworkflow.ui
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -45,6 +49,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        ensureContactReadPermission()
         setContent {
             GemmaWorkflowTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
@@ -52,6 +57,16 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    private fun ensureContactReadPermission() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.READ_CONTACTS), READ_CONTACTS_REQUEST_CODE)
+        }
+    }
+
+    private companion object {
+        const val READ_CONTACTS_REQUEST_CODE = 1001
     }
 }
 

@@ -18,6 +18,11 @@ import com.gemmaworkflow.platform.tools.impl.ShareTextTool
 import com.gemmaworkflow.platform.tools.impl.ValidateJsonTool
 import com.gemmaworkflow.platform.tools.impl.WebSearchTool
 import com.gemmaworkflow.platform.tools.impl.LookupContactTool
+import com.gemmaworkflow.platform.tools.impl.SearchMediaTool
+import com.gemmaworkflow.platform.tools.impl.SearchFilesTool
+import com.gemmaworkflow.platform.tools.impl.SearchNotesTool
+import com.gemmaworkflow.platform.tools.impl.SearchSmsTool
+import com.gemmaworkflow.platform.tools.impl.GetCalendarEventsTool
 
 /**
  * Registers all tools once at app startup.
@@ -45,7 +50,15 @@ object ToolInitializer {
         // Tier 3 — Search & Knowledge
         ToolRegistry.register(WebSearchTool)
         ToolRegistry.register(SearchPlacesTool)
+        ToolRegistry.register(LookupContactTool(context, name = "get_contact"))
         ToolRegistry.register(LookupContactTool(context))
+
+        // Tier 6 — Domain Entity Search (entity type classification via tool selection)
+        ToolRegistry.register(SearchMediaTool(context))
+        ToolRegistry.register(SearchFilesTool(context))
+        ToolRegistry.register(SearchNotesTool(context))
+        ToolRegistry.register(SearchSmsTool(context))
+        ToolRegistry.register(GetCalendarEventsTool(context))
 
         // Tier 4 — Execution
         ToolRegistry.register(SendIntentTool(context))

@@ -23,7 +23,7 @@ object FindSkill {
         // Group by category for readability
         val temporal = all.filter { it.name in setOf("get_current_time", "resolve_datetime", "compute_duration", "get_day_of_week") }
         val device = all.filter { it.name in setOf("list_installed_apps", "resolve_intent", "get_device_location") }
-        val search = all.filter { it.name in setOf("web_search", "search_places", "lookup_contact") }
+        val search = all.filter { it.name in setOf("web_search", "search_places", "get_contact", "lookup_contact") }
         val execution = all.filter { it.name in setOf("send_intent", "open_uri", "share_text", "set_alarm", "create_calendar_event") }
         val reasoning = all.filter { it.name in setOf("calculator", "validate_json") }
 

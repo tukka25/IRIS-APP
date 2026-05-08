@@ -9,8 +9,8 @@ set -euo pipefail
 #
 # Useful overrides:
 #   AVD_NAME=Gemma_Medium_API_35 MEMORY_MB=2048 scripts/run_medium_emulator_app.sh
-#   LOG_FILTER="WorkflowGeneration|WorkflowRunner|InferenceManager|litert|AndroidRuntime" scripts/run_medium_emulator_app.sh
 #   LOG_ALL=1 scripts/run_medium_emulator_app.sh
+#   LOG_FILTER="AndroidRuntime|FATAL EXCEPTION|OutOfMemory" scripts/run_medium_emulator_app.sh
 
 SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Library/Android/sdk}}"
 EMULATOR="$SDK/emulator/emulator"
@@ -45,13 +45,20 @@ API_LEVEL="${API_LEVEL:-35}"
 DEVICE_ID="${DEVICE_ID:-medium_phone}"
 MEMORY_MB="${MEMORY_MB:-4096}"
 GPU_MODE="${GPU_MODE:-host}"
-LOG_FILTER="${LOG_FILTER:-}"
-LOG_ALL="${LOG_ALL:-1}"
+DEFAULT_LOG_FILTER="WorkflowGeneration|WorkflowRunner|InferenceManager|ToolInitializer|ToolRegistry|ToolAwareGenerator|Tool call|Tool result|TOOL|get_contact|lookup_contact|Available tools|Installed app list sent to AI|Full capabilities sent to AI|AI output|IntentDiscovery"
+LOG_FILTER="${LOG_FILTER:-$DEFAULT_LOG_FILTER}"
+LOG_ALL="${LOG_ALL:-0}"
 EMULATOR_LOG="${EMULATOR_LOG:-/tmp/gemmaworkflow-emulator.log}"
 LOCAL_MODEL_PATH="${LOCAL_MODEL_PATH:-local-models/gemma-4-E2B-it.litertlm}"
 DEVICE_MODEL_DIR="${DEVICE_MODEL_DIR:-/sdcard/Android/data/com.gemmaworkflow/files/models}"
 DEVICE_MODEL_NAME="${DEVICE_MODEL_NAME:-gemma-4-E2B-it.litertlm}"
 DEVICE_MODEL_PATH="$DEVICE_MODEL_DIR/$DEVICE_MODEL_NAME"
+SEED_CONTACTS="${SEED_CONTACTS:-1}"
+DEMO_CONTACTS=(
+    "Maya Chen|+15550101001|maya.chen@example.com"
+    "Omar Haddad|+15550101002|omar.haddad@example.com"
+    "Lina Patel|+15550101003|lina.patel@example.com"
+)
 
 if [ -z "${JAVA_HOME:-}" ] && [ -d "/Applications/Android Studio.app/Contents/jbr/Contents/Home" ]; then
     export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
@@ -72,6 +79,46 @@ if [ "$(uname -m)" = "arm64" ]; then
 else
     ABI="${ABI:-x86_64}"
 fi
+
+seed_contact() {
+    local name="$1"
+    local phone="$2"
+    local email="$3"
+    local raw_id
+
+    if "$ADB" -e shell "content query --uri content://com.android.contacts/contacts --projection display_name --where \"display_name='$name'\" 2>/dev/null | grep -q \"$name\"" >/dev/null 2>&1; then
+        echo "Contact already seeded: $name"
+        return 0
+    fi
+
+    "$ADB" -e shell "content insert --uri content://com.android.contacts/raw_contacts --bind account_type:s: --bind account_name:s:" >/dev/null 2>&1 || return 1
+    raw_id="$("$ADB" -e shell "content query --uri content://com.android.contacts/raw_contacts --projection _id 2>/dev/null | sed -n 's/.*_id=\\([0-9][0-9]*\\).*/\\1/p' | tail -n 1" | tr -d '\r')"
+
+    if [ -z "$raw_id" ]; then
+        return 1
+    fi
+
+    "$ADB" -e shell "content insert --uri content://com.android.contacts/data --bind raw_contact_id:i:$raw_id --bind mimetype:s:vnd.android.cursor.item/name --bind data1:s:\"$name\"" >/dev/null 2>&1 || return 1
+    "$ADB" -e shell "content insert --uri content://com.android.contacts/data --bind raw_contact_id:i:$raw_id --bind mimetype:s:vnd.android.cursor.item/phone_v2 --bind data1:s:\"$phone\" --bind data2:i:2" >/dev/null 2>&1 || return 1
+    "$ADB" -e shell "content insert --uri content://com.android.contacts/data --bind raw_contact_id:i:$raw_id --bind mimetype:s:vnd.android.cursor.item/email_v2 --bind data1:s:\"$email\" --bind data2:i:1" >/dev/null 2>&1 || return 1
+
+    echo "Seeded contact: $name"
+}
+
+seed_demo_contacts() {
+    if [ "$SEED_CONTACTS" != "1" ]; then
+        echo "Skipping demo contact seeding because SEED_CONTACTS=$SEED_CONTACTS"
+        return 0
+    fi
+
+    echo "Seeding demo contacts into emulator contact book..."
+    for contact in "${DEMO_CONTACTS[@]}"; do
+        IFS='|' read -r name phone email <<< "$contact"
+        if ! seed_contact "$name" "$phone" "$email"; then
+            echo "Warning: could not seed contact '$name'. The Contacts provider may be unavailable on this image." >&2
+        fi
+    done
+}
 
 if [ -z "${SYSTEM_IMAGE:-}" ]; then
     SYSTEM_IMAGE="system-images;android-${API_LEVEL};google_apis;${ABI}"
@@ -160,6 +207,13 @@ done
 
 echo "Building and installing debug app..."
 ./gradlew :app:installDebug
+
+echo "Granting READ_CONTACTS for emulator smoke tests..."
+if ! "$ADB" -e shell pm grant com.gemmaworkflow android.permission.READ_CONTACTS >/dev/null 2>&1; then
+    echo "Warning: could not grant READ_CONTACTS. Contact tools will report permission errors until permission is granted." >&2
+fi
+
+seed_demo_contacts
 
 if [ -f "$LOCAL_MODEL_PATH" ]; then
     LOCAL_MODEL_SIZE="$(wc -c < "$LOCAL_MODEL_PATH" | tr -d ' ')"

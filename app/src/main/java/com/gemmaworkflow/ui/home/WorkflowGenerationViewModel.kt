@@ -10,6 +10,7 @@ import com.gemmaworkflow.domain.parser.WorkflowJsonParser
 import com.gemmaworkflow.domain.planner.PlannerAgents
 import com.gemmaworkflow.domain.planner.PromptBuilder
 import com.gemmaworkflow.domain.planner.RequestAnalysisParser
+import com.gemmaworkflow.domain.planner.RetoWorkflowPlanner
 import com.gemmaworkflow.domain.runner.WorkflowRunner
 import com.gemmaworkflow.domain.safety.WorkflowValidator
 import com.gemmaworkflow.platform.capability.IntentDiscoveryEngine
@@ -19,6 +20,8 @@ import com.gemmaworkflow.platform.inference.InferenceState
 import com.gemmaworkflow.platform.tools.AgentToolAssignments
 import com.gemmaworkflow.platform.tools.FindSkill
 import com.gemmaworkflow.platform.tools.ToolAwareGenerator
+import com.gemmaworkflow.platform.tools.reto.RetoOrchestrator
+import com.gemmaworkflow.platform.tools.reto.RetoTrace
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -47,6 +50,16 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
 
     private companion object {
         const val TAG = "WorkflowGeneration"
+
+        /**
+         * Enable RETO (layered tool orchestration) for Stage 1.
+         * When true, uses RetoOrchestrator + EntityPreProcessor instead
+         * of direct ToolAwareGenerator calls.
+         *
+         * MVP: set to false to keep existing pipeline as fallback.
+         * After smoke testing, set to true.
+         */
+        private const val USE_RETO_ORCHESTRATION = true
     }
 
     init {
@@ -107,15 +120,73 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
             appendDebug("Intent catalog", "${intentCatalog.apps.size} apps, ${intentCatalog.standardIntents.size} standard intents loaded")
 
             try {
-                // Stage 1 — RequestAnalysisAgent (temporal + device tools)
+                // Variables shared between RETO and legacy paths
+                var analysisRaw: String
+                var actionPlanRaw: String
+                var jsonRaw: String
+                var triggerHint: String
+
+                if (USE_RETO_ORCHESTRATION) {
+                    // ═══════════════════════════════════════════
+                    // RETO PATH — layered tool orchestration
+                    // Replaces all 4 stages with constrained-layer execution.
+                    // ═══════════════════════════════════════════
+                    appendDebug("Pipeline", "RETO orchestration active")
+
+                    val retoPlanner = RetoWorkflowPlanner(
+                        engine = engine,
+                        context = getApplication(),
+                        capabilityScanner = capabilityScanner
+                    )
+
+                    // Phase 1: RETO orchestration (replaces Stage 1+2+3+4)
+                    markStage(0, StageStatus.Running)
+                    markStage(1, StageStatus.Running)
+                    markStage(2, StageStatus.Running)
+                    markStage(3, StageStatus.Running)
+                    _uiState.update { it.copy(stage = "RETO orchestration...") }
+
+                    val retoResult = withContext(Dispatchers.Default) {
+                        retoPlanner.generateWorkflow(
+                            userRequest = prompt,
+                            onTrace = { trace -> appendRetoDebug(trace) }
+                        )
+                    }
+
+                    // Mark all stages done
+                    (0..3).forEach { markStage(it, StageStatus.Done); delay(8) }
+
+                    analysisRaw = retoResult.analysisRaw
+                    actionPlanRaw = retoResult.actionPlanRaw
+                    jsonRaw = retoResult.workflowJsonRaw
+
+                    recordTokenUsage("RETO Orchestration (all stages)", analysisRaw.length + actionPlanRaw.length + jsonRaw.length)
+                    appendDebug("AI output: request analysis", analysisRaw)
+                    appendDebug("AI output: action plan", actionPlanRaw)
+                    appendDebug("AI output: final workflow JSON", jsonRaw)
+
+                    val analysis = RequestAnalysisParser.parse(analysisRaw)
+                    triggerHint = analysis.normalizedTriggerHint
+                    appendDebug("Parsed analysis goal", analysis.goal)
+                    appendDebug("Trigger hint", triggerHint)
+                    appendDebug("Missing info", analysis.missingInfo.joinToString().ifBlank { "none" })
+                } else {
+                // Stage 1 — RequestAnalysisAgent (v4: entity classification via tool selection)
+                // The model identifies what TYPE each entity is and calls the matching domain tool.
+                // No preprocessor — the model's tool selection IS the classification.
                 markStage(0, StageStatus.Running)
                 _uiState.update { it.copy(stage = "Analysing request...") }
                 val analysisTools = AgentToolAssignments.forAgent(AgentToolAssignments.PlannerAgent.RequestAnalysis)
+
+                // Build tool instructions FIRST, then append to prompt (v4 order fix)
+                val toolInstructions = PromptBuilder.buildToolUseInstructions(FindSkill.schemaFor(analysisTools))
+
                 val analysisPrompt = PromptBuilder.buildRequestAnalysisPrompt(
                     userRequest = prompt,
                     installedApps = installedAppsSummary
-                ) + "\n\n" + FindSkill.schemaFor(analysisTools) + "\n\nYou may call tools using: TOOL: name {params}"
-                val analysisRaw = withContext(Dispatchers.Default) {
+                ) + "\n\n" + toolInstructions
+
+                analysisRaw = withContext(Dispatchers.Default) {
                     agents.requestAnalysis(
                         prompt = analysisPrompt,
                         allowedTools = analysisTools,
@@ -127,7 +198,7 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
                 recordTokenUsage("Request Analysis", analysisPrompt.length)
                 appendDebug("AI output: request analysis", analysisRaw)
                 val analysis = RequestAnalysisParser.parse(analysisRaw)
-                val triggerHint = analysis.normalizedTriggerHint
+                triggerHint = analysis.normalizedTriggerHint
                 appendDebug("Parsed analysis goal", analysis.goal)
                 appendDebug("Trigger hint", triggerHint)
                 appendDebug("Applications from request", analysis.applications.joinToString {
@@ -158,8 +229,8 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
                     triggerHint = triggerHint,
                     availableActions = combinedCapabilities,
                     nativeDiscovery = nativeDiscovery
-                ) + "\n\n" + FindSkill.schemaFor(actionTools) + "\n\nYou may call tools using: TOOL: name {params}"
-                val actionPlanRaw = withContext(Dispatchers.Default) {
+                ) + "\n\n" + PromptBuilder.buildToolUseInstructions(FindSkill.schemaFor(actionTools))
+                actionPlanRaw = withContext(Dispatchers.Default) {
                     agents.actionPlan(
                         prompt = actionPlanPrompt,
                         allowedTools = actionTools,
@@ -177,8 +248,8 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
                 _uiState.update { it.copy(stage = "Generating JSON...") }
                 val jsonTools = AgentToolAssignments.forAgent(AgentToolAssignments.PlannerAgent.WorkflowJson)
                 val jsonPrompt = PromptBuilder.buildWorkflowJsonPrompt(prompt, actionPlanRaw, capabilitySummary) +
-                    "\n\n" + FindSkill.schemaFor(jsonTools) + "\n\nYou may call tools using: TOOL: name {params}"
-                val jsonRaw = withContext(Dispatchers.Default) {
+                    "\n\n" + PromptBuilder.buildToolUseInstructions(FindSkill.schemaFor(jsonTools))
+                jsonRaw = withContext(Dispatchers.Default) {
                     agents.workflowJson(
                         prompt = jsonPrompt,
                         allowedTools = jsonTools,
@@ -190,8 +261,9 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
                 appendDebug("AI output: final workflow JSON", jsonRaw)
                 markStage(3, StageStatus.Done)
                 delay(16)
+                } // end else (non-RETO path)
 
-                // Parse + validate
+                // Parse + validate (shared between both paths)
                 _uiState.update { it.copy(stage = "Validating...") }
                 val workflow = WorkflowJsonParser.parse(jsonRaw)
                 val errors = WorkflowValidator.validate(workflow, resolvableIds)
@@ -314,6 +386,24 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
             )
         }
         appendDebug(emoji, "$label $detail")
+    }
+
+    /**
+     * RETO orchestration trace logging for debug panel.
+     * Shows layers, tool calls, observations, and repairs.
+     */
+    private fun appendRetoDebug(trace: RetoTrace) {
+        appendDebug("\uD83D\uDCCB RETO", "${trace.layerSketch.layers.size} layers planned")
+        trace.layerSketch.layers.forEach { layer ->
+            appendDebug("  Layer ${layer.index}", "${layer.objective} [${layer.allowedTools.joinToString()}]")
+        }
+        trace.observations.forEachIndexed { i, obs ->
+            val emoji = if (obs.success) "\u2705" else "\u274C"
+            appendDebug("  $emoji Obs $i", "${obs.toolName} → ${obs.output.take(100)}")
+        }
+        trace.repairs.forEach { repair ->
+            appendDebug("  \uD83D\uDD27 Repair", "${repair.toolName} L${repair.layerIndex} attempt ${repair.attempt}: ${if (repair.success) "fixed" else "failed"}")
+        }
     }
 
     override fun onCleared() {

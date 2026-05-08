@@ -1,6 +1,8 @@
 package com.gemmaworkflow.platform.tools.impl
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.database.Cursor
 import android.provider.ContactsContract
 import com.gemmaworkflow.platform.tools.Tool
@@ -18,7 +20,7 @@ import java.net.URLEncoder
  * Tier 3 — Search & Knowledge tools.
  * web_search: self-hosted or free search API
  * search_places: OpenStreetMap Nominatim (free, no API key)
- * lookup_contact: Android ContactsContract content provider
+ * get_contact / lookup_contact: Android ContactsContract content provider
  */
 
 /** Minimal web search using DuckDuckGo Lite (no API key needed). */
@@ -123,8 +125,10 @@ object SearchPlacesTool : Tool {
 }
 
 /** Look up a contact from the device address book. */
-class LookupContactTool(private val context: Context) : Tool {
-    override val name = "lookup_contact"
+class LookupContactTool(
+    private val context: Context,
+    override val name: String = "lookup_contact"
+) : Tool {
     override val description = "Search device contacts by name, returns phone + email"
     override val parameters = listOf(
         ToolParam("name", "string", description = "Contact name or partial match")
@@ -132,6 +136,9 @@ class LookupContactTool(private val context: Context) : Tool {
 
     override suspend fun execute(input: Map<String, String>): ToolResult {
         val name = input["name"] ?: return ToolResult(false, "", "Missing 'name'")
+        if (context.checkSelfPermission(Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
+            return ToolResult(false, "", "READ_CONTACTS permission is not granted")
+        }
 
         return runCatching {
             val results = mutableListOf<String>()

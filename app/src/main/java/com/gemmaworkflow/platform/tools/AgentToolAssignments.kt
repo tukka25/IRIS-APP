@@ -15,15 +15,35 @@ object AgentToolAssignments {
      * Stage 1 — RequestAnalysisAgent
      * Needs: temporal context + device awareness
      * Why: To understand "next Friday", "when I'm at the gym",
-     *       and what apps are available.
+     *       what apps are available, and whether named contacts exist.
+     */
+    /**
+     * Stage 1 — RequestAnalysisAgent (REVISED: 7 tools)
+     * Needs: temporal context + domain entity resolution.
+     *
+     * Why these tools:
+     * - Temporal: get_current_time, resolve_datetime (time expressions)
+     * - Domain search: search_media, search_files, search_notes, search_sms, get_calendar_events
+     *
+     * The model CLASSIFIES entities by choosing the right tool:
+     * - "workout playlist" → search_media
+     * - "budget spreadsheet" → search_files
+     * - "grocery list note" → search_notes
+     * - "message from Mom" → search_sms
+     * - "dentist appointment" → get_calendar_events
+     *
+     * This scales: each new domain = one new tool.
+     * The RETO layer planner constrains tools to relevant subsets per request.
      */
     val requestAnalysisTools = setOf(
-        "get_current_time",      // When is "now"?
-        "resolve_datetime",      // "next Friday at 6pm" → timestamp
-        "compute_duration",      // "in 2 hours"
-        "get_day_of_week",       // Quick day lookup
-        "list_installed_apps",   // What can we automate?
-        "get_device_location"    // Where is the user?
+        "get_current_time",       // When is "now"?
+        "resolve_datetime",       // "next Friday at 6pm" → timestamp
+        "get_contact",            // Resolve contact names → phone/email
+        "search_media",           // Songs, playlists, artists, albums
+        "search_files",           // Documents, spreadsheets, PDFs
+        "search_notes",           // Notes and lists from note apps
+        "search_sms",             // SMS/text messages by contact/content
+        "get_calendar_events"     // Calendar events by title/date
     )
 
     /**
@@ -40,7 +60,7 @@ object AgentToolAssignments {
         "resolve_intent",
         "web_search",
         "search_places",
-        "lookup_contact",
+        "get_contact",
         "send_intent",
         "open_uri",
         "share_text",

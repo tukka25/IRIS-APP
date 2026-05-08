@@ -1,5 +1,6 @@
 package com.gemmaworkflow.platform.tools
 
+import android.util.Log
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.ConversationConfig
 import com.google.ai.edge.litertlm.SamplerConfig
@@ -22,10 +23,16 @@ class ToolAwareGenerator(
     private val engine: Engine,
     private val allowedTools: Set<String> = emptySet(),
     private val maxToolCalls: Int = 5,
-    private val onToolCall: (ToolCallEvent) -> Unit = {}
+    private val temperature: Float = 0.2f,
+    private val onToolCall: (ToolCallEvent) -> Unit = {},
+    private val schemaGate: Any? = null  // ToolSchemaGate type — avoids circular dependency
 ) {
 
-    private val sampler = SamplerConfig(topK = 40, topP = 0.95, temperature = 0.2)
+    private val sampler = SamplerConfig(topK = 40, topP = 0.95, temperature = temperature.toDouble())
+
+    private companion object {
+        const val TAG = "ToolAwareGenerator"
+    }
 
     /**
      * Generate text with tool support.
@@ -34,6 +41,7 @@ class ToolAwareGenerator(
     suspend fun generate(prompt: String): String = withContext(Dispatchers.Default) {
         var currentPrompt = prompt
         var toolCallCount = 0
+        val transcript = StringBuilder(prompt)
         val finalOutput = StringBuilder()
 
         while (toolCallCount < maxToolCalls) {
@@ -43,18 +51,22 @@ class ToolAwareGenerator(
             ).use { conv ->
                 conv.sendMessage(currentPrompt).toString()
             }
+            Log.d(TAG, "SLM raw output (${rawOutput.length} chars): ${rawOutput.take(800)}")
 
             // Check for tool calls
             val toolCall = ToolCallParser.findToolCall(rawOutput)
 
             if (toolCall == null) {
                 // No tool call — this is the final output
+                Log.d(TAG, "No tool call parsed; treating output as final answer")
                 finalOutput.append(rawOutput)
                 break
             }
+            Log.d(TAG, "Parsed tool call: ${toolCall.name} params=${toolCall.params}")
 
             // Check if tool is allowed
             if (toolCall.name !in allowedTools && allowedTools.isNotEmpty()) {
+                Log.d(TAG, "Denied tool call: ${toolCall.name}; allowed=${allowedTools.joinToString()}")
                 onToolCall(ToolCallEvent(
                     type = ToolCallEventType.DENIED,
                     toolName = toolCall.name,
@@ -84,7 +96,14 @@ class ToolAwareGenerator(
 
             // Inject result back into the prompt
             val resultBlock = ToolCallParser.formatResult(toolCall.name, result)
-            currentPrompt = "$prompt\n\nThe tool '$currentPrompt' returned:\n$resultBlock\n\nContinue where you left off."
+            transcript.appendLine()
+            transcript.appendLine("MODEL_TOOL_CALL:")
+            transcript.appendLine(toolCall.rawMatch)
+            transcript.appendLine()
+            transcript.append(resultBlock)
+            transcript.appendLine()
+            transcript.appendLine("Use TOOL_RESULT above. If enough information is available, return the requested final JSON only. If another tool is still necessary, output exactly one more TOOL call and no other text.")
+            currentPrompt = transcript.toString()
 
             toolCallCount++
         }
