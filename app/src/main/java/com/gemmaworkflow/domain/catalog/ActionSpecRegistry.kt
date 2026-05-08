@@ -1,8 +1,6 @@
 package com.gemmaworkflow.domain.catalog
 
 import android.content.Intent
-import android.provider.AlarmClock
-import android.provider.CalendarContract
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -138,17 +136,13 @@ object ActionSpecRegistry {
         ),
         ActionSpec(
             id = "share.share_text",
-            label = "Share text",
-            description = "Open the Android share sheet with text so the user can choose a target app.",
+            label = "Copy text to clipboard",
+            description = "Silently copy text to the system clipboard.",
             params = listOf(
-                ParamSpec("text", ParamType.String, description = "Text content to share")
+                ParamSpec("text", ParamType.String, description = "Text content to copy to clipboard")
             ),
-            execution = ExecutionSpec.AndroidIntent(
-                action = Intent.ACTION_SEND,
-                mimeType = "text/plain",
-                extras = listOf(ExtraSpec("text", Intent.EXTRA_TEXT, ParamType.String)),
-                chooserTitle = "Share via"
-            ),
+            execution = ExecutionSpec.BuiltIn,
+            availability = AvailabilitySpec.Always,
             triggerCompatible = setOf("manual", "time", "share_sheet", "nfc"),
             examples = listOf(
                 buildJsonObject {
@@ -159,18 +153,13 @@ object ActionSpecRegistry {
         ),
         ActionSpec(
             id = "share.share_image",
-            label = "Share image",
-            description = "Open the Android share sheet with an image content URI.",
+            label = "Copy image to clipboard",
+            description = "Silently copy an image URI to the clipboard.",
             params = listOf(
-                ParamSpec("uri", ParamType.Uri, description = "Content URI of the image")
+                ParamSpec("uri", ParamType.Uri, description = "Content URI of the image to copy")
             ),
-            execution = ExecutionSpec.AndroidIntent(
-                action = Intent.ACTION_SEND,
-                mimeType = "image/*",
-                extras = listOf(ExtraSpec("uri", Intent.EXTRA_STREAM, ParamType.Uri)),
-                flags = listOf(IntentFlag.NewTask, IntentFlag.GrantReadUriPermission),
-                chooserTitle = "Share image via"
-            ),
+            execution = ExecutionSpec.BuiltIn,
+            availability = AvailabilitySpec.Always,
             triggerCompatible = setOf("manual", "share_sheet"),
             fallbackActionIds = listOf("share.share_text"),
             examples = listOf(
@@ -208,21 +197,15 @@ object ActionSpecRegistry {
         ),
         ActionSpec(
             id = "alarm.set_alarm",
-            label = "Set alarm",
-            description = "Open the alarm app to create or confirm an alarm.",
+            label = "Set silent alarm",
+            description = "Set a silent alarm via AlarmManager — no alarm app UI is opened.",
             params = listOf(
                 ParamSpec("hour", ParamType.Int, description = "Hour in 24-hour time, 0-23"),
                 ParamSpec("minutes", ParamType.Int, description = "Minutes, 0-59"),
                 ParamSpec("message", ParamType.String, required = false, description = "Optional alarm label")
             ),
-            execution = ExecutionSpec.AndroidIntent(
-                action = AlarmClock.ACTION_SET_ALARM,
-                extras = listOf(
-                    ExtraSpec("hour", AlarmClock.EXTRA_HOUR, ParamType.Int),
-                    ExtraSpec("minutes", AlarmClock.EXTRA_MINUTES, ParamType.Int),
-                    ExtraSpec("message", AlarmClock.EXTRA_MESSAGE, ParamType.String)
-                )
-            ),
+            execution = ExecutionSpec.BuiltIn,
+            availability = AvailabilitySpec.Always,
             triggerCompatible = setOf("manual", "time", "nfc"),
             examples = listOf(
                 buildJsonObject {
@@ -255,7 +238,7 @@ object ActionSpecRegistry {
         ActionSpec(
             id = "calendar.create_event",
             label = "Create calendar event",
-            description = "Silently create a calendar event with the given details.",
+            description = "Silently create a calendar event via CalendarProvider. Requires WRITE_CALENDAR permission.",
             params = listOf(
                 ParamSpec("title", ParamType.String, description = "Event title"),
                 ParamSpec("begin_time_millis", ParamType.DateTimeMillis, description = "Start time in epoch milliseconds"),
@@ -263,18 +246,8 @@ object ActionSpecRegistry {
                 ParamSpec("location", ParamType.String, required = false, description = "Event location"),
                 ParamSpec("description", ParamType.String, required = false, description = "Event notes")
             ),
-            execution = ExecutionSpec.AndroidIntent(
-                action = Intent.ACTION_INSERT,
-                dataTemplate = CalendarContract.Events.CONTENT_URI.toString(),
-                mimeType = "vnd.android.cursor.item/event",
-                extras = listOf(
-                    ExtraSpec("title", CalendarContract.Events.TITLE, ParamType.String),
-                    ExtraSpec("begin_time_millis", CalendarContract.EXTRA_EVENT_BEGIN_TIME, ParamType.DateTimeMillis),
-                    ExtraSpec("end_time_millis", CalendarContract.EXTRA_EVENT_END_TIME, ParamType.DateTimeMillis),
-                    ExtraSpec("location", CalendarContract.Events.EVENT_LOCATION, ParamType.String),
-                    ExtraSpec("description", CalendarContract.Events.DESCRIPTION, ParamType.String)
-                )
-            ),
+            execution = ExecutionSpec.BuiltIn,
+            availability = AvailabilitySpec.Always,
             triggerCompatible = setOf("manual", "time", "nfc"),
             requiresConfirmation = false,
             fallbackActionIds = listOf("share.share_text"),

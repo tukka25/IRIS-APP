@@ -31,7 +31,7 @@ object ShareSheetTriggerHandler {
     private const val NOTIFICATION_ID_BASE = 3000
 
     /**
-     * Called by [ShareReceiver] when an ACTION_SEND intent is received.
+     * Called when a share intent is received by [MainActivity] via the share sheet.
      * Presents the workflow selector or runs directly if only one match.
      */
     fun handleIncomingShare(context: Context, sharedContent: SharedContent) {
@@ -159,26 +159,13 @@ object ShareSheetTriggerHandler {
 
         val summary = sharedContent.displaySummary()
 
-        // Build a notification that lists the workflows; tapping each one runs it directly.
-        // Use an inbox-style big text to show all options, with each line clickable via pending intent.
+        // Build a notification that shows all matching workflows as a list.
+        // Tapping the notification opens the full selector in the app.
         val inboxStyle = NotificationCompat.InboxStyle()
             .setBigContentTitle("Run shared content with...")
             .setSummaryText(summary)
 
-        workflows.take(5).forEachIndexed { index, workflow ->
-            val runIntent = Intent(context, MainActivity::class.java).apply {
-                action = ACTION_RUN_SHARE_WORKFLOW
-                putExtra(EXTRA_SHARED_TEXT, sharedContent.text)
-                sharedContent.uri?.let { putExtra(EXTRA_SHARED_URI, it.toString()) }
-                putExtra(EXTRA_WORKFLOW_NAME, workflow.name)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-            }
-            val pendingIntent = PendingIntent.getActivity(
-                context,
-                /* requestCode = */ index,
-                runIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
+        workflows.take(5).forEach { workflow ->
             inboxStyle.addLine("\u2022 ${workflow.name}")
         }
 

@@ -69,7 +69,7 @@ Milestone 6 is substantially complete. The full pipeline from natural language �
 | Manual run (tap button) | ✅ | Works — confirmed by user |
 | NFC write tag + scan + run | ✅ | `NfcTriggerWriter`, `NfcTriggerHandler`, `DeepLinkRouter`, `NfcSetupScreen` |
 | Time trigger via AlarmManager | ✅ | `TimeTriggerScheduler`, `TimeTriggerReceiver`, `BootReceiver`, `TimeTriggerNotification`, `TimeTriggerConfirmationActivity` |
-| Share sheet (receive shared content) | ✅ | `ShareReceiver`, `ShareSheetTriggerHandler`, `ShareSheetSetupScreen` |
+| Share sheet (receive shared content) | ✅ | `ShareSheetTriggerHandler`, `ShareSheetSetupScreen` |
 | TriggerRegistry register/unregister | ✅ | `TriggerCatalog.kt` |
 | Setup state tracking | ✅ | `NfcTriggerSetupScreen`, `TimeTriggerSetupScreen`, `ShareSheetSetupScreen` |
 
@@ -161,7 +161,6 @@ app/src/main/java/com/gemmaworkflow/
   platform/nfc/DeepLinkRouter.kt                   NEW        foreground NFC + deep-link
   platform/nfc/NfcTriggerHandler.kt                NEW        background NFC receiver
   platform/nfc/NfcTriggerWriter.kt                 NEW        NDEF tag writer
-  platform/share/ShareReceiver.kt                   NEW        ACTION_SEND receiver
   platform/share/ShareSheetTriggerHandler.kt       NEW        share → workflow routing
   ui/MainActivity.kt                              modified   trigger setup screens, confirmation dialog
   ui/home/NfcTriggerSetupScreen.kt                NEW

@@ -172,18 +172,5 @@
             </intent-filter>
         </receiver>
 
-        <!-- Receives ACTION_SEND when the app is launched via share sheet (even if not yet running). -->
-        <receiver
-            android:name=".platform.share.ShareReceiver"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.SEND" />
-                <data android:mimeType="text/plain" />
-            </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.SEND" />
-                <data android:mimeType="image/*" />
-            </intent-filter>
-        </receiver>
     </application>
 </manifest>

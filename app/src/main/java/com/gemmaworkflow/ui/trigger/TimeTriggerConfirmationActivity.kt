@@ -42,6 +42,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Activity displayed when a scheduled time trigger fires.
@@ -122,7 +123,7 @@ class TimeTriggerConfirmationActivity : ComponentActivity() {
             val workflow = repo.get(workflowName)
             if (workflow == null) {
                 Log.e(TAG, "Workflow not found: '$workflowName'")
-                finish()
+                withContext(Dispatchers.Main) { finish() }
                 return@launch
             }
             try {
@@ -133,7 +134,7 @@ class TimeTriggerConfirmationActivity : ComponentActivity() {
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to run workflow '$workflowName'", e)
             }
-            finish()
+            withContext(Dispatchers.Main) { finish() }
         }
     }
 }

@@ -43,7 +43,7 @@ data class PendingShare(
 }
 
 data class WorkflowGenerationUiState(
-    val prompt: String = "send message to +971****8872 saying hi, and invite him to meeting on 6 oclock on next friday and then add it to my calender.",
+    val prompt: String = "send a message to +1-555-000-0000 saying hi, and invite them to a meeting at 6 oclock on next friday, then add it to my calendar.",
     val inferenceState: InferenceState = InferenceState.Idle,
     val isModelReady: Boolean = false,
     val isBusy: Boolean = false,

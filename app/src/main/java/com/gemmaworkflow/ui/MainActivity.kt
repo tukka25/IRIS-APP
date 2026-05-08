@@ -69,6 +69,8 @@ import com.gemmaworkflow.ui.home.WorkflowGenerationViewModel
 import com.gemmaworkflow.ui.nfc.NfcSetupScreen
 import com.gemmaworkflow.ui.theme.GemmaWorkflowTheme
 import com.gemmaworkflow.ui.trigger.formatTriggerSummary
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 
 class MainActivity : ComponentActivity() {
     private val viewModel: WorkflowGenerationViewModel by viewModels()
@@ -103,90 +105,97 @@ class MainActivity : ComponentActivity() {
     private fun handleIntent(intent: Intent?) {
         if (intent == null) return
 
-        // Share sheet intent: extract content and show workflow selector
-        if (intent.action == Intent.ACTION_SEND) {
-            if (intent.type == null) return
-            val sharedContent: SharedContent? = when {
-                intent.type == "text/plain" || intent.type?.startsWith("text/") == true -> {
-                    intent.getStringExtra(Intent.EXTRA_TEXT)?.let { text ->
-                        SharedContent.Text(text = text)
+        lifecycleScope.launch {
+            // Wait for savedWorkflows to be loaded (it might be empty on cold start)
+            withTimeoutOrNull(2000) {
+                viewModel.uiState.first { it.savedWorkflows.isNotEmpty() }
+            }
+
+            // Share sheet intent: extract content and show workflow selector
+            if (intent.action == Intent.ACTION_SEND) {
+                if (intent.type == null) return@launch
+                val sharedContent: SharedContent? = when {
+                    intent.type == "text/plain" || intent.type?.startsWith("text/") == true -> {
+                        intent.getStringExtra(Intent.EXTRA_TEXT)?.let { text ->
+                            SharedContent.Text(text = text)
+                        }
+                    }
+                    intent.type?.startsWith("image/") == true -> {
+                        intent.getParcelableExtra<android.net.Uri>(Intent.EXTRA_STREAM)?.let { uri ->
+                            SharedContent.Image(uri = uri, type = intent.type ?: "image/*")
+                        }
+                    }
+                    else -> null
+                }
+                if (sharedContent != null) {
+                    viewModel.setSharedContent(sharedContent)
+                }
+                return@launch
+            }
+
+            // Action from ShareSheetTriggerHandler notification: run named workflow with pending share
+            if (intent.action == ShareSheetTriggerHandler.ACTION_RUN_SHARE_WORKFLOW) {
+                val workflowName = intent.getStringExtra(ShareSheetTriggerHandler.EXTRA_WORKFLOW_NAME)
+                val sharedText = intent.getStringExtra(ShareSheetTriggerHandler.EXTRA_SHARED_TEXT)
+                val sharedUri = intent.getStringExtra(ShareSheetTriggerHandler.EXTRA_SHARED_URI)
+
+                if (workflowName != null) {
+                    val content: SharedContent? = when {
+                        !sharedText.isNullOrBlank() -> SharedContent.Text(text = sharedText)
+                        !sharedUri.isNullOrBlank() -> SharedContent.Image(uri = android.net.Uri.parse(sharedUri))
+                        else -> null
+                    }
+                    if (content != null) {
+                        val workflow = viewModel.uiState.value.savedWorkflows.find { it.name == workflowName }
+                        if (workflow != null) {
+                            viewModel.selectWorkflowFromShare(workflow, content)
+                        }
                     }
                 }
-                intent.type?.startsWith("image/") == true -> {
-                    intent.getParcelableExtra<android.net.Uri>(Intent.EXTRA_STREAM)?.let { uri ->
-                        SharedContent.Image(uri = uri, type = intent.type ?: "image/*")
-                    }
-                }
-                else -> null
+                return@launch
             }
-            if (sharedContent != null) {
-                viewModel.setSharedContent(sharedContent)
-            }
-            return
-        }
 
-        // Action from ShareSheetTriggerHandler notification: run named workflow with pending share
-        if (intent.action == ShareSheetTriggerHandler.ACTION_RUN_SHARE_WORKFLOW) {
-            val workflowName = intent.getStringExtra(ShareSheetTriggerHandler.EXTRA_WORKFLOW_NAME)
-            val sharedText = intent.getStringExtra(ShareSheetTriggerHandler.EXTRA_SHARED_TEXT)
-            val sharedUri = intent.getStringExtra(ShareSheetTriggerHandler.EXTRA_SHARED_URI)
-
-            if (workflowName != null) {
+            // Action from ShareSheetTriggerHandler notification: open share selector UI
+            if (intent.action == ShareSheetTriggerHandler.ACTION_SHOW_SHARE_SELECTOR) {
+                val sharedText = intent.getStringExtra(ShareSheetTriggerHandler.EXTRA_SHARED_TEXT)
+                val sharedUri = intent.getStringExtra(ShareSheetTriggerHandler.EXTRA_SHARED_URI)
                 val content: SharedContent? = when {
                     !sharedText.isNullOrBlank() -> SharedContent.Text(text = sharedText)
                     !sharedUri.isNullOrBlank() -> SharedContent.Image(uri = android.net.Uri.parse(sharedUri))
                     else -> null
                 }
                 if (content != null) {
+                    viewModel.setSharedContent(content)
+                }
+                return@launch
+            }
+
+            // Action from ShareSheetTriggerHandler notification: just show the shared content
+            if (intent.action == ShareSheetTriggerHandler.ACTION_SHOW_SHARE_CONTENT) {
+                val sharedText = intent.getStringExtra(ShareSheetTriggerHandler.EXTRA_SHARED_TEXT)
+                val sharedUri = intent.getStringExtra(ShareSheetTriggerHandler.EXTRA_SHARED_URI)
+                val content: SharedContent? = when {
+                    !sharedText.isNullOrBlank() -> SharedContent.Text(text = sharedText)
+                    !sharedUri.isNullOrBlank() -> SharedContent.Image(uri = android.net.Uri.parse(sharedUri))
+                    else -> null
+                }
+                if (content != null) {
+                    viewModel.setSharedContent(content)
+                }
+                return@launch
+            }
+
+            // Handle ACTION_RUN_WORKFLOW from TimeTriggerConfirmationActivity "Run Now" shortcut.
+            if (intent.action == DeepLinkRouter.ACTION_RUN_WORKFLOW) {
+                val workflowName = intent.getStringExtra(DeepLinkRouter.EXTRA_WORKFLOW_ID)
+                if (workflowName != null) {
                     val workflow = viewModel.uiState.value.savedWorkflows.find { it.name == workflowName }
                     if (workflow != null) {
-                        viewModel.selectWorkflowFromShare(workflow, content)
+                        viewModel.runWorkflow(workflow)
                     }
                 }
+                return@launch
             }
-            return
-        }
-
-        // Action from ShareSheetTriggerHandler notification: open share selector UI
-        if (intent.action == ShareSheetTriggerHandler.ACTION_SHOW_SHARE_SELECTOR) {
-            val sharedText = intent.getStringExtra(ShareSheetTriggerHandler.EXTRA_SHARED_TEXT)
-            val sharedUri = intent.getStringExtra(ShareSheetTriggerHandler.EXTRA_SHARED_URI)
-            val content: SharedContent? = when {
-                !sharedText.isNullOrBlank() -> SharedContent.Text(text = sharedText)
-                !sharedUri.isNullOrBlank() -> SharedContent.Image(uri = android.net.Uri.parse(sharedUri))
-                else -> null
-            }
-            if (content != null) {
-                viewModel.setSharedContent(content)
-            }
-            return
-        }
-
-        // Action from ShareSheetTriggerHandler notification: just show the shared content
-        if (intent.action == ShareSheetTriggerHandler.ACTION_SHOW_SHARE_CONTENT) {
-            val sharedText = intent.getStringExtra(ShareSheetTriggerHandler.EXTRA_SHARED_TEXT)
-            val sharedUri = intent.getStringExtra(ShareSheetTriggerHandler.EXTRA_SHARED_URI)
-            val content: SharedContent? = when {
-                !sharedText.isNullOrBlank() -> SharedContent.Text(text = sharedText)
-                !sharedUri.isNullOrBlank() -> SharedContent.Image(uri = android.net.Uri.parse(sharedUri))
-                else -> null
-            }
-            if (content != null) {
-                viewModel.setSharedContent(content)
-            }
-            return
-        }
-
-        // Handle ACTION_RUN_WORKFLOW from TimeTriggerConfirmationActivity "Run Now" shortcut.
-        if (intent.action == DeepLinkRouter.ACTION_RUN_WORKFLOW) {
-            val workflowName = intent.getStringExtra(DeepLinkRouter.EXTRA_WORKFLOW_ID)
-            if (workflowName != null) {
-                val workflow = viewModel.uiState.value.savedWorkflows.find { it.name == workflowName }
-                if (workflow != null) {
-                    viewModel.runWorkflow(workflow)
-                }
-            }
-            return
         }
     }
 

@@ -11,8 +11,8 @@ import com.gemmaworkflow.domain.model.TriggerConfig
  * Schedules and cancels exact alarms for time-triggered workflows.
  *
  * Each workflow gets one PendingIntent keyed by its name hash code.
- * When the alarm fires, [TimeTriggerReceiver] loads the workflow from disk and
- * executes it silently — no notification, no app launch.
+ * When the alarm fires, [TimeTriggerReceiver] posts a notification and requires
+ * user confirmation before executing the workflow.
  *
  * Repeat days are stored as alarm extras; the receiver re-schedules the next
  * occurrence before dispatching so daily/weekly patterns fire reliably.

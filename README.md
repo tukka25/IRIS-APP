@@ -12,7 +12,7 @@ User prompt
     │
     ▼
 ┌─────────────────────┐
-│   LiteRT-LM GPU     │  ← Gemma 4 2B on-device via LiteRT-LM
+│   LiteRT-LM          │  ← Gemma 4 2B on-device via LiteRT-LM
 │   Planner Pipeline   │  ← 4-stage: RequestAnalysis → Capability → ActionPlan → JSON
 └────────┬────────────┘
          │ JSON workflow
@@ -47,14 +47,16 @@ WorkflowRunner   NFC / Time / Share Sheet
 
 ## Action Catalog
 
-| `browser.open_url` | Open URL in Chrome Custom Tab | No (in-app) |
+| Action | Description | Silent |
+|---|---|---|
+| `browser.open_url` | Open URL in Chrome Custom Tab | No |
 | `maps.open_place` | Open a place in Maps | No |
-| `share.share_text` | Share text | No |
-| `share.share_image` | Share image | No |
+| `share.share_text` | Copy text to clipboard | Yes |
+| `share.share_image` | Copy image URI to clipboard | Yes |
 | `sms.compose` | Open SMS composer | No |
-| `alarm.set_alarm` | Set silent alarm | Yes |
-| `clipboard.copy_text` | Copy text silently | Yes |
-| `calendar.create_event` | Create calendar event silently | Yes |
+| `alarm.set_alarm` | Set silent alarm via AlarmManager | Yes |
+| `clipboard.copy_text` | Copy text to clipboard | Yes |
+| `calendar.create_event` | Create calendar event via CalendarProvider | Yes |
 
 ---
 
@@ -126,7 +128,6 @@ app/src/main/java/com/gemmaworkflow/
 │   │   ├── NfcTriggerHandler.kt             # Background NFC scan receiver
 │   │   └── NfcTriggerWriter.kt              # NDEF tag writer
 │   └── share/
-│       ├── ShareReceiver.kt                 # ACTION_SEND receiver
 │       └── ShareSheetTriggerHandler.kt       # Share → workflow matching
 └── ui/
     ├── MainActivity.kt                      # Navigation + confirmation dialog

@@ -8,6 +8,10 @@ import android.content.Intent
 import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
+import android.Manifest
+import android.content.pm.PackageManager
+import com.gemmaworkflow.R
 import com.gemmaworkflow.platform.nfc.DeepLinkRouter
 import com.gemmaworkflow.ui.MainActivity
 
@@ -42,6 +46,15 @@ object TimeTriggerNotification {
      * Activity can load it directly without parsing a URI.
      */
     fun post(context: Context, workflowName: String) {
+        // Check permission before posting
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) 
+                != PackageManager.PERMISSION_GRANTED) {
+                Log.w(TAG, "Cannot post notification: POST_NOTIFICATIONS permission not granted")
+                return
+            }
+        }
+
         val notificationManager =
             context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
@@ -52,7 +65,7 @@ object TimeTriggerNotification {
         val runDirectIntent = buildRunDirectIntent(context, workflowName)
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle("Scheduled Workflow")
             .setContentText("Run \"$workflowName\"?")
             .setPriority(NotificationCompat.PRIORITY_HIGH)

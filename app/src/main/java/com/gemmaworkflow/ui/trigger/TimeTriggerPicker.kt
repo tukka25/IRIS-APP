@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Schedule
@@ -133,17 +134,17 @@ fun TimeTriggerPickerDialog(
         title = { Text("Schedule Time Trigger") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                // Time picker.
+                // Time picker — hour/minute derived from timeState, not mutated separately.
                 val timeState = rememberTimePickerState(
                     initialHour = hour,
                     initialMinute = minute,
                     is24Hour = false
                 )
 
-                // Sync state back when user interacts with the picker.
-                timeState.let {
-                    hour = it.hour
-                    minute = it.minute
+                // Sync timeState back to outer scope hour/minute on user interaction.
+                LaunchedEffect(timeState) {
+                    hour = timeState.hour
+                    minute = timeState.minute
                 }
 
                 TimePicker(state = timeState)
