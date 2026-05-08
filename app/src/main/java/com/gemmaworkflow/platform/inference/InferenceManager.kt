@@ -32,7 +32,7 @@ object InferenceManager {
     private var initialized = false
 
     /**
-     * Load the default LiteRT-LM model with GPU backend.
+     * Load the default LiteRT-LM model, preferring GPU then falling back to CPU.
      * Safe to call multiple times — subsequent calls are no-ops if already loaded.
      */
     suspend fun initialize(context: Context) {
@@ -48,15 +48,31 @@ object InferenceManager {
 
                 Log.i(TAG, "Loading model: ${modelFile.absolutePath}")
 
-                val config = EngineConfig(
-                    modelPath = modelFile.absolutePath,
-                    backend = Backend.GPU(),
-                    cacheDir = context.cacheDir.absolutePath
-                )
+                // Try GPU first; fall back to CPU if unavailable.
+                val gpuResult = runCatching {
+                    val gpuConfig = EngineConfig(
+                        modelPath = modelFile.absolutePath,
+                        backend = Backend.GPU(),
+                        cacheDir = context.cacheDir.absolutePath
+                    )
+                    Engine(gpuConfig).also { it.initialize() }
+                }
 
-                engine = Engine(config).also { it.initialize() }
+                engine = if (gpuResult.isSuccess) {
+                    Log.i(TAG, "Model loaded successfully on GPU")
+                    gpuResult.getOrThrow()
+                } else {
+                    Log.w(TAG, "GPU unavailable (${gpuResult.exceptionOrNull()?.message}), falling back to CPU")
+                    val cpuConfig = EngineConfig(
+                        modelPath = modelFile.absolutePath,
+                        backend = Backend.CPU(),
+                        cacheDir = context.cacheDir.absolutePath
+                    )
+                    Engine(cpuConfig).also { it.initialize() }.also {
+                        Log.i(TAG, "Model loaded successfully on CPU")
+                    }
+                }
 
-                Log.i(TAG, "Model loaded successfully on GPU")
                 _state.value = InferenceState.Ready
             }
         }.onFailure { throwable ->
@@ -70,7 +86,9 @@ object InferenceManager {
 
                 message.contains("GPU", ignoreCase = true) ||
                 message.contains("OpenCL", ignoreCase = true) ||
-                message.contains("Vulkan", ignoreCase = true) ->
+                message.contains("Vulkan", ignoreCase = true) ||
+                message.contains("WebGPU", ignoreCase = true) ||
+                message.contains("No adapters found", ignoreCase = true) ->
                     InferenceState.GpuUnavailable(message)
 
                 else -> InferenceState.Error(message)

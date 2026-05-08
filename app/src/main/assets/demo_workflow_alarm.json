@@ -1,0 +1,37 @@
+{
+  "name": "Morning Alarm & Calendar",
+  "summary": "Sets an alarm for 7:30am and creates a calendar event for a morning workout.",
+  "trigger": {
+    "type": "manual"
+  },
+  "actions": [
+    {
+      "id": "alarm.set_alarm",
+      "params": {
+        "hour": 7,
+        "minutes": 30,
+        "message": "Morning workout"
+      },
+      "requires_confirmation": true
+    },
+    {
+      "id": "calendar.create_event",
+      "params": {
+        "title": "Gym session",
+        "begin_time_millis": 1770000000000,
+        "end_time_millis": 1770003600000,
+        "location": "Local gym",
+        "description": "Morning workout routine"
+      },
+      "requires_confirmation": true
+    },
+    {
+      "id": "sms.compose",
+      "params": {
+        "message": "Headed to the gym. See you later!"
+      },
+      "requires_confirmation": true
+    }
+  ],
+  "missing_setup": []
+}

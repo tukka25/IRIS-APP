@@ -77,13 +77,18 @@ The app should prove three things:
 
 1. User enters a request on the Home screen.
 2. `PromptBuilder` creates a compact system prompt containing the JSON schema, supported actions, and trigger types.
-3. `PlannerService` calls either `MockPlannerEngine` or `LitertLmEngine`.
+3. `PlannerService` calls the 4-stage planner pipeline using the loaded LiteRT-LM engine:
+   - **Stage 1:** `RequestAnalysisAgent` — extracts goal, trigger hint, app categories.
+   - **Stage 2:** `CapabilityResolverAgent` — grounds request against `ActionSpecRegistry` + `PackageManager`.
+   - **Stage 3:** `ActionPlanAgent` — selects action IDs and fills params.
+   - **Stage 4:** `JsonBuildingAgent` — produces final validated JSON.
 4. `WorkflowJsonParser` extracts and decodes the returned JSON into typed Kotlin models.
-5. `SafeActionRouter` validates every app, action, parameter, URL, and package name against an allowlist.
-6. The UI shows the workflow preview and raw JSON.
-7. User saves the workflow to Room.
-8. User taps "Run Now" or creates a trigger.
-9. `WorkflowRunner` dispatches steps sequentially and writes execution results to history.
+5. `WorkflowValidator` validates every action, parameter, URL, and trigger against `ActionSpecRegistry`.
+6. The UI shows the workflow preview (step list + params) and raw JSON.
+7. User saves the workflow — stored as JSON via `JsonFileStorage` (file-based, not Room).
+8. User taps "Run Now" or attaches a trigger (NFC, Time, Share Sheet).
+9. `WorkflowRunner` dispatches steps sequentially — either via `IntentFactory` (AndroidIntent), `ChromeCustomTabOpener` (CustomTab), or platform executors (Clipboard, Calendar, Alarm).
+10. `ExecutionHistoryRepository` appends `ExecutionLogEntry` to the on-disk history log.
 
 ## Technology Choices
 
@@ -266,17 +271,18 @@ data class WorkflowEntity(
 
 ## Action Catalog
 
-Use a small Android-real catalog first.
+| App | Action | Dispatch path |
+|-----|--------|---------------|
+| Browser | `open_url` | Chrome Custom Tab |
+| Maps | `open_place` | `ACTION_VIEW` + geo: URI |
+| Share | `share_text` | ClipboardManager |
+| Share | `share_image` | ClipboardManager |
+| SMS | `compose` | `ACTION_SENDTO` |
+| Alarm | `set_alarm` | `AlarmManager.setExactAndAllowWhileIdle()` |
+| Clipboard | `copy_text` | `ClipboardManager.setPrimaryClip()` |
+| Calendar | `create_event` | `ContentResolver.insert(CalendarContract)` |
 
-| App | Action | Dispatch path | Notes |
-|-----|--------|---------------|-------|
-| Spotify | `play_search(query)` | Intent or URI fallback | Requires Spotify installed; test on device. |
-| Obsidian | `create_note(title, content)` | Android share intent or app URL if verified | Keep as demo target only after testing. |
-| Maps | `open_place(query)` | `geo:` or Google Maps URL | Reliable Android fallback action. |
-| Browser | `open_url(url)` | `ACTION_VIEW` | Useful universal fallback. |
-| ShareSheet | `share_text(text)` | `ACTION_SEND` | Reliable for creating visible cross-app behavior. |
-
-Avoid iOS-only examples in the Android prompt catalog. If the demo needs note creation and Obsidian is not reliable, use `ACTION_SEND` to send text into any installed notes app through the Android share sheet.
+> **ExecutionSpec variants:** `AndroidIntent` (generic Intent), `CustomTab` (Chrome Custom Tabs), `BuiltIn` (direct platform API — clipboard, calendar, alarm).
 
 ## Planner Layer
 

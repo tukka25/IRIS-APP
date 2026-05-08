@@ -1,0 +1,24 @@
+{
+  "name": "Share Image & Open Browser",
+  "summary": "Shares an image, then opens a URL in the browser.",
+  "trigger": {
+    "type": "manual"
+  },
+  "actions": [
+    {
+      "id": "share.share_image",
+      "params": {
+        "uri": "content://media/external/images/media/1"
+      },
+      "requires_confirmation": true
+    },
+    {
+      "id": "browser.open_url",
+      "params": {
+        "url": "https://example.com"
+      },
+      "requires_confirmation": false
+    }
+  ],
+  "missing_setup": []
+}
