@@ -61,6 +61,9 @@ dependencies {
     // Chrome Custom Tabs: in-app browser tab, no app switch
     implementation("androidx.browser:browser:1.8.0")
 
+    // Glance: home-screen AppWidget with Compose-style API
+    implementation("androidx.glance:glance-appwidget:1.1.1")
+
     // LiteRT-LM: on-device LLM inference with GPU acceleration
     // Pin 0.10.0 (latest stable on Google Maven as of May 2026)
     implementation("com.google.ai.edge.litertlm:litertlm-android:0.10.0")

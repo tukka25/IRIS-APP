@@ -21,6 +21,7 @@ import com.gemmaworkflow.domain.safety.WorkflowValidator
 import com.gemmaworkflow.domain.triggers.TriggerRegistry
 import com.gemmaworkflow.domain.triggers.TriggerRegistrationResult
 import com.gemmaworkflow.platform.alarm.TimeTriggerScheduler
+import com.gemmaworkflow.widget.WorkflowWidgetGlance
 import com.gemmaworkflow.platform.capability.PackageCapabilityScanner
 import com.gemmaworkflow.platform.inference.InferenceManager
 import com.gemmaworkflow.platform.inference.InferenceState
@@ -69,7 +70,8 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
         viewModelScope.launch(Dispatchers.IO) {
             DemoWorkflowSeeder.seedIfNeeded(application, workflowRepo)
             val saved = workflowRepo.loadAll()
-            _uiState.update { it.copy(savedWorkflows = saved) }
+            val (summaries, activity) = buildHistoryState(saved)
+            _uiState.update { it.copy(savedWorkflows = saved, workflowSummaries = summaries, recentActivity = activity) }
         }
     }
 
@@ -291,10 +293,14 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
                 appendDebug(label, message)
             }
             historyRepo.log(workflow.name, results)
+            WorkflowWidgetGlance.updateAll(getApplication())
             currentRunner = null
+            val saved = workflowRepo.loadAll()
+            val (summaries, activity) = buildHistoryState(saved)
             _uiState.update {
                 it.copy(isBusy = false, saved = true, runResults = results,
                     pendingConfirmation = null, runningWorkflow = null,
+                    savedWorkflows = saved, workflowSummaries = summaries, recentActivity = activity,
                     stage = if (results.all { r -> r.success }) "All steps completed" else "Some steps failed")
             }
         } catch (e: ConfirmationRequired) {
@@ -609,6 +615,34 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
                 prompt = promptHint
             )
         }
+    }
+
+    fun clearPreview() {
+        _uiState.update { it.copy(workflowPreview = null, rawJson = null, isBusy = false,
+            stage = "", stageTimeline = emptyList(), error = null, runResults = emptyList(), saved = false) }
+    }
+
+    private fun buildHistoryState(
+        workflows: List<PlannedWorkflow>
+    ): Pair<Map<String, WorkflowRunSummary>, List<RecentRun>> {
+        val summaries = workflows.associate { wf ->
+            val history = historyRepo.forWorkflow(wf.name)
+            wf.name to WorkflowRunSummary(
+                recentHistory = history.takeLast(6).map { it.allSuccess },
+                totalRuns = history.size,
+                lastRunMillis = history.lastOrNull()?.timestampMillis ?: 0L
+            )
+        }
+        val activity = workflows.flatMap { wf ->
+            historyRepo.forWorkflow(wf.name).map { entry ->
+                RecentRun(
+                    workflowName = wf.name,
+                    success = entry.allSuccess,
+                    timestampMillis = entry.timestampMillis
+                )
+            }
+        }.sortedByDescending { it.timestampMillis }.take(8)
+        return Pair(summaries, activity)
     }
 
     private fun appendDebug(label: String, message: String) {

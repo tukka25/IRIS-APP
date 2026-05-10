@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -14,9 +15,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -34,9 +38,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
+import com.gemmaworkflow.data.repository.ExecutionHistoryRepository
 import com.gemmaworkflow.data.repository.WorkflowRepository
 import com.gemmaworkflow.domain.model.PlannedWorkflow
 import com.gemmaworkflow.domain.runner.WorkflowRunner
+import com.gemmaworkflow.widget.WorkflowWidgetGlance
 import com.gemmaworkflow.platform.nfc.DeepLinkRouter
 import com.gemmaworkflow.platform.nfc.DeepLink
 import com.gemmaworkflow.ui.theme.GemmaWorkflowTheme
@@ -145,6 +151,11 @@ class TimeTriggerConfirmationActivity : ComponentActivity() {
                 }
                 val allSuccess = results.all { it.success }
                 Log.i(TAG, "Time trigger workflow '$workflowName' completed — allSuccess=$allSuccess")
+                withContext(Dispatchers.IO) {
+                    ExecutionHistoryRepository(this@TimeTriggerConfirmationActivity)
+                        .log(workflowName, results)
+                }
+                WorkflowWidgetGlance.updateAll(this@TimeTriggerConfirmationActivity)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to run workflow '$workflowName'", e)
             }
@@ -207,6 +218,7 @@ private fun TimeTriggerConfirmationScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
             .verticalScroll(rememberScrollState())
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -214,26 +226,38 @@ private fun TimeTriggerConfirmationScreen(
         Text("Scheduled Workflow", style = MaterialTheme.typography.headlineSmall)
 
         // Workflow summary card
-        Card(modifier = Modifier.fillMaxWidth()) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(workflow.name, style = MaterialTheme.typography.titleMedium)
                 if (workflow.summary.isNotBlank()) {
                     Text(workflow.summary, style = MaterialTheme.typography.bodyMedium)
                 }
                 Text(
-                    "Trigger: Scheduled \u2022 ${formatTriggerTime(workflow)}",
+                    "\u23f0 ${formatTriggerTime(workflow)}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.outline
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
         }
 
-        // Steps card
-        Text("Steps", style = MaterialTheme.typography.titleSmall)
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            "ACTIONS",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
+            Column(modifier = Modifier.padding(vertical = 4.dp)) {
                 workflow.actions.forEachIndexed { index, step ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Text(
                             "${index + 1}.",
                             style = MaterialTheme.typography.bodySmall,
@@ -248,13 +272,13 @@ private fun TimeTriggerConfirmationScreen(
                                     step.params.entries.joinToString(", ") { "${it.key}=${it.value}" },
                                     style = MaterialTheme.typography.bodySmall,
                                     fontFamily = FontFamily.Monospace,
-                                    color = MaterialTheme.colorScheme.outline
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
                     }
                     if (index < workflow.actions.lastIndex) {
-                        HorizontalDivider()
+                        HorizontalDivider(modifier = Modifier.padding(start = 40.dp))
                     }
                 }
             }
@@ -266,19 +290,22 @@ private fun TimeTriggerConfirmationScreen(
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             OutlinedButton(
                 onClick = onDismiss,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(50)
             ) {
                 Text("Dismiss")
             }
             OutlinedButton(
                 onClick = onView,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(50)
             ) {
                 Text("View")
             }
             Button(
                 onClick = onRun,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(50)
             ) {
                 Text("Run Now")
             }

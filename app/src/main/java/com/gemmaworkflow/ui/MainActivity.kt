@@ -71,6 +71,34 @@ import com.gemmaworkflow.ui.theme.GemmaWorkflowTheme
 import com.gemmaworkflow.ui.trigger.formatTriggerSummary
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Bookmarks
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import com.gemmaworkflow.ui.home.RecentRun
+import com.gemmaworkflow.ui.home.WorkflowGenerationUiState
+import com.gemmaworkflow.ui.home.WorkflowRunSummary
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.Icons
+import androidx.compose.material3.Icon
 
 class MainActivity : ComponentActivity() {
     private val viewModel: WorkflowGenerationViewModel by viewModels()
@@ -310,209 +338,357 @@ private fun WorkflowGenerationScreen(viewModel: WorkflowGenerationViewModel) {
         return
     }
 
+    var selectedTab by remember { mutableIntStateOf(0) }
+    var showGenerate by remember { mutableStateOf(false) }
+
+    if (showGenerate || state.isBusy || state.workflowPreview != null) {
+        GenerateScreen(
+            state = state,
+            viewModel = viewModel,
+            onBack = { viewModel.clearPreview(); showGenerate = false }
+        )
+        return
+    }
+
+    Scaffold(
+        containerColor = Color(0xFF0D0D0F),
+        bottomBar = {
+            NavigationBar(containerColor = Color(0xFF1C1C1E), tonalElevation = 0.dp) {
+                val navItems = listOf(
+                    Triple(Icons.Filled.Bolt, "Workflows", 0),
+                    Triple(Icons.Filled.Bookmarks, "Library", 1),
+                    Triple(Icons.Filled.History, "History", 2),
+                    Triple(Icons.Filled.Settings, "Settings", 3)
+                )
+                navItems.forEach { (icon, label, index) ->
+                    NavigationBarItem(
+                        selected = selectedTab == index,
+                        onClick = { selectedTab = index },
+                        icon = { Icon(icon, contentDescription = label) },
+                        label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+                        colors = androidx.compose.material3.NavigationBarItemDefaults.colors(
+                            selectedIconColor = Color(0xFF007AFF),
+                            selectedTextColor = Color(0xFF007AFF),
+                            indicatorColor = Color(0xFF1C1C1E),
+                            unselectedIconColor = Color(0xFF636366),
+                            unselectedTextColor = Color(0xFF636366)
+                        )
+                    )
+                }
+            }
+        }
+    ) { padding ->
+        when (selectedTab) {
+            0 -> WorkflowsHomeTab(state, viewModel, padding, onNewWorkflow = { showGenerate = true })
+            1 -> LibraryTab(padding)
+            2 -> HistoryTab(state, padding)
+            else -> SettingsTab(padding)
+        }
+    }
+}
+
+// \u2500\u2500 Dark home tab \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+
+private val HomeBackground = Color(0xFF0D0D0F)
+private val HomeSectionLabel = Color(0xFF636366)
+private val HomeCardBg = Color(0xFF1C1C1E)
+
+@Composable
+private fun WorkflowsHomeTab(
+    state: WorkflowGenerationUiState,
+    viewModel: WorkflowGenerationViewModel,
+    padding: PaddingValues,
+    onNewWorkflow: () -> Unit
+) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(HomeBackground)
+            .padding(padding),
+        contentPadding = PaddingValues(bottom = 16.dp)
+    ) {
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Workflows", style = MaterialTheme.typography.headlineMedium, color = Color.White)
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    ModelStatusPill(state.inferenceState)
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .background(Color(0xFF007AFF), CircleShape)
+                            .clickable(onClick = onNewWorkflow),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Filled.Add, contentDescription = "New workflow", tint = Color.White,
+                            modifier = Modifier.size(20.dp))
+                    }
+                }
+            }
+        }
+
+        if (state.savedWorkflows.isNotEmpty()) {
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("SAVED", style = MaterialTheme.typography.labelMedium, color = HomeSectionLabel)
+                    Text("${state.savedWorkflows.size}", style = MaterialTheme.typography.labelMedium,
+                        color = Color(0xFF007AFF))
+                }
+                Spacer(modifier = Modifier.size(8.dp))
+            }
+            items(state.savedWorkflows) { wf ->
+                WorkflowCard(
+                    workflow = wf,
+                    summary = state.workflowSummaries[wf.name],
+                    onClick = { viewModel.loadWorkflowDetail(wf.name) }
+                )
+            }
+        }
+
+        if (state.recentActivity.isNotEmpty()) {
+            item {
+                Spacer(modifier = Modifier.size(16.dp))
+                Text("RECENT ACTIVITY", style = MaterialTheme.typography.labelMedium,
+                    color = HomeSectionLabel,
+                    modifier = Modifier.padding(horizontal = 20.dp))
+                Spacer(modifier = Modifier.size(8.dp))
+            }
+            items(state.recentActivity) { run ->
+                RecentActivityRow(run)
+            }
+        }
+    }
+}
+
+@Composable
+private fun WorkflowCard(
+    workflow: PlannedWorkflow,
+    summary: WorkflowRunSummary?,
+    onClick: () -> Unit
+) {
+    val iconColor = triggerIconColor(workflow)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp)
+            .background(HomeCardBg, RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+            .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Box(
+            modifier = Modifier.size(44.dp).background(iconColor, RoundedCornerShape(12.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(triggerEmoji(workflow), style = MaterialTheme.typography.titleMedium)
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(workflow.name, style = MaterialTheme.typography.titleSmall,
+                color = Color.White, maxLines = 1)
+            Text(triggerSubtitle(workflow), style = MaterialTheme.typography.labelSmall,
+                color = HomeSectionLabel, maxLines = 1)
+        }
+        if (summary != null && summary.recentHistory.isNotEmpty()) {
+            Row(horizontalArrangement = Arrangement.spacedBy(3.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                summary.recentHistory.forEach { ok ->
+                    Box(modifier = Modifier.size(7.dp).background(
+                        if (ok) Color(0xFF34C759) else Color(0xFFFF3B30), CircleShape))
+                }
+            }
+            Spacer(modifier = Modifier.size(4.dp))
+        }
+        Icon(Icons.Filled.ChevronRight, contentDescription = null,
+            tint = HomeSectionLabel, modifier = Modifier.size(18.dp))
+    }
+}
+
+@Composable
+private fun RecentActivityRow(run: RecentRun) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 3.dp)
+            .background(HomeCardBg, RoundedCornerShape(12.dp))
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Box(
+            modifier = Modifier.size(28.dp)
+                .background(if (run.success) Color(0xFF34C759) else Color(0xFFFF3B30), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(if (run.success) "\u2713" else "\u2717", color = Color.White,
+                style = MaterialTheme.typography.labelSmall)
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(run.workflowName, style = MaterialTheme.typography.bodyMedium,
+                color = Color.White, maxLines = 1)
+            Text(formatRelativeTime(run.timestampMillis),
+                style = MaterialTheme.typography.labelSmall, color = HomeSectionLabel)
+        }
+    }
+}
+
+@Composable
+private fun ModelStatusPill(inferenceState: InferenceState) {
+    val (label, color) = when (inferenceState) {
+        is InferenceState.Ready -> "\u25CF GPU" to Color(0xFF34C759)
+        is InferenceState.Loading -> "\u25CF Loading" to Color(0xFFFF9500)
+        else -> "\u25CF Offline" to Color(0xFFFF3B30)
+    }
+    Box(
+        modifier = Modifier
+            .background(Color(0xFF2C2C2E), RoundedCornerShape(50))
+            .padding(horizontal = 10.dp, vertical = 6.dp)
+    ) {
+        Text(label, style = MaterialTheme.typography.labelSmall, color = color)
+    }
+}
+
+@Composable
+private fun LibraryTab(padding: PaddingValues) {
+    Box(modifier = Modifier.fillMaxSize().background(HomeBackground).padding(padding),
+        contentAlignment = Alignment.Center) {
+        Text("Action Library", color = HomeSectionLabel, style = MaterialTheme.typography.titleMedium)
+    }
+}
+
+@Composable
+private fun HistoryTab(state: WorkflowGenerationUiState, padding: PaddingValues) {
+    LazyColumn(modifier = Modifier.fillMaxSize().background(HomeBackground).padding(padding),
+        contentPadding = PaddingValues(bottom = 16.dp)) {
+        item {
+            Text("RECENT ACTIVITY", style = MaterialTheme.typography.labelMedium,
+                color = HomeSectionLabel,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp))
+        }
+        if (state.recentActivity.isEmpty()) {
+            item {
+                Box(modifier = Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) {
+                    Text("No runs yet", color = HomeSectionLabel, style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+        } else {
+            items(state.recentActivity) { run -> RecentActivityRow(run) }
+        }
+    }
+}
+
+@Composable
+private fun SettingsTab(padding: PaddingValues) {
+    Box(modifier = Modifier.fillMaxSize().background(HomeBackground).padding(padding),
+        contentAlignment = Alignment.Center) {
+        Text("Settings", color = HomeSectionLabel, style = MaterialTheme.typography.titleMedium)
+    }
+}
+
+// \u2500\u2500 Generate / review screen \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+
+@Composable
+private fun GenerateScreen(
+    state: WorkflowGenerationUiState,
+    viewModel: WorkflowGenerationViewModel,
+    onBack: () -> Unit
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
             .verticalScroll(rememberScrollState())
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text("GemmaWorkflow", style = MaterialTheme.typography.headlineMedium)
-
-        ModelStatusCard(state.inferenceState)
-
-        if (state.savedWorkflows.isNotEmpty()) {
-            Text("Saved", style = MaterialTheme.typography.labelMedium)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                state.savedWorkflows.take(4).forEach { wf ->
-                    OutlinedButton(
-                        onClick = { viewModel.loadWorkflowDetail(wf.name) },
-                        modifier = Modifier.weight(1f),
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp, vertical = 2.dp)
-                    ) {
-                        Text(wf.name, maxLines = 1, style = MaterialTheme.typography.bodySmall)
-                    }
-                }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            TextButton(onClick = onBack, contentPadding = PaddingValues(0.dp)) {
+                Text("\u2190 Back", color = MaterialTheme.colorScheme.primary)
+            }
+            if (state.isBusy) {
+                Text("${state.elapsedSeconds}s", style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
 
-        OutlinedTextField(
-            value = state.prompt,
-            onValueChange = viewModel::updatePrompt,
-            modifier = Modifier.fillMaxWidth(),
-            minLines = 3,
-            label = { Text("What should GemmaWorkflow do?") },
-            supportingText = { Text("e.g. \"When I tap this, open Maps to the nearest coffee shop and share my location\"") }
+        Text(
+            if (state.isBusy) "Generating\u2026" else if (state.workflowPreview != null) "Review Workflow" else "New Workflow",
+            style = MaterialTheme.typography.headlineSmall
         )
 
-        Button(
-            enabled = state.canGenerate,
-            onClick = viewModel::generate,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(if (state.isBusy) "Generating\u2026" else "Generate Workflow")
-        }
-
-        if (state.isBusy) {
-            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(state.stage, style = MaterialTheme.typography.bodySmall)
-                Text(
-                    "${state.elapsedSeconds}s",
-                    style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                state.stageTimeline.forEach { stage ->
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        val icon = when (stage.status) {
-                            StageStatus.Done -> "\u2713"
-                            StageStatus.Running -> "\u25B6"
-                            StageStatus.Pending -> "\u25CB"
-                        }
-                        val color = when (stage.status) {
-                            StageStatus.Done -> MaterialTheme.colorScheme.primary
-                            StageStatus.Running -> MaterialTheme.colorScheme.tertiary
-                            StageStatus.Pending -> MaterialTheme.colorScheme.outline
-                        }
-                        Text(icon, color = color, style = MaterialTheme.typography.bodyMedium)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(stage.label, color = color, style = MaterialTheme.typography.bodySmall)
+        // Request display
+        if (state.prompt.isNotBlank() && (state.isBusy || state.workflowPreview != null)) {
+            Text("YOUR REQUEST", style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Row(modifier = Modifier.padding(14.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(state.prompt, style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f))
+                    Box(modifier = Modifier
+                        .background(Color(0xFFE5F1FF), RoundedCornerShape(50))
+                        .padding(horizontal = 8.dp, vertical = 4.dp)) {
+                        Text("On-device", style = MaterialTheme.typography.labelSmall,
+                            color = Color(0xFF007AFF))
                     }
                 }
             }
+        } else if (!state.isBusy && state.workflowPreview == null) {
+            OutlinedTextField(
+                value = state.prompt,
+                onValueChange = viewModel::updatePrompt,
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 3,
+                label = { Text("What should GemmaWorkflow do?") },
+                supportingText = { Text("e.g. \"Every morning at 9, open Maps to nearest coffee shop\"") }
+            )
+            Button(
+                enabled = state.canGenerate,
+                onClick = viewModel::generate,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(50)
+            ) { Text("Generate Workflow") }
         }
 
-        if (state.error != null) {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
-            ) {
-                Text(
-                    text = state.error.orEmpty(),
-                    modifier = Modifier.padding(12.dp),
+        // Inference card (shown during generation)
+        if (state.isBusy) {
+            InferenceCard(state)
+        }
+
+        // Error
+        state.error?.let { err ->
+            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
+                Text(err, modifier = Modifier.padding(12.dp),
                     color = MaterialTheme.colorScheme.onErrorContainer,
                     style = MaterialTheme.typography.bodyMedium)
             }
         }
 
-        val workflow = state.workflowPreview
-        if (workflow != null) {
-            HorizontalDivider()
-
-            Text("Generated Workflow", style = MaterialTheme.typography.titleMedium)
-
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(workflow.name, style = MaterialTheme.typography.titleSmall)
-                    if (workflow.summary.isNotBlank()) {
-                        Text(workflow.summary, style = MaterialTheme.typography.bodyMedium)
-                    }
-                    Text("Trigger: ${triggerLabel(workflow)}", style = MaterialTheme.typography.bodySmall)
-                    Text("Actions (${workflow.actions.size}):", style = MaterialTheme.typography.labelMedium)
-                    workflow.actions.forEach { step ->
-                        Text(
-                            "  \u2022 ${step.id} ${step.params}",
-                            style = MaterialTheme.typography.bodySmall,
-                            fontFamily = FontFamily.Monospace
-                        )
-                    }
-                    if (workflow.missingSetup.isNotEmpty()) {
-                        Text(
-                            "Needs setup: ${workflow.missingSetup.joinToString()}",
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
-                }
-            }
-
-            if (state.validationErrors.isNotEmpty()) {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
-                ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Text("Validation errors:", style = MaterialTheme.typography.labelMedium)
-                        state.validationErrors.forEach { err ->
-                            Text("  \u2022 $err", color = MaterialTheme.colorScheme.onErrorContainer)
-                        }
-                    }
-                }
-            }
-
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedButton(
-                    onClick = viewModel::saveWorkflow,
-                    enabled = !state.saved
-                ) {
-                    Text(if (state.saved) "Saved" else "Save")
-                }
-                Button(
-                    onClick = viewModel::runWorkflow,
-                    enabled = state.isValid && !state.isBusy
-                ) {
-                    Text("Run Now")
-                }
-            }
-
-            if (state.rawJson != null) {
-                Text("Raw Model Output", style = MaterialTheme.typography.titleSmall)
-                SelectionContainer {
-                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-                        Text(
-                            text = state.rawJson.orEmpty(),
-                            modifier = Modifier.padding(12.dp),
-                            fontFamily = FontFamily.Monospace,
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
-                }
-            }
+        // Workflow review (WHEN / THEN DO)
+        state.workflowPreview?.let { workflow ->
+            ReviewWorkflowCard(workflow, state, viewModel)
         }
 
+        // Run results
         if (state.runResults.isNotEmpty()) {
-            HorizontalDivider()
-            Text("Execution Results", style = MaterialTheme.typography.titleMedium)
-            state.runResults.forEach { result ->
-                RunResultRow(result)
-            }
-        }
-
-        if (state.debugMessages.isNotEmpty()) {
-            HorizontalDivider()
-            Text("Debug Trace", style = MaterialTheme.typography.titleMedium)
-            SelectionContainer {
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-                    Column(
-                        modifier = Modifier.padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        state.debugMessages.forEach { message ->
-                            Column {
-                                Text(
-                                    message.label,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                                Text(
-                                    message.message,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontFamily = FontFamily.Monospace
-                                )
-                            }
-                        }
+            Text("RESULTS", style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(vertical = 4.dp)) {
+                    state.runResults.forEachIndexed { i, result ->
+                        RunResultRow(result)
+                        if (i < state.runResults.lastIndex) HorizontalDivider(modifier = Modifier.padding(start = 44.dp))
                     }
                 }
             }
@@ -523,41 +699,260 @@ private fun WorkflowGenerationScreen(viewModel: WorkflowGenerationViewModel) {
 }
 
 @Composable
+private fun InferenceCard(state: WorkflowGenerationUiState) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("ON-DEVICE INFERENCE", style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Card(
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF0D0D0F)),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(modifier = Modifier.fillMaxWidth().padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Text("Gemma", style = MaterialTheme.typography.titleLarge,
+                        color = Color.White, fontWeight = FontWeight.Bold)
+                    Box(modifier = Modifier
+                        .background(Color(0xFF1C3A1C), RoundedCornerShape(50))
+                        .padding(horizontal = 10.dp, vertical = 4.dp)) {
+                        Text("\u25CF GPU \u00B7 LiteRT-LM", style = MaterialTheme.typography.labelSmall,
+                            color = Color(0xFF34C759))
+                    }
+                }
+                Text("0 packets leaving device",
+                    style = MaterialTheme.typography.bodySmall, color = Color(0xFF636366))
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth(),
+                    color = Color(0xFF007AFF), trackColor = Color(0xFF1C1C1E))
+                // Pipeline steps
+                Text("PIPELINE", style = MaterialTheme.typography.labelMedium, color = Color(0xFF636366))
+                state.stageTimeline.forEach { stage ->
+                    val (icon, color) = when (stage.status) {
+                        StageStatus.Done -> "\u2713" to Color(0xFF34C759)
+                        StageStatus.Running -> "\u25B6" to Color(0xFF007AFF)
+                        StageStatus.Pending -> "\u25CB" to Color(0xFF636366)
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(icon, color = color, style = MaterialTheme.typography.bodySmall)
+                        Text(stage.label, color = if (stage.status == StageStatus.Pending)
+                            Color(0xFF636366) else Color.White,
+                            style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReviewWorkflowCard(
+    workflow: PlannedWorkflow,
+    state: WorkflowGenerationUiState,
+    viewModel: WorkflowGenerationViewModel
+) {
+    // Workflow name + model badge
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Row(modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box(modifier = Modifier.size(44.dp)
+                .background(triggerIconColor(workflow), RoundedCornerShape(12.dp)),
+                contentAlignment = Alignment.Center) {
+                Text(triggerEmoji(workflow), style = MaterialTheme.typography.titleMedium)
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(workflow.name, style = MaterialTheme.typography.titleMedium)
+                if (workflow.summary.isNotBlank()) {
+                    Text(workflow.summary, style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+                }
+            }
+        }
+        Box(modifier = Modifier
+            .padding(horizontal = 16.dp).padding(bottom = 12.dp)
+            .background(Color(0xFF1C1C1E), RoundedCornerShape(50))
+            .padding(horizontal = 10.dp, vertical = 4.dp)) {
+            Text("\u25CF Gemma \u00B7 GPU \u00B7 LiteRT-LM", style = MaterialTheme.typography.labelSmall,
+                color = Color(0xFF34C759))
+        }
+    }
+
+    // WHEN section
+    Text("WHEN", style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Box(modifier = Modifier.size(36.dp)
+                    .background(triggerIconColor(workflow), RoundedCornerShape(10.dp)),
+                    contentAlignment = Alignment.Center) {
+                    Text(triggerEmoji(workflow), style = MaterialTheme.typography.bodyMedium)
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(triggerTypeLabel(workflow), style = MaterialTheme.typography.bodyMedium)
+                    Text(triggerSubtitle(workflow), style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            HorizontalDivider()
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                Text("OR TRIGGER BY", style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                listOf("NFC" to "\u2717", "Share" to "\u27F3", "Manual" to "\u25B6").forEach { (label, icon) ->
+                    Box(modifier = Modifier
+                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(50))
+                        .padding(horizontal = 10.dp, vertical = 4.dp)) {
+                        Text("$icon $label", style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        }
+    }
+
+    // THEN DO section
+    Row(modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically) {
+        Text("THEN DO", style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("${workflow.actions.size} step${if (workflow.actions.size != 1) "s" else ""}",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(vertical = 4.dp)) {
+            workflow.actions.forEachIndexed { index, step ->
+                val spec = ActionSpecRegistry.find(step.id)
+                val label = spec?.label ?: step.id
+                val icon = stepIcon(step.id)
+                Row(modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Box(modifier = Modifier.size(36.dp)
+                        .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(10.dp)),
+                        contentAlignment = Alignment.Center) {
+                        Text(icon, style = MaterialTheme.typography.bodyMedium)
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("STEP ${index + 1} \u00B7 ${step.id.substringBefore('.').uppercase()}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(label, style = MaterialTheme.typography.bodyMedium)
+                        step.params.entries.take(2).forEach { (k, v) ->
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(k, style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.width(80.dp))
+                                Text(v.toString(), style = MaterialTheme.typography.bodySmall,
+                                    fontFamily = FontFamily.Monospace)
+                            }
+                        }
+                        if (step.requiresConfirmation) {
+                            Box(modifier = Modifier
+                                .padding(top = 4.dp)
+                                .background(MaterialTheme.colorScheme.errorContainer, RoundedCornerShape(50))
+                                .padding(horizontal = 8.dp, vertical = 2.dp)) {
+                                Text("Asks first", style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.error)
+                            }
+                        }
+                    }
+                }
+                if (index < workflow.actions.lastIndex)
+                    HorizontalDivider(modifier = Modifier.padding(start = 64.dp))
+            }
+        }
+    }
+
+    // Validation errors
+    if (state.validationErrors.isNotEmpty()) {
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text("Validation errors:", style = MaterialTheme.typography.labelMedium)
+                state.validationErrors.forEach { err ->
+                    Text("\u2022 $err", color = MaterialTheme.colorScheme.onErrorContainer,
+                        style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
+    }
+
+    // Actions: Save + Run
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        OutlinedButton(
+            onClick = viewModel::saveWorkflow,
+            enabled = !state.saved,
+            modifier = Modifier.weight(1f),
+            shape = RoundedCornerShape(50)
+        ) { Text(if (state.saved) "Saved \u2713" else "Save") }
+        Button(
+            onClick = viewModel::runWorkflow,
+            enabled = state.isValid && !state.isBusy,
+            modifier = Modifier.weight(1f),
+            shape = RoundedCornerShape(50)
+        ) { Text("Run Now") }
+    }
+}
+
+@Composable
 private fun ModelStatusCard(state: InferenceState) {
     val (label, color) = when (state) {
         is InferenceState.Idle -> "Idle" to MaterialTheme.colorScheme.outline
         is InferenceState.Loading -> "Loading model\u2026" to MaterialTheme.colorScheme.primary
-        is InferenceState.Ready -> "Ready \u2014 GPU (LiteRT-LM)" to MaterialTheme.colorScheme.primary
+        is InferenceState.Ready -> "Ready \u2014 GPU (LiteRT-LM)" to MaterialTheme.colorScheme.secondary
         is InferenceState.MissingModel -> "Model not found" to MaterialTheme.colorScheme.error
         is InferenceState.GpuUnavailable -> "GPU unavailable: ${state.reason}" to MaterialTheme.colorScheme.error
         is InferenceState.Error -> "Error: ${state.message}" to MaterialTheme.colorScheme.error
     }
-    Card(colors = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.1f))) {
-        Text(
-            text = label,
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, color.copy(alpha = 0.4f))
+    ) {
+        Row(
             modifier = Modifier.padding(12.dp),
-            color = color,
-            style = MaterialTheme.typography.bodyMedium
-        )
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text("\u25cf", color = color, style = MaterialTheme.typography.bodySmall)
+            Text(label, color = color, style = MaterialTheme.typography.bodyMedium)
+        }
     }
 }
 
 @Composable
 private fun RunResultRow(result: ExecutionResult) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = if (result.success) "\u2713" else "\u2717",
-            color = if (result.success) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-            style = MaterialTheme.typography.titleMedium
-        )
-        Spacer(modifier = Modifier.width(8.dp))
+        Box(
+            modifier = Modifier
+                .size(24.dp)
+                .background(
+                    color = if (result.success) MaterialTheme.colorScheme.secondary
+                            else MaterialTheme.colorScheme.error,
+                    shape = RoundedCornerShape(50)
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = if (result.success) "\u2713" else "\u2717",
+                color = Color.White,
+                style = MaterialTheme.typography.labelSmall
+            )
+        }
+        Spacer(modifier = Modifier.width(10.dp))
         Column {
-            Text(result.stepId, style = MaterialTheme.typography.bodySmall)
+            Text(result.stepId, style = MaterialTheme.typography.bodyMedium)
             if (result.message.isNotBlank()) {
-                Text(result.message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                Text(result.message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
@@ -627,6 +1022,49 @@ private fun triggerLabel(workflow: com.gemmaworkflow.domain.model.PlannedWorkflo
     }
 }
 
+private fun triggerEmoji(workflow: com.gemmaworkflow.domain.model.PlannedWorkflow): String =
+    when (workflow.trigger) {
+        is com.gemmaworkflow.domain.model.TriggerConfig.Time -> "⏰"
+        is com.gemmaworkflow.domain.model.TriggerConfig.Nfc -> "📱"
+        is com.gemmaworkflow.domain.model.TriggerConfig.ShareSheet -> "📤"
+        is com.gemmaworkflow.domain.model.TriggerConfig.TaskerRequired -> "⚡"
+        is com.gemmaworkflow.domain.model.TriggerConfig.Manual -> "▶️"
+    }
+
+private fun triggerIconColor(workflow: PlannedWorkflow): Color = when (workflow.trigger) {
+    is TriggerConfig.Time -> Color(0xFFFF9500)
+    is TriggerConfig.Nfc -> Color(0xFFAF52DE)
+    is TriggerConfig.ShareSheet -> Color(0xFF34C759)
+    is TriggerConfig.TaskerRequired -> Color(0xFFFF3B30)
+    is TriggerConfig.Manual -> Color(0xFF007AFF)
+}
+
+private fun triggerSubtitle(workflow: PlannedWorkflow): String = when (val t = workflow.trigger) {
+    is TriggerConfig.Time -> formatTriggerSummary(t)
+    is TriggerConfig.Nfc -> "NFC tag"
+    is TriggerConfig.ShareSheet -> "Share sheet"
+    is TriggerConfig.TaskerRequired -> "Tasker"
+    is TriggerConfig.Manual -> "Manual"
+}
+
+private fun triggerTypeLabel(workflow: PlannedWorkflow): String = when (workflow.trigger) {
+    is TriggerConfig.Time -> "Schedule"
+    is TriggerConfig.Nfc -> "NFC Tag"
+    is TriggerConfig.ShareSheet -> "Share Sheet"
+    is TriggerConfig.TaskerRequired -> "Tasker"
+    is TriggerConfig.Manual -> "Manual"
+}
+
+private fun formatRelativeTime(timestampMillis: Long): String {
+    val diff = System.currentTimeMillis() - timestampMillis
+    return when {
+        diff < 60_000L -> "Just now"
+        diff < 3_600_000L -> "${diff / 60_000}m ago"
+        diff < 86_400_000L -> "${diff / 3_600_000}h ago"
+        else -> "${diff / 86_400_000}d ago"
+    }
+}
+
 /** Returns a unicode icon for an action id, matching the existing text-emoji style used in the UI. */
 private fun stepIcon(actionId: String): String = when {
     actionId.startsWith("browser.") -> "\uD83C\uDF10"   // globe
@@ -654,62 +1092,86 @@ private fun WorkflowDetailScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
             .verticalScroll(rememberScrollState())
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+        TextButton(
+            onClick = onBack,
+            contentPadding = PaddingValues(0.dp)
         ) {
-            Text("Workflow Detail", style = MaterialTheme.typography.headlineSmall)
-            OutlinedButton(onClick = onBack) {
-                Text("Back")
-            }
+            Text("\u2190 Workflows", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
         }
 
+        Text(workflow.name, style = MaterialTheme.typography.headlineSmall)
+
+        if (workflow.summary.isNotBlank()) {
+            Text(
+                workflow.summary,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        Text(
+            "TRIGGER",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
         Card(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(workflow.name, style = MaterialTheme.typography.titleMedium)
-                if (workflow.summary.isNotBlank()) {
-                    Text(workflow.summary, style = MaterialTheme.typography.bodyMedium)
-                }
-                Text("Trigger: ${triggerLabel(workflow)}", style = MaterialTheme.typography.bodySmall)
+            Row(
+                modifier = Modifier.padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(triggerEmoji(workflow), style = MaterialTheme.typography.titleMedium)
+                Text(triggerLabel(workflow), style = MaterialTheme.typography.bodyMedium)
             }
         }
 
-        Text("Steps", style = MaterialTheme.typography.titleSmall)
-        workflow.actions.forEach { step ->
-            val spec = ActionSpecRegistry.find(step.id)
-            val icon = stepIcon(step.id)
-            val label = spec?.label ?: step.id
-            val params = step.params.entries.joinToString(", ") { "${it.key}=${it.value}" }
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(icon, style = MaterialTheme.typography.titleMedium)
-                Spacer(modifier = Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(label, style = MaterialTheme.typography.bodyMedium)
-                    if (params.isNotBlank()) {
-                        Text(
-                            params,
-                            style = MaterialTheme.typography.bodySmall,
-                            fontFamily = FontFamily.Monospace,
-                            color = MaterialTheme.colorScheme.outline
-                        )
+        Text(
+            "ACTIONS",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(vertical = 4.dp)) {
+                workflow.actions.forEachIndexed { index, step ->
+                    val spec = ActionSpecRegistry.find(step.id)
+                    val icon = stepIcon(step.id)
+                    val label = spec?.label ?: step.id
+                    val params = step.params.entries.joinToString(", ") { "${it.key}=${it.value}" }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(icon, style = MaterialTheme.typography.titleMedium)
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(label, style = MaterialTheme.typography.bodyMedium)
+                            if (params.isNotBlank()) {
+                                Text(
+                                    params,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        if (step.requiresConfirmation) {
+                            Text(
+                                "\u26A0\uFE0F",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
                     }
-                }
-                if (step.requiresConfirmation) {
-                    Text(
-                        "\u26A0\uFE0F",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error
-                    )
+                    if (index < workflow.actions.lastIndex) {
+                        HorizontalDivider(modifier = Modifier.padding(start = 56.dp))
+                    }
                 }
             }
         }
@@ -717,12 +1179,12 @@ private fun WorkflowDetailScreen(
         Button(
             onClick = onRun,
             enabled = !isBusy,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(50)
         ) {
-            Text(if (isBusy) "Running\u2026" else "Run")
+            Text(if (isBusy) "Running\u2026" else "Run Now")
         }
 
-        // Show "Schedule" or "Set up trigger" button based on trigger type
         val triggerConfig = workflow.trigger
         val showScheduleButton = triggerConfig is TriggerConfig.Manual || triggerConfig is TriggerConfig.Time
         val showShareSheetSetupButton = triggerConfig is TriggerConfig.ShareSheet
@@ -731,7 +1193,8 @@ private fun WorkflowDetailScreen(
             val label = if (triggerConfig is TriggerConfig.Time) "\u23F0 Edit Schedule" else "\u23F0 Schedule"
             OutlinedButton(
                 onClick = onSetupTrigger,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(50)
             ) {
                 Text(label)
             }
@@ -740,7 +1203,8 @@ private fun WorkflowDetailScreen(
         if (showShareSheetSetupButton) {
             OutlinedButton(
                 onClick = onSetupTrigger,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(50)
             ) {
                 Text("\uD83D\uDCE4 Set up Share Sheet")
             }
@@ -776,7 +1240,7 @@ private fun ShareSheetPicker(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text("Share to GemmaWorkflow", style = MaterialTheme.typography.headlineSmall)
-            OutlinedButton(onClick = onDismiss) {
+            TextButton(onClick = onDismiss) {
                 Text("Cancel")
             }
         }

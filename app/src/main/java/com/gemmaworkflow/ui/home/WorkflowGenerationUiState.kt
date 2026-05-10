@@ -42,6 +42,18 @@ data class PendingShare(
         }
 }
 
+data class WorkflowRunSummary(
+    val recentHistory: List<Boolean>,
+    val totalRuns: Int,
+    val lastRunMillis: Long
+)
+
+data class RecentRun(
+    val workflowName: String,
+    val success: Boolean,
+    val timestampMillis: Long
+)
+
 data class WorkflowGenerationUiState(
     val prompt: String = "send a message to +1-555-000-0000 saying hi, and invite them to a meeting at 6 oclock on next friday, then add it to my calendar.",
     val inferenceState: InferenceState = InferenceState.Idle,
@@ -58,6 +70,8 @@ data class WorkflowGenerationUiState(
     val runResults: List<ExecutionResult> = emptyList(),
     val debugMessages: List<DebugMessage> = emptyList(),
     val savedWorkflows: List<PlannedWorkflow> = emptyList(),
+    val workflowSummaries: Map<String, WorkflowRunSummary> = emptyMap(),
+    val recentActivity: List<RecentRun> = emptyList(),
     val selectedWorkflowName: String? = null,
     /** Set when a step requires user confirmation; cleared after confirm or dismiss. */
     val pendingConfirmation: ConfirmationRequest? = null,
