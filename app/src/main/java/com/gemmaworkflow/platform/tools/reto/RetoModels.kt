@@ -8,18 +8,8 @@ import kotlinx.serialization.json.JsonObject
 data class RetoLayerSketch(
     val request: String,
     val layers: List<RetoLayer>,
-    /** Entities detected in the request, grouped by layer index. Used to build the checklist in layer prompts. */
-    val detectedEntities: Map<Int, List<DetectedEntity>> = emptyMap()
-)
-
-/**
- * An entity detected in the user request that a tool can resolve.
- * Rendered in the layer prompt as a TODO checklist item.
- */
-data class DetectedEntity(
-    val text: String,            // The matching text from the request, e.g. "next Friday at 6 oclock"
-    val category: String,       // Human-readable category, e.g. "time expression", "contact name"
-    val suggestedTool: String   // Tool name that should resolve this entity
+    /** Fact requirements identified in Phase 0. Drives deterministic resolution. */
+    val requirementLedger: RequirementLedger = RequirementLedger.EMPTY
 )
 
 data class RetoLayer(
@@ -64,11 +54,3 @@ data class RetoRepairRecord(
     val repairedArgs: JsonObject?,
     val success: Boolean
 )
-
-/**
- * Schema-gate validation result.
- */
-sealed interface SchemaGateResult {
-    data object Valid : SchemaGateResult
-    data class Invalid(val error: String, val repairable: Boolean) : SchemaGateResult
-}

@@ -1,5 +1,7 @@
 package com.gemmaworkflow.platform.tools
 
+import com.gemmaworkflow.platform.tools.reto.ToolMetadataRegistry
+
 /**
  * Minimal skill index for the SLM.
  *
@@ -36,11 +38,8 @@ object FindSkill {
 
     /**
      * Filtered index — only the tools this agent is allowed to use.
-     * Pass AgentToolAssignments.forAgent(role) to get the right set.
-     *
-     * Example:
-     *   FindSkill.indexFor(AgentToolAssignments.forAgent(PlannerAgent.RequestAnalysis))
-     *   → only temporal + device tools
+     * The RETO slot-grounding stage normally passes action-scoped tool names
+     * from ActionSpecRegistry.toolNamesForAction(...).
      */
     fun indexFor(allowedTools: Set<String>): String = buildString {
         val registry = ToolRegistry
@@ -61,7 +60,9 @@ object FindSkill {
         val registry = ToolRegistry
         val tools = allowedTools.mapNotNull { registry.get(it) }.sortedBy { it.name }
         for (tool in tools) {
-            appendLine("Tool: ${tool.name}")
+            val displayName = ToolAliasRegistry.aliasFor(tool.name)
+            val callName = if (displayName != tool.name) " (call as: ${tool.name})" else ""
+            appendLine("Tool: $displayName$callName")
             appendLine("  ${tool.description}")
             if (tool.parameters.isNotEmpty()) {
                 appendLine("  Parameters:")
@@ -72,7 +73,24 @@ object FindSkill {
             } else {
                 appendLine("  Parameters: none")
             }
+            val examples = ToolMetadataRegistry.get(tool.name)?.examples.orEmpty().take(2)
+            if (examples.isNotEmpty()) {
+                appendLine("  Examples:")
+                examples.forEach { example ->
+                    appendLine("    - ${example.description}: TOOL: ${tool.name} ${example.args.toJsonLike()}")
+                }
+            }
             appendLine()
         }
     }
+
+    private fun Map<String, String>.toJsonLike(): String {
+        if (isEmpty()) return "{}"
+        return entries.joinToString(prefix = "{", postfix = "}") { (key, value) ->
+            "\"${key.escapeJsonLike()}\":\"${value.escapeJsonLike()}\""
+        }
+    }
+
+    private fun String.escapeJsonLike(): String =
+        replace("\\", "\\\\").replace("\"", "\\\"")
 }

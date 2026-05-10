@@ -37,6 +37,8 @@ class IntentFactory {
     ): Intent? {
         return when (val execution = spec.execution) {
             is ExecutionSpec.AndroidIntent -> buildAndroidIntent(execution, spec, params, includeChooser)
+            is ExecutionSpec.PackageLaunch,
+            is ExecutionSpec.InternalTool -> null
         }
     }
 

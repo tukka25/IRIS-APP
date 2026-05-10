@@ -3,8 +3,8 @@ package com.gemmaworkflow.platform.tools
 /**
  * Singleton registry of all available tools.
  *
- * Tools are registered once at startup. Each planner agent receives only
- * the subset it's authorized to use (see AgentToolAssignments).
+ * Tools are registered once at startup. Planner stages receive scoped
+ * subsets from ActionSpecRegistry and FindSkill.schemaFor(...).
  */
 object ToolRegistry {
 

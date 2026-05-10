@@ -4,25 +4,32 @@ import android.content.Context
 import com.gemmaworkflow.platform.tools.impl.CalculatorTool
 import com.gemmaworkflow.platform.tools.impl.ComputeDurationTool
 import com.gemmaworkflow.platform.tools.impl.CreateCalendarEventTool
+import com.gemmaworkflow.platform.tools.impl.CreateLocalReminderTool
+import com.gemmaworkflow.platform.tools.impl.GetCalendarEventsTool
+import com.gemmaworkflow.platform.tools.impl.GetClipboardTextTool
 import com.gemmaworkflow.platform.tools.impl.GetCurrentTimeTool
 import com.gemmaworkflow.platform.tools.impl.GetDayOfWeekTool
 import com.gemmaworkflow.platform.tools.impl.GetDeviceLocationTool
 import com.gemmaworkflow.platform.tools.impl.ListInstalledAppsTool
+import com.gemmaworkflow.platform.tools.impl.ListRecentNotificationsTool
+import com.gemmaworkflow.platform.tools.impl.LookupContactTool
+import com.gemmaworkflow.platform.tools.impl.OpenDeepLinkTool
+import com.gemmaworkflow.platform.tools.impl.OpenSettingsPanelTool
 import com.gemmaworkflow.platform.tools.impl.OpenUriTool
 import com.gemmaworkflow.platform.tools.impl.ResolveDatetimeTool
 import com.gemmaworkflow.platform.tools.impl.ResolveIntentTool
+import com.gemmaworkflow.platform.tools.impl.SearchFilesTool
+import com.gemmaworkflow.platform.tools.impl.SearchMediaTool
+import com.gemmaworkflow.platform.tools.impl.SearchNotesTool
 import com.gemmaworkflow.platform.tools.impl.SearchPlacesTool
+import com.gemmaworkflow.platform.tools.impl.SearchSmsTool
 import com.gemmaworkflow.platform.tools.impl.SendIntentTool
 import com.gemmaworkflow.platform.tools.impl.SetAlarmTool
+import com.gemmaworkflow.platform.tools.impl.SetClipboardTextTool
+import com.gemmaworkflow.platform.tools.impl.SetCountdownTimerTool
 import com.gemmaworkflow.platform.tools.impl.ShareTextTool
 import com.gemmaworkflow.platform.tools.impl.ValidateJsonTool
 import com.gemmaworkflow.platform.tools.impl.WebSearchTool
-import com.gemmaworkflow.platform.tools.impl.LookupContactTool
-import com.gemmaworkflow.platform.tools.impl.SearchMediaTool
-import com.gemmaworkflow.platform.tools.impl.SearchFilesTool
-import com.gemmaworkflow.platform.tools.impl.SearchNotesTool
-import com.gemmaworkflow.platform.tools.impl.SearchSmsTool
-import com.gemmaworkflow.platform.tools.impl.GetCalendarEventsTool
 
 /**
  * Registers all tools once at app startup.
@@ -53,7 +60,7 @@ object ToolInitializer {
         ToolRegistry.register(LookupContactTool(context, name = "get_contact"))
         ToolRegistry.register(LookupContactTool(context))
 
-        // Tier 6 — Domain Entity Search (entity type classification via tool selection)
+        // Tier 6 — Domain Entity Search
         ToolRegistry.register(SearchMediaTool(context))
         ToolRegistry.register(SearchFilesTool(context))
         ToolRegistry.register(SearchNotesTool(context))
@@ -70,6 +77,15 @@ object ToolInitializer {
         // Tier 5 — Reasoning
         ToolRegistry.register(CalculatorTool)
         ToolRegistry.register(ValidateJsonTool)
+
+        // Tier 7 — Reminders, Settings, Notifications, Clipboard, Browser
+        ToolRegistry.register(SetCountdownTimerTool(context))
+        ToolRegistry.register(CreateLocalReminderTool(context))
+        ToolRegistry.register(OpenSettingsPanelTool(context))
+        ToolRegistry.register(ListRecentNotificationsTool(context))
+        ToolRegistry.register(GetClipboardTextTool(context))
+        ToolRegistry.register(SetClipboardTextTool(context))
+        ToolRegistry.register(OpenDeepLinkTool(context))
 
         android.util.Log.i("ToolInitializer", "Registered ${ToolRegistry.all().size} tools")
     }

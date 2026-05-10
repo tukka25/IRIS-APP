@@ -10,6 +10,9 @@ interface Tool {
     /** Unique name used by the SLM to call this tool, e.g. "get_current_time". */
     val name: String
 
+    /** Model-facing alias shown in prompts instead of internal name. E.g. "find_contact_by_name" for "get_contact". */
+    val modelAlias: String? get() = null
+
     /** One-line description shown in the tool listing. Keep under 100 chars. */
     val description: String
 

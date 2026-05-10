@@ -22,7 +22,7 @@ import kotlinx.serialization.json.longOrNull
 object WorkflowValidator {
 
     private val allowedUrlSchemes = setOf("https", "http")
-    private val allowedUriSchemes = setOf("content", "file", "geo", "smsto")
+    private val allowedUriSchemes = setOf("content", "file", "geo", "smsto", "tel")
 
     /**
      * Validate a workflow. Returns a list of error messages.

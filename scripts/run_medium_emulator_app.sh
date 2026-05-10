@@ -45,12 +45,13 @@ API_LEVEL="${API_LEVEL:-35}"
 DEVICE_ID="${DEVICE_ID:-medium_phone}"
 MEMORY_MB="${MEMORY_MB:-4096}"
 GPU_MODE="${GPU_MODE:-host}"
+APP_ID="${APP_ID:-com.gemmaworkflow}"
 DEFAULT_LOG_FILTER="WorkflowGeneration|WorkflowRunner|InferenceManager|ToolInitializer|ToolRegistry|ToolAwareGenerator|Tool call|Tool result|TOOL|get_contact|lookup_contact|Available tools|Installed app list sent to AI|Full capabilities sent to AI|AI output|IntentDiscovery"
 LOG_FILTER="${LOG_FILTER:-$DEFAULT_LOG_FILTER}"
 LOG_ALL="${LOG_ALL:-0}"
 EMULATOR_LOG="${EMULATOR_LOG:-/tmp/gemmaworkflow-emulator.log}"
 LOCAL_MODEL_PATH="${LOCAL_MODEL_PATH:-local-models/gemma-4-E2B-it.litertlm}"
-DEVICE_MODEL_DIR="${DEVICE_MODEL_DIR:-/sdcard/Android/data/com.gemmaworkflow/files/models}"
+DEVICE_MODEL_DIR="${DEVICE_MODEL_DIR:-/sdcard/Android/data/$APP_ID/files/models}"
 DEVICE_MODEL_NAME="${DEVICE_MODEL_NAME:-gemma-4-E2B-it.litertlm}"
 DEVICE_MODEL_PATH="$DEVICE_MODEL_DIR/$DEVICE_MODEL_NAME"
 SEED_CONTACTS="${SEED_CONTACTS:-1}"
@@ -118,6 +119,52 @@ seed_demo_contacts() {
             echo "Warning: could not seed contact '$name'. The Contacts provider may be unavailable on this image." >&2
         fi
     done
+}
+
+wait_for_shared_storage() {
+    echo "Waiting for emulator shared storage..."
+
+    for _ in $(seq 1 60); do
+        if "$ADB" -e shell "test -d /sdcard" >/dev/null 2>&1; then
+            return 0
+        fi
+
+        if "$ADB" -e shell "test -d /storage/emulated/0" >/dev/null 2>&1; then
+            if [[ "$DEVICE_MODEL_DIR" == /sdcard/* ]]; then
+                DEVICE_MODEL_DIR="/storage/emulated/0/${DEVICE_MODEL_DIR#/sdcard/}"
+                DEVICE_MODEL_PATH="$DEVICE_MODEL_DIR/$DEVICE_MODEL_NAME"
+                echo "Using shared storage fallback: $DEVICE_MODEL_DIR"
+            fi
+            return 0
+        fi
+
+        # Some images report boot_completed before credential-encrypted storage
+        # and the /sdcard symlink are fully usable. Unlock again and keep waiting.
+        "$ADB" -e shell input keyevent 82 >/dev/null 2>&1 || true
+        sleep 1
+    done
+
+    echo "Shared storage is not available on this emulator." >&2
+    echo "Debug info:" >&2
+    "$ADB" -e shell "ls -ld /sdcard /storage /storage/emulated /storage/emulated/0 2>&1 || true" >&2 || true
+    "$ADB" -e shell "sm list-volumes all 2>&1 || true" >&2 || true
+    echo "" >&2
+    echo "This usually means the currently running emulator is still mounting storage," >&2
+    echo "or it is not a normal phone/tablet image with shared external storage." >&2
+    echo "Close other emulators or wipe/recreate the AVD, then rerun this script." >&2
+    return 1
+}
+
+ensure_device_model_dir() {
+    wait_for_shared_storage
+
+    if ! "$ADB" -e shell "mkdir -p '$DEVICE_MODEL_DIR' && test -d '$DEVICE_MODEL_DIR'" >/dev/null 2>&1; then
+        echo "Could not create model directory: $DEVICE_MODEL_DIR" >&2
+        echo "Storage debug info:" >&2
+        "$ADB" -e shell "ls -ld /sdcard /sdcard/Android /sdcard/Android/data 2>&1 || true" >&2 || true
+        "$ADB" -e shell "df -h /sdcard 2>&1 || true" >&2 || true
+        return 1
+    fi
 }
 
 if [ -z "${SYSTEM_IMAGE:-}" ]; then
@@ -204,12 +251,13 @@ until [ "$("$ADB" -e shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')"
 done
 
 "$ADB" -e shell input keyevent 82 >/dev/null 2>&1 || true
+wait_for_shared_storage
 
 echo "Building and installing debug app..."
 ./gradlew :app:installDebug
 
 echo "Granting READ_CONTACTS for emulator smoke tests..."
-if ! "$ADB" -e shell pm grant com.gemmaworkflow android.permission.READ_CONTACTS >/dev/null 2>&1; then
+if ! "$ADB" -e shell pm grant "$APP_ID" android.permission.READ_CONTACTS >/dev/null 2>&1; then
     echo "Warning: could not grant READ_CONTACTS. Contact tools will report permission errors until permission is granted." >&2
 fi
 
@@ -225,7 +273,7 @@ if [ -f "$LOCAL_MODEL_PATH" ]; then
         echo "Pushing model to emulator..."
         echo "  local:  $LOCAL_MODEL_PATH ($LOCAL_MODEL_SIZE bytes)"
         echo "  device: $DEVICE_MODEL_PATH"
-        "$ADB" -e shell "mkdir -p '$DEVICE_MODEL_DIR'"
+        ensure_device_model_dir
         "$ADB" -e push "$LOCAL_MODEL_PATH" "$DEVICE_MODEL_PATH"
     fi
 else
@@ -234,7 +282,7 @@ else
 fi
 
 echo "Launching GemmaWorkflow..."
-"$ADB" -e shell am start -n com.gemmaworkflow/.ui.MainActivity
+"$ADB" -e shell am start -n "$APP_ID/.ui.MainActivity"
 
 echo ""
 echo "Streaming Logcat. Press Ctrl+C to stop logs."

@@ -222,7 +222,8 @@ Rules:
     fun buildWorkflowJsonPrompt(
         goal: String,
         actionPlanJson: String,
-        catalogSummary: String
+        catalogSummary: String,
+        groundedFacts: String = ""
     ): String = """
 You are a JSON formatter for GemmaWorkflow. Convert the action plan into the final workflow JSON contract.
 
@@ -230,6 +231,9 @@ Goal: $goal
 
 Available actions (ONLY use these IDs):
 $catalogSummary
+
+Grounded facts and action params already resolved by Kotlin:
+${groundedFacts.ifBlank { "No grounded facts were provided." }}
 
 Action plan to format:
 $actionPlanJson
@@ -258,6 +262,8 @@ Rules:
 - Every action id MUST come from the available actions list.
 - Every param key MUST come from the chosen action's schema.
 - Preserve numeric and boolean params as JSON numbers/booleans, not strings.
+- If "Grounded action params" contains action_id.param = value, include that value in the matching action's params.
+- Do not put an item in missing_setup for a value that is already present in Grounded action params or already filled in the final params.
 - Do not output Android intent actions, extra keys, package names, or URI templates.
 - requires_confirmation should be true for actions that send data externally (share, post).
 - missing_setup lists real prerequisites the user must handle.

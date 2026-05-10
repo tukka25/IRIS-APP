@@ -40,26 +40,35 @@ object GetCurrentTimeTool : Tool {
 
 /**
  * Resolves human datetime expressions into precise timestamps.
- * Supports: "next Friday at 2pm", "tomorrow morning", "in 2 hours",
- * "May 15 at 18:00", "next week Monday 9am".
+ *
+ * Structured input contract:
+ * - expression: required natural-language time expression, e.g. "next Friday at 6pm"
+ * - reference_time_iso: optional ISO_OFFSET_DATE_TIME, used as "now" for relative phrases
+ * - timezone: optional IANA timezone, e.g. "Asia/Dubai"; defaults to the device timezone
+ *
+ * Supports: "next Friday at 2pm", "6 o'clock on next Friday",
+ * "tomorrow morning", "in 2 hours", "May 15 at 18:00", "next week Monday 9am".
  */
 object ResolveDatetimeTool : Tool {
     override val name = "resolve_datetime"
-    override val description = "Converts human time expressions to exact timestamps"
+    override val description = "Converts relative date/time text to iso/date/time/unix_ms using a reference time"
     override val parameters = listOf(
-        ToolParam("expression", "string", description = "e.g. 'next Friday at 2pm', 'tomorrow 9am', 'in 30 minutes'")
+        ToolParam("expression", "string", description = "Normalize user phrase, e.g. 'next Friday at 6pm', 'tomorrow at 09:00', 'in 30 minutes'"),
+        ToolParam("reference_time_iso", "string", required = false, description = "Current time as ISO offset datetime, e.g. 2026-05-09T14:30:00+04:00"),
+        ToolParam("timezone", "string", required = false, description = "IANA timezone, e.g. Asia/Dubai")
     )
 
     override suspend fun execute(input: Map<String, String>): ToolResult {
-        val expr = input["expression"]?.trim()?.lowercase() ?: ""
+        val expr = normalizeExpression(input["expression"].orEmpty())
         if (expr.isBlank()) return ToolResult(false, "", "Missing 'expression' param")
 
-        val now = LocalDateTime.now()
-        val zone = ZoneId.systemDefault()
+        val reference = parseReferenceTime(input["reference_time_iso"])
+        val zone = parseZone(input["timezone"], reference?.zone)
+        val now = reference?.withZoneSameInstant(zone)?.toLocalDateTime() ?: LocalDateTime.now(zone)
         val result = try {
             resolveExpression(expr, now)
         } catch (e: Exception) {
-            return ToolResult(false, "", "Could not parse: '$expr'. Try 'next Friday at 2pm' or '2026-05-15T18:00'")
+            return ToolResult(false, "", "Could not parse: '$expr'. Use formats like 'next Friday at 6pm', '6pm on next Friday', 'tomorrow at 09:00', 'in 30 minutes', or '2026-05-15T18:00'")
         }
 
         val zoned = ZonedDateTime.of(result, zone)
@@ -73,20 +82,16 @@ object ResolveDatetimeTool : Tool {
     }
 
     private fun resolveExpression(expr: String, now: LocalDateTime): LocalDateTime {
-        // "next Friday at 2pm"
-        val nextDayRegex = Regex("""next\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\s*(at\s*)?(\d{1,2})(:\d{2})?\s*(am|pm)?""")
-        nextDayRegex.find(expr)?.let { match ->
-            val day = DayOfWeek.valueOf(match.groupValues[1].uppercase())
-            val hour24 = parseHour(match.groupValues[3], match.groupValues[5])
-            val minute = match.groupValues[4].removePrefix(":").toIntOrNull() ?: 0
-            val targetTime = LocalTime.of(hour24, minute)
-            var targetDate = now.toLocalDate().plusDays(1)
-            while (targetDate.dayOfWeek != day) targetDate = targetDate.plusDays(1)
-            return LocalDateTime.of(targetDate, targetTime)
+        parseDayAndTime(expr, now)?.let { return it }
+
+        // "tomorrow morning" / "tomorrow afternoon" / "tomorrow evening"
+        val tomorrowPartOfDayRegex = Regex("""tomorrow\s+(morning|afternoon|evening|night)""")
+        tomorrowPartOfDayRegex.find(expr)?.let { match ->
+            return LocalDateTime.of(now.toLocalDate().plusDays(1), partOfDayTime(match.groupValues[1]))
         }
 
         // "tomorrow at 9am" / "tomorrow 9"
-        val tomorrowRegex = Regex("""tomorrow\s*(at\s*)?(\d{1,2})(:\d{2})?\s*(am|pm)?""")
+        val tomorrowRegex = Regex("""tomorrow\s*(at\s*)?${TIME_PATTERN.pattern}""")
         tomorrowRegex.find(expr)?.let { match ->
             val hour24 = parseHour(match.groupValues[2], match.groupValues[4])
             val minute = match.groupValues[3].removePrefix(":").toIntOrNull() ?: 0
@@ -94,7 +99,7 @@ object ResolveDatetimeTool : Tool {
         }
 
         // "today at 6pm"
-        val todayRegex = Regex("""today\s*(at\s*)?(\d{1,2})(:\d{2})?\s*(am|pm)?""")
+        val todayRegex = Regex("""today\s*(at\s*)?${TIME_PATTERN.pattern}""")
         todayRegex.find(expr)?.let { match ->
             val hour24 = parseHour(match.groupValues[2], match.groupValues[4])
             val minute = match.groupValues[3].removePrefix(":").toIntOrNull() ?: 0
@@ -129,14 +134,97 @@ object ResolveDatetimeTool : Tool {
         throw IllegalArgumentException("Unrecognized expression: $expr")
     }
 
+    private fun parseDayAndTime(expr: String, now: LocalDateTime): LocalDateTime? {
+        // "next Friday at 6pm", "next friday 18:00", "next friday at 6 o'clock"
+        Regex("""(next\s+)?${DAY_PATTERN.pattern}\s*(at\s*)?${TIME_PATTERN.pattern}""")
+            .find(expr)?.let { match ->
+                val isExplicitNext = match.groupValues[1].isNotBlank()
+                val day = parseDay(match.groupValues[2])
+                val time = parseTime(match.groupValues[4], match.groupValues[5], match.groupValues[6])
+                return LocalDateTime.of(nextDateFor(day, now, isExplicitNext), time)
+            }
+
+        // "6pm on next Friday", "6 o'clock next friday"
+        Regex("""${TIME_PATTERN.pattern}\s*(on\s*)?(next\s+)?${DAY_PATTERN.pattern}""")
+            .find(expr)?.let { match ->
+                val time = parseTime(match.groupValues[1], match.groupValues[2], match.groupValues[3])
+                val isExplicitNext = match.groupValues[5].isNotBlank()
+                val day = parseDay(match.groupValues[6])
+                return LocalDateTime.of(nextDateFor(day, now, isExplicitNext), time)
+            }
+
+        // "next Friday" with no time defaults to 09:00 so relative date still resolves.
+        Regex("""(next\s+)?${DAY_PATTERN.pattern}""")
+            .find(expr)?.let { match ->
+                val isExplicitNext = match.groupValues[1].isNotBlank()
+                val day = parseDay(match.groupValues[2])
+                return LocalDateTime.of(nextDateFor(day, now, isExplicitNext), LocalTime.of(9, 0))
+            }
+
+        return null
+    }
+
     private fun parseHour(hourStr: String, ampm: String): Int {
         val h = hourStr.toInt()
         return when (ampm.lowercase()) {
-            "am" -> if (h == 12) 0 else h
-            "pm" -> if (h == 12) 12 else h + 12
+            "am", "a.m." -> if (h == 12) 0 else h
+            "pm", "p.m." -> if (h == 12) 12 else h + 12
             else -> h
         }
     }
+
+    private fun parseTime(hour: String, minute: String, ampm: String): LocalTime {
+        val hour24 = parseHour(hour, ampm)
+        val minuteValue = minute.removePrefix(":").toIntOrNull() ?: 0
+        return LocalTime.of(hour24, minuteValue)
+    }
+
+    private fun parseDay(raw: String): DayOfWeek =
+        DayOfWeek.valueOf(raw.uppercase())
+
+    private fun nextDateFor(day: DayOfWeek, now: LocalDateTime, explicitNext: Boolean): LocalDate {
+        var targetDate = if (explicitNext) now.toLocalDate().plusDays(1) else now.toLocalDate()
+        while (targetDate.dayOfWeek != day) targetDate = targetDate.plusDays(1)
+        if (!explicitNext && targetDate == now.toLocalDate()) {
+            targetDate = targetDate.plusWeeks(1)
+        }
+        return targetDate
+    }
+
+    private fun partOfDayTime(part: String): LocalTime = when (part) {
+        "morning" -> LocalTime.of(9, 0)
+        "afternoon" -> LocalTime.of(13, 0)
+        "evening" -> LocalTime.of(18, 0)
+        "night" -> LocalTime.of(20, 0)
+        else -> LocalTime.of(9, 0)
+    }
+
+    private fun normalizeExpression(raw: String): String =
+        raw.trim()
+            .lowercase()
+            .replace("o’clock", "o'clock")
+            .replace("oclock", "o'clock")
+            .replace(Regex("""\s+"""), " ")
+
+    private fun parseReferenceTime(raw: String?): ZonedDateTime? {
+        if (raw.isNullOrBlank()) return null
+        return runCatching {
+            ZonedDateTime.parse(raw, DateTimeFormatter.ISO_OFFSET_DATE_TIME)
+        }.recoverCatching {
+            LocalDateTime.parse(raw, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                .atZone(ZoneId.systemDefault())
+        }.getOrNull()
+    }
+
+    private fun parseZone(raw: String?, fallback: ZoneId?): ZoneId {
+        if (!raw.isNullOrBlank()) {
+            runCatching { return ZoneId.of(raw) }
+        }
+        return fallback ?: ZoneId.systemDefault()
+    }
+
+    private val DAY_PATTERN = Regex("""(monday|tuesday|wednesday|thursday|friday|saturday|sunday)""")
+    private val TIME_PATTERN = Regex("""(\d{1,2})(:\d{2})?\s*(am|pm|a\.m\.|p\.m\.)?\s*(?:o'?clock)?""")
 }
 
 /** Computes duration between two times or adds/subtracts from a time. */

@@ -33,6 +33,14 @@ data class ToolMetadata(
     /** Max local repair attempts before marking as failed */
     val maxRepairAttempts: Int = 2,
 
+    /** Short model-facing examples injected with the tool schema. Keep to 1-2 examples per tool. */
+    val examples: List<ToolExample> = emptyList(),
+
     /** Convenience: can this tool be used during workflow generation? */
     val generationAllowed: Boolean = mode != ToolMode.EFFECTFUL
+)
+
+data class ToolExample(
+    val description: String,
+    val args: Map<String, String>
 )
