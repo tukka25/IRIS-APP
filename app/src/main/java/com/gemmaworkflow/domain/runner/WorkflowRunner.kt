@@ -10,6 +10,7 @@ import android.provider.Settings
 import android.util.Log
 import com.gemmaworkflow.domain.catalog.ActionSpec
 import com.gemmaworkflow.domain.catalog.ActionSpecRegistry
+import com.gemmaworkflow.domain.catalog.ExecutionSpec
 import com.gemmaworkflow.domain.model.ExecutionResult
 import com.gemmaworkflow.domain.model.PlannedWorkflow
 import com.gemmaworkflow.domain.model.WorkflowStep
@@ -17,6 +18,10 @@ import com.gemmaworkflow.platform.alarm.AlarmApiExecutor
 import com.gemmaworkflow.platform.calendar.CalendarApiExecutor
 import com.gemmaworkflow.platform.capability.ChromeCustomTabOpener
 import com.gemmaworkflow.platform.clipboard.ClipboardApiExecutor
+import com.gemmaworkflow.platform.tools.ToolRegistry
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * Thrown by [WorkflowRunner.executeStep] when a step has [WorkflowStep.requiresConfirmation] set.
@@ -80,7 +85,7 @@ class WorkflowRunner(
         return step
     }
 
-    private fun executeStep(
+    private suspend fun executeStep(
         step: WorkflowStep,
         stepIndex: Int,
         onDebug: (label: String, String) -> Unit
@@ -174,6 +179,18 @@ class WorkflowRunner(
             return result
         }
 
+        when (val execution = spec.execution) {
+            is ExecutionSpec.PackageLaunch -> {
+                return executePackageLaunch(step, spec, execution, onDebug)
+            }
+            is ExecutionSpec.InternalTool -> {
+                return executeInternalTool(step, spec, execution, onDebug)
+            }
+            is ExecutionSpec.AndroidIntent -> Unit
+            is ExecutionSpec.CustomTab,
+            ExecutionSpec.BuiltIn -> Unit
+        }
+
         return runCatching {
             onDebug("Tool call", "${step.id} params=${step.params}")
             Log.d(TAG, "Tool call ${step.id} params=${step.params}")
@@ -209,6 +226,58 @@ class WorkflowRunner(
                 }
             }
         )
+    }
+
+    private fun executePackageLaunch(
+        step: WorkflowStep,
+        spec: ActionSpec,
+        execution: ExecutionSpec.PackageLaunch,
+        onDebug: (label: String, message: String) -> Unit
+    ): ExecutionResult {
+        val packageName = step.params[execution.packageParamName]?.asString()
+            ?: return ExecutionResult(stepId = step.id, success = false, message = "Missing package name")
+
+        val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName)
+            ?: return tryFallback(step, spec, onDebug, "No launchable app for package $packageName")
+
+        return runCatching {
+            launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            onDebug("Tool call", "${step.id} package=$packageName")
+            onDebug("Native getLaunchIntentForPackage", packageName)
+            context.startActivity(launchIntent)
+        }.fold(
+            onSuccess = {
+                ExecutionResult(
+                    stepId = step.id,
+                    success = true,
+                    message = "Started ${spec.label}"
+                )
+            },
+            onFailure = {
+                tryFallback(step, spec, onDebug, it.message ?: "Failed to launch $packageName")
+            }
+        )
+    }
+
+    private suspend fun executeInternalTool(
+        step: WorkflowStep,
+        spec: ActionSpec,
+        execution: ExecutionSpec.InternalTool,
+        onDebug: (label: String, message: String) -> Unit
+    ): ExecutionResult {
+        val input = step.params.mapValues { (_, value) -> value.asString().orEmpty() }
+        onDebug("Tool call", "${execution.toolName} params=$input")
+        val result = ToolRegistry.execute(execution.toolName, input)
+
+        return if (result.success) {
+            ExecutionResult(
+                stepId = step.id,
+                success = true,
+                message = result.output.ifBlank { "Started ${spec.label}" }
+            )
+        } else {
+            tryFallback(step, spec, onDebug, result.error ?: "Internal tool failed")
+        }
     }
 
     private fun tryFallback(
@@ -300,4 +369,8 @@ class WorkflowRunner(
     private companion object {
         const val TAG = "WorkflowRunner"
     }
+}
+
+private fun JsonElement.asString(): String? {
+    return runCatching { jsonPrimitive.contentOrNull }.getOrNull()
 }

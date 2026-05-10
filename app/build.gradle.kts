@@ -15,6 +15,9 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0"
+
+        // Phone testing: require LiteRT-LM GPU init instead of silently falling back to CPU.
+        buildConfigField("boolean", "FORCE_GPU_INFERENCE", "false")
     }
 
     buildFeatures {

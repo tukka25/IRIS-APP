@@ -1,5 +1,6 @@
 package com.gemmaworkflow.ui
 
+import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.nfc.NfcAdapter
@@ -10,6 +11,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -85,6 +87,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        ensureRequiredRuntimePermissions()
         handleIntent(intent)
         observeDeepLinkEvents()
         checkNotificationPermission()
@@ -95,6 +98,28 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    private fun ensureRequiredRuntimePermissions() {
+        val missingPermissions = listOf(
+            Manifest.permission.READ_CONTACTS,
+            Manifest.permission.READ_CALENDAR,
+            Manifest.permission.WRITE_CALENDAR
+        ).filter { permission ->
+            ContextCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED
+        }
+
+        if (missingPermissions.isNotEmpty()) {
+            ActivityCompat.requestPermissions(
+                this,
+                missingPermissions.toTypedArray(),
+                RUNTIME_PERMISSIONS_REQUEST_CODE
+            )
+        }
+    }
+
+    private companion object {
+        const val RUNTIME_PERMISSIONS_REQUEST_CODE = 1001
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -372,8 +397,10 @@ private fun WorkflowGenerationScreen(viewModel: WorkflowGenerationViewModel) {
                 )
             }
 
+            // Stage timeline + token usage
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                state.stageTimeline.forEach { stage ->
+                state.stageTimeline.forEachIndexed { index, stage ->
+                    val tokenInfo = state.stageTokenUsage.getOrNull(index)
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.fillMaxWidth()
@@ -390,7 +417,36 @@ private fun WorkflowGenerationScreen(viewModel: WorkflowGenerationViewModel) {
                         }
                         Text(icon, color = color, style = MaterialTheme.typography.bodyMedium)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text(stage.label, color = color, style = MaterialTheme.typography.bodySmall)
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(stage.label, color = color, style = MaterialTheme.typography.bodySmall)
+                            // Token usage bar
+                            if (tokenInfo != null && tokenInfo.estimatedTokens > 0) {
+                                val pct = (tokenInfo.estimatedTokens.toFloat() / tokenInfo.contextWindow).coerceAtMost(1f)
+                                val barColor = when {
+                                    pct > 0.8f -> MaterialTheme.colorScheme.error
+                                    pct > 0.5f -> MaterialTheme.colorScheme.tertiary
+                                    else -> MaterialTheme.colorScheme.primary
+                                }
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    // Mini progress bar
+                                    androidx.compose.material3.LinearProgressIndicator(
+                                        progress = { pct },
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(6.dp),
+                                        color = barColor,
+                                        trackColor = barColor.copy(alpha = 0.15f),
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        "${tokenInfo.estimatedTokens} / ${tokenInfo.contextWindow}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontFamily = FontFamily.Monospace,
+                                        color = barColor
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -527,7 +583,7 @@ private fun ModelStatusCard(state: InferenceState) {
     val (label, color) = when (state) {
         is InferenceState.Idle -> "Idle" to MaterialTheme.colorScheme.outline
         is InferenceState.Loading -> "Loading model\u2026" to MaterialTheme.colorScheme.primary
-        is InferenceState.Ready -> "Ready \u2014 GPU (LiteRT-LM)" to MaterialTheme.colorScheme.primary
+        is InferenceState.Ready -> "Ready \u2014 ${state.backend} (LiteRT-LM)" to MaterialTheme.colorScheme.primary
         is InferenceState.MissingModel -> "Model not found" to MaterialTheme.colorScheme.error
         is InferenceState.GpuUnavailable -> "GPU unavailable: ${state.reason}" to MaterialTheme.colorScheme.error
         is InferenceState.Error -> "Error: ${state.message}" to MaterialTheme.colorScheme.error
