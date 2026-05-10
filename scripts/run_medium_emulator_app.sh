@@ -263,6 +263,124 @@ fi
 
 seed_demo_contacts
 
+# ══════════════════════════════════════════════════════════
+# Pre-flight setup — permissions, test data, app installs
+# ══════════════════════════════════════════════════════════
+echo ""
+echo "Setting up emulator environment for all actions and tools..."
+
+# ── Grant all runtime permissions ──
+PERMISSIONS=(
+    "android.permission.READ_CONTACTS"
+    "android.permission.WRITE_CONTACTS"
+    "android.permission.READ_CALENDAR"
+    "android.permission.WRITE_CALENDAR"
+    "android.permission.READ_SMS"
+    "android.permission.SEND_SMS"
+    "android.permission.POST_NOTIFICATIONS"
+    "android.permission.READ_MEDIA_AUDIO"
+    "android.permission.READ_EXTERNAL_STORAGE"
+    "android.permission.WRITE_EXTERNAL_STORAGE"
+)
+for perm in "${PERMISSIONS[@]}"; do
+    if "$ADB" -e shell pm grant "$APP_ID" "$perm" >/dev/null 2>&1; then
+        echo "  Granted: ${perm##*.}"
+    else
+        echo "  Skipped (unavailable): ${perm##*.}"
+    fi
+done
+
+# ── Seed demo calendar events (for get_calendar_events / calendar.create_event tests) ──
+echo ""
+echo "Seeding demo calendar events..."
+SEED_CALENDAR="${SEED_CALENDAR:-1}"
+if [ "$SEED_CALENDAR" = "1" ]; then
+    NOW_MS=$(date +%s)000
+    TOMORROW_MS=$(date -v+1d +%s)000 2>/dev/null || TOMORROW_MS=$((NOW_MS + 86400000))
+    NEXT_WEEK_MS=$((NOW_MS + 7 * 86400000))
+
+    for event in \
+        "Dentist appointment|2026-05-15T14:00:00|2026-05-15T15:00:00|Dr. Smith Office|Regular checkup" \
+        "Team demo|2026-05-12T10:00:00|2026-05-12T11:00:00|Conference Room A|Show hackathon progress" \
+        "Lunch with Maya|2026-05-16T12:30:00|2026-05-16T13:30:00|Cafe Nero||"
+    do
+        IFS='|' read -r title start end location desc <<< "$event"
+        "$ADB" -e shell "content insert --uri content://com.android.calendar/events \
+            --bind title:s:'$title' \
+            --bind dtstart:i:$(( $(date -jf "%Y-%m-%dT%H:%M:%S" "$start" +%s 2>/dev/null || echo 1778000000) * 1000 )) \
+            --bind dtend:i:$(( $(date -jf "%Y-%m-%dT%H:%M:%S" "$end" +%s 2>/dev/null || echo 1778003600) * 1000 )) \
+            --bind eventLocation:s:'$location' \
+            --bind description:s:'$desc' \
+            --bind calendar_id:i:1" >/dev/null 2>&1 && echo "  Seeded event: $title" || echo "  Skipped event: $title (Calendar provider unavailable)"
+    done
+else
+    echo "  Skipping calendar seeding (SEED_CALENDAR=$SEED_CALENDAR)"
+fi
+
+# ── Seed demo SMS messages (for search_sms tests) ──
+echo ""
+echo "Seeding demo SMS messages..."
+SEED_SMS="${SEED_SMS:-1}"
+if [ "$SEED_SMS" = "1" ]; then
+    for sms in \
+        "15555215554|Hey, are we still on for the meeting tomorrow?|$((NOW_MS - 3600000))" \
+        "15555215555|Don't forget to bring the documents!|$((NOW_MS - 7200000))" \
+        "+15550101001|Hi! Just confirming our lunch on Friday.|$((NOW_MS - 86400000))"
+    do
+        IFS='|' read -r address body date <<< "$sms"
+        "$ADB" -e shell "content insert --uri content://sms/inbox \
+            --bind address:s:'$address' \
+            --bind body:s:'$body' \
+            --bind date:i:$date \
+            --bind read:i:0" >/dev/null 2>&1 && echo "  Seeded SMS: $address" || echo "  Skipped SMS: $address (SMS provider unavailable)"
+    done
+else
+    echo "  Skipping SMS seeding (SEED_SMS=$SEED_SMS)"
+fi
+
+# ── Install app APKs for app-specific actions ──
+echo ""
+echo "Checking app-specific action dependencies..."
+INSTALL_APPS="${INSTALL_APPS:-1}"
+APK_DIR="${APK_DIR:-local-models/apks}"
+
+if [ "$INSTALL_APPS" = "1" ]; then
+    # WhatsApp — needed for whatsapp.send_text
+    if "$ADB" -e shell pm list packages com.whatsapp | grep -q whatsapp; then
+        echo "  WhatsApp already installed"
+    else
+        if [ -f "$APK_DIR/whatsapp.apk" ]; then
+            echo "  Installing WhatsApp..."
+            "$ADB" -e install "$APK_DIR/whatsapp.apk" >/dev/null 2>&1 && echo "  WhatsApp installed" || echo "  WhatsApp install failed (APK may be incompatible)"
+        else
+            echo "  WhatsApp APK not found at $APK_DIR/whatsapp.apk — skip"
+        fi
+    fi
+
+    # Spotify — needed for spotify.search_and_play
+    if "$ADB" -e shell pm list packages com.spotify.music | grep -q spotify; then
+        echo "  Spotify already installed"
+    else
+        if [ -f "$APK_DIR/spotify.apk" ]; then
+            echo "  Installing Spotify..."
+            "$ADB" -e install "$APK_DIR/spotify.apk" >/dev/null 2>&1 && echo "  Spotify installed" || echo "  Spotify install failed (APK may be incompatible)"
+        else
+            echo "  Spotify APK not found at $APK_DIR/spotify.apk — skip"
+        fi
+    fi
+
+    echo "  (Place APKs in $APK_DIR/ to auto-install)"
+else
+    echo "  Skipping app installs (INSTALL_APPS=$INSTALL_APPS)"
+fi
+
+echo ""
+echo "Pre-flight setup complete."
+echo ""
+
+# Append RETO pipeline tags to log filter
+LOG_FILTER="${LOG_FILTER}|TaskDecomposer|CapabilityBinder|SlotGroundingPlanner|RequirementBuilder|ResolverRegistry|RetoOrchestrator|RetoLayerExecutor|RetoLayerPlanner|RetoWorkflowPlanner|CoverageValidator|WorkflowValidator|WorkflowJsonParser"
+
 if [ -f "$LOCAL_MODEL_PATH" ]; then
     LOCAL_MODEL_SIZE="$(wc -c < "$LOCAL_MODEL_PATH" | tr -d ' ')"
     DEVICE_MODEL_SIZE="$("$ADB" -e shell "stat -c %s '$DEVICE_MODEL_PATH' 2>/dev/null || echo missing" | tr -d '\r')"

@@ -174,9 +174,9 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
                     appendDebug("  $emoji ${req.id}", "${req.factType.label} from \"${req.mention}\" via ${req.resolverTool ?: req.factType.resolverTool} args=${req.toolArgs} → ${req.status} (${if (req.blocking) "blocking" else "optional"})")
                 }
 
-                appendDebug("══ PHASE 2 — Analysis ══", analysisRaw.take(600))
-                appendDebug("══ PHASE 3 — Action Plan ══", actionPlanRaw.take(600))
-                appendDebug("══ PHASE 4 — Final JSON ══", jsonRaw.take(600))
+                appendDebug("══ PHASE 2 — Analysis ══", analysisRaw)
+                appendDebug("══ PHASE 3 — Action Plan ══", actionPlanRaw)
+                appendDebug("══ PHASE 4 — Final JSON ══", jsonRaw)
 
                 val analysis = RequestAnalysisParser.parse(analysisRaw)
                 appendDebug("Parsed analysis goal", analysis.goal)

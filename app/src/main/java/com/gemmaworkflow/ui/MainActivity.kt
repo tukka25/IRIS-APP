@@ -87,7 +87,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        ensureContactReadPermission()
+        ensureRequiredRuntimePermissions()
         handleIntent(intent)
         observeDeepLinkEvents()
         checkNotificationPermission()
@@ -100,14 +100,26 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun ensureContactReadPermission() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.READ_CONTACTS), READ_CONTACTS_REQUEST_CODE)
+    private fun ensureRequiredRuntimePermissions() {
+        val missingPermissions = listOf(
+            Manifest.permission.READ_CONTACTS,
+            Manifest.permission.READ_CALENDAR,
+            Manifest.permission.WRITE_CALENDAR
+        ).filter { permission ->
+            ContextCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED
+        }
+
+        if (missingPermissions.isNotEmpty()) {
+            ActivityCompat.requestPermissions(
+                this,
+                missingPermissions.toTypedArray(),
+                RUNTIME_PERMISSIONS_REQUEST_CODE
+            )
         }
     }
 
     private companion object {
-        const val READ_CONTACTS_REQUEST_CODE = 1001
+        const val RUNTIME_PERMISSIONS_REQUEST_CODE = 1001
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -571,7 +583,7 @@ private fun ModelStatusCard(state: InferenceState) {
     val (label, color) = when (state) {
         is InferenceState.Idle -> "Idle" to MaterialTheme.colorScheme.outline
         is InferenceState.Loading -> "Loading model\u2026" to MaterialTheme.colorScheme.primary
-        is InferenceState.Ready -> "Ready \u2014 GPU (LiteRT-LM)" to MaterialTheme.colorScheme.primary
+        is InferenceState.Ready -> "Ready \u2014 ${state.backend} (LiteRT-LM)" to MaterialTheme.colorScheme.primary
         is InferenceState.MissingModel -> "Model not found" to MaterialTheme.colorScheme.error
         is InferenceState.GpuUnavailable -> "GPU unavailable: ${state.reason}" to MaterialTheme.colorScheme.error
         is InferenceState.Error -> "Error: ${state.message}" to MaterialTheme.colorScheme.error

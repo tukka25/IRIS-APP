@@ -82,7 +82,8 @@ $toolSchemas
         appendLine()
         appendLine("  TIME / DATE expression       → get_current_time or resolve_datetime")
         appendLine("    Examples: \"tomorrow at 9am\", \"next Friday\", \"in 2 hours\"")
-        appendLine("    Tool: TOOL: resolve_datetime {\"expression\": \"next Friday at 6pm\"}")
+        appendLine("    Tool: TOOL: resolve_datetime {\"expression\": \"next Friday at 6 o'clock\", \"default_period\": \"pm\"}")
+        appendLine("    Use default_period only when the user gives an ambiguous 1-12 hour without AM/PM.")
         appendLine()
         appendLine("If you're unsure which type, call the tool that best matches the user's intent.")
         appendLine("If no entity is present, skip entity tools and go directly to analysis.")
@@ -124,6 +125,15 @@ $toolSchemas
         appendLine("  → TOOL: resolve_datetime {\"expression\": \"next week\"}")
         appendLine("  ← TOOL_RESULT: 2026-05-15")
         appendLine("  → {\"goal\": \"Remind about dentist\", \"trigger_hint\": \"time\", ...}")
+        appendLine()
+        appendLine("Example 4 — Ambiguous meeting time:")
+        appendLine("  User: \"invite Maya to a meeting next Friday at 6 o'clock\"")
+        appendLine("  Entities: Maya (NAME → contact), next Friday at 6 o'clock (TIME → date/time)")
+        appendLine("  → TOOL: get_contact {\"name\": \"Maya\"}")
+        appendLine("  ← TOOL_RESULT: +971501234567")
+        appendLine("  → TOOL: resolve_datetime {\"expression\": \"next Friday at 6 o'clock\", \"default_period\": \"pm\"}")
+        appendLine("  ← TOOL_RESULT: 2026-05-15T18:00:00+04:00")
+        appendLine("  → {\"goal\": \"Invite Maya to a meeting\", \"trigger_hint\": \"manual\", ...}")
         appendLine()
 
         // ── User's request ──
@@ -259,9 +269,11 @@ Output schema (strict):
 
 Rules:
 - Output ONLY valid JSON, no markdown, no explanation.
+- Do not use trailing commas.
 - Every action id MUST come from the available actions list.
 - Every param key MUST come from the chosen action's schema.
 - Preserve numeric and boolean params as JSON numbers/booleans, not strings.
+- Never output arithmetic expressions such as 1777810000000 + 3600000. Compute the final value and output a single JSON number.
 - If "Grounded action params" contains action_id.param = value, include that value in the matching action's params.
 - Do not put an item in missing_setup for a value that is already present in Grounded action params or already filled in the final params.
 - Do not output Android intent actions, extra keys, package names, or URI templates.

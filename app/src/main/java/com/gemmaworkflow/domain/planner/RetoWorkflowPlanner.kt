@@ -1,8 +1,12 @@
 package com.gemmaworkflow.domain.planner
 
 import android.util.Log
+import com.google.ai.edge.litertlm.ConversationConfig
 import com.google.ai.edge.litertlm.Engine
+import com.google.ai.edge.litertlm.SamplerConfig
 import com.gemmaworkflow.domain.catalog.ActionSpecRegistry
+import com.gemmaworkflow.domain.parser.WorkflowJsonParser
+import com.gemmaworkflow.domain.safety.WorkflowValidator
 import com.gemmaworkflow.platform.capability.PackageCapabilityScanner
 import com.gemmaworkflow.platform.tools.reto.CapabilityBinder
 import com.gemmaworkflow.platform.tools.reto.CoverageValidator
@@ -25,10 +29,6 @@ class RetoWorkflowPlanner(
     private val engine: Engine,
     private val capabilityScanner: PackageCapabilityScanner
 ) {
-    private companion object {
-        const val TAG = "RetoWorkflowPlanner"
-    }
-
     /** Exposed for debug UI — last Phase 0 result. */
     var lastDecomposition: TaskDecomposer.DecompositionResult? = null
         private set
@@ -87,7 +87,7 @@ class RetoWorkflowPlanner(
             installedApps = installedAppsSummary,
             compactFacts = orchestrateResult.compactSummary
         )
-        onPhase("Phase 2 — Raw Output", analysisRaw.take(500))
+        onPhase("Phase 2 — Raw Output", analysisRaw)
 
         // Phase 3: Build action plan from resolved facts
         onPhase("Phase 3 — Action Plan", "Building action plan from resolved facts")
@@ -107,11 +107,20 @@ class RetoWorkflowPlanner(
             compactFacts = orchestrateResult.compactSummary
         )
         onPhase("Phase 4 — Raw Output", jsonRaw)
+        val verifiedJsonRaw = verifyAndRepairWorkflowJson(
+            initialJson = jsonRaw,
+            userRequest = userRequest,
+            capabilitySummary = capabilitySummary,
+            compactFacts = orchestrateResult.compactSummary,
+            availableActionIds = resolvableIds,
+            onPhase = onPhase
+        )
+        onPhase("Phase 4 — Verified JSON", verifiedJsonRaw)
 
         return RetoWorkflowResult(
             analysisRaw = analysisRaw,
             actionPlanRaw = actionPlanRaw,
-            workflowJsonRaw = jsonRaw,
+            workflowJsonRaw = verifiedJsonRaw,
             trace = orchestrateResult.trace,
             ledger = orchestrateResult.ledger,
             debugTrace = orchestrateResult.debugTrace
@@ -146,8 +155,8 @@ class RetoWorkflowPlanner(
         }
 
         return engine.createConversation(
-            com.google.ai.edge.litertlm.ConversationConfig(
-                samplerConfig = com.google.ai.edge.litertlm.SamplerConfig(
+            ConversationConfig(
+                samplerConfig = SamplerConfig(
                     topK = 40, topP = 0.95, temperature = 0.4
                 )
             )
@@ -174,8 +183,8 @@ class RetoWorkflowPlanner(
         }
 
         return engine.createConversation(
-            com.google.ai.edge.litertlm.ConversationConfig(
-                samplerConfig = com.google.ai.edge.litertlm.SamplerConfig(
+            ConversationConfig(
+                samplerConfig = SamplerConfig(
                     topK = 40, topP = 0.95, temperature = 0.2
                 )
             )
@@ -196,9 +205,123 @@ class RetoWorkflowPlanner(
         )
 
         return engine.createConversation(
-            com.google.ai.edge.litertlm.ConversationConfig(
-                samplerConfig = com.google.ai.edge.litertlm.SamplerConfig(
+            ConversationConfig(
+                samplerConfig = SamplerConfig(
                     topK = 40, topP = 0.95, temperature = 0.2
+                )
+            )
+        ).use { conv -> conv.sendMessage(prompt).toString() }
+    }
+
+    private suspend fun verifyAndRepairWorkflowJson(
+        initialJson: String,
+        userRequest: String,
+        capabilitySummary: String,
+        compactFacts: String,
+        availableActionIds: Set<String>,
+        onPhase: (String, String) -> Unit
+    ): String {
+        var candidate = initialJson
+        repeat(JSON_REPAIR_ATTEMPTS + 1) { attempt ->
+            val errors = verifyWorkflowJson(candidate, availableActionIds)
+            if (errors.isEmpty()) {
+                val label = if (attempt == 0) "initial output" else "repair attempt $attempt"
+                onPhase("Phase 4 — JSON Verification", "Passed on $label.")
+                return candidate
+            }
+
+            onPhase(
+                "Phase 4 — JSON Verification",
+                buildString {
+                    appendLine("Attempt ${attempt + 1} failed:")
+                    errors.forEach { appendLine("- $it") }
+                }.trim()
+            )
+
+            if (attempt == JSON_REPAIR_ATTEMPTS) {
+                return candidate
+            }
+
+            candidate = repairWorkflowJsonWithModel(
+                userRequest = userRequest,
+                capabilitySummary = capabilitySummary,
+                compactFacts = compactFacts,
+                previousJson = candidate,
+                errors = errors
+            )
+            onPhase("Phase 4 — JSON Repair Raw Output", candidate)
+        }
+        return candidate
+    }
+
+    private fun verifyWorkflowJson(rawJson: String, availableActionIds: Set<String>): List<String> =
+        runCatching {
+            val workflow = WorkflowJsonParser.parse(rawJson)
+            WorkflowValidator.validate(workflow, availableActionIds)
+        }.getOrElse { error ->
+            listOf("Parse error: ${error.message ?: error::class.java.simpleName}")
+        }
+
+    private suspend fun repairWorkflowJsonWithModel(
+        userRequest: String,
+        capabilitySummary: String,
+        compactFacts: String,
+        previousJson: String,
+        errors: List<String>
+    ): String {
+        val prompt = buildString {
+            appendLine("You are a strict JSON repair agent for GemmaWorkflow.")
+            appendLine("The previous final workflow JSON failed parsing or validation.")
+            appendLine("Return corrected JSON only. No markdown. No explanation. No trailing commas.")
+            appendLine()
+            appendLine("User request:")
+            appendLine(userRequest)
+            appendLine()
+            appendLine("Available action schemas. Use ONLY these action IDs and param keys:")
+            appendLine(capabilitySummary)
+            appendLine()
+            appendLine("Grounded facts and action params already resolved by Kotlin:")
+            appendLine(compactFacts.ifBlank { "No grounded facts were provided." })
+            appendLine()
+            appendLine("Verifier errors:")
+            errors.forEach { appendLine("- $it") }
+            appendLine()
+            appendLine("Previous JSON:")
+            appendLine(previousJson)
+            appendLine()
+            appendLine("Required root schema:")
+            appendLine("""{
+  "name": "short workflow name",
+  "summary": "one sentence",
+  "trigger": {
+    "type": "manual" | "time" | "nfc" | "share_sheet" | "tasker_setup_required",
+    "setup_state": "ready" | "needs_setup",
+    "schedule": { "hour": 9, "minute": 0, "repeat_days": [] } or null
+  },
+  "actions": [
+    {
+      "id": "catalog.action.id",
+      "params": {},
+      "requires_confirmation": true or false
+    }
+  ],
+  "missing_setup": []
+}""")
+            appendLine()
+            appendLine("Repair rules:")
+            appendLine("- Preserve the user's intent and the previously grounded facts.")
+            appendLine("- Remove unknown action IDs and unknown params.")
+            appendLine("- Fill required params when the value is present in grounded facts.")
+            appendLine("- Keep numeric milliseconds as JSON numbers, not strings.")
+            appendLine("- Never output arithmetic expressions such as 1777810000000 + 3600000. Compute the final value and output a single JSON number.")
+            appendLine("- If calendar.create_event has begin_time_millis and no end_time_millis, compute end_time_millis as exactly one hour after begin_time_millis unless the user specified a duration.")
+            appendLine("- Do not list missing_setup for values already present in params or grounded facts.")
+        }
+
+        return engine.createConversation(
+            ConversationConfig(
+                samplerConfig = SamplerConfig(
+                    topK = 20, topP = 0.9, temperature = 0.1
                 )
             )
         ).use { conv -> conv.sendMessage(prompt).toString() }
@@ -212,4 +335,9 @@ class RetoWorkflowPlanner(
         val ledger: com.gemmaworkflow.platform.tools.reto.RequirementLedger,
         val debugTrace: String
     )
+
+    private companion object {
+        const val TAG = "RetoWorkflowPlanner"
+        const val JSON_REPAIR_ATTEMPTS = 1
+    }
 }

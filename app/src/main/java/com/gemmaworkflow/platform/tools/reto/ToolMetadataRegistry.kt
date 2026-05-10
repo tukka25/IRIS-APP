@@ -32,7 +32,7 @@ object ToolMetadataRegistry {
             repairable = true,
             maxRepairAttempts = 2,
             examples = listOf(
-                ex("Resolve a meeting time", "expression" to "next Friday at 6pm", "reference_time_iso" to "2026-05-10T14:30:00+04:00", "timezone" to "Asia/Dubai"),
+                ex("Resolve a meeting time", "expression" to "next Friday at 6 o'clock", "reference_time_iso" to "2026-05-10T14:30:00+04:00", "timezone" to "Asia/Dubai", "default_period" to "pm"),
                 ex("Resolve a relative reminder", "expression" to "in 30 minutes", "reference_time_iso" to "2026-05-10T14:30:00+04:00", "timezone" to "Asia/Dubai")
             )
         ))
