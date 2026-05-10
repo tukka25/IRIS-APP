@@ -251,8 +251,12 @@ object ResolveDatetimeTool : Tool {
         else -> null
     }
 
-    private fun usesAmbiguousHour(expr: String): Boolean =
-        TIME_PATTERN.find(expr)?.groupValues?.getOrNull(3).isNullOrBlank()
+    private fun usesAmbiguousHour(expr: String): Boolean {
+        val match = TIME_PATTERN.find(expr) ?: return false
+        val hour = match.groupValues.getOrNull(1)?.toIntOrNull() ?: return false
+        val meridiem = match.groupValues.getOrNull(3)
+        return meridiem.isNullOrBlank() && hour in 1..12
+    }
 
     private val DAY_PATTERN = Regex("""(monday|tuesday|wednesday|thursday|friday|saturday|sunday)""")
     private val TIME_PATTERN = Regex("""(\d{1,2})(:\d{2})?\s*(am|pm|a\.m\.|p\.m\.)?\s*(?:o'?clock)?""")
