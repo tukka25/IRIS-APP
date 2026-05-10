@@ -1,6 +1,9 @@
 package com.gemmaworkflow.domain.triggers
 
+import android.content.Context
+import com.gemmaworkflow.domain.model.TriggerConfig
 import com.gemmaworkflow.domain.model.SetupState
+import com.gemmaworkflow.platform.alarm.TimeTriggerScheduler
 
 /**
  * Catalog of supported trigger types.
@@ -55,29 +58,52 @@ object TriggerCatalog {
 
 /**
  * Registers and unregisters workflow triggers.
- * MVP: manual run is always supported. Other triggers show NeedsSetup.
+ *
+ * For [TriggerConfig.Time], registers the alarm with [TimeTriggerScheduler].
+ * For other trigger types, stores the intent/Easer profile as appropriate.
  */
 object TriggerRegistry {
 
-    fun register(workflowId: String, triggerType: String): TriggerRegistrationResult {
-        val trigger = TriggerCatalog.find(triggerType)
+    private var scheduler: TimeTriggerScheduler? = null
+
+    fun initialize(context: Context) {
+        if (scheduler == null) {
+            scheduler = TimeTriggerScheduler(context)
+        }
+    }
+
+    fun register(workflowId: String, triggerType: String, trigger: TriggerConfig?): TriggerRegistrationResult {
+        val triggerInfo = TriggerCatalog.find(triggerType)
             ?: return TriggerRegistrationResult(false, "Unknown trigger type: $triggerType")
 
-        return when (trigger.setupState) {
-            SetupState.Ready -> TriggerRegistrationResult(true, "Trigger registered")
+        // If we have a Time trigger config, we can register it now (schedules the alarm).
+        if (trigger is TriggerConfig.Time) {
+            scheduleTimeTrigger(workflowId, trigger)
+            return TriggerRegistrationResult(true, "Trigger registered")
+        }
+
+        return when (triggerInfo.setupState) {
+            SetupState.Ready -> {
+                TriggerRegistrationResult(true, "Trigger registered")
+            }
             SetupState.NeedsSetup -> TriggerRegistrationResult(
                 false,
-                "'${trigger.label}' requires setup before it can be activated."
+                "'${triggerInfo.label}' requires setup before it can be activated."
             )
             SetupState.Unsupported -> TriggerRegistrationResult(
                 false,
-                "'${trigger.label}' is not supported yet."
+                "'${triggerInfo.label}' is not supported yet."
             )
         }
     }
 
     fun unregister(workflowId: String) {
-        // MVP: no persistent trigger state to clean up
+        scheduler?.cancel(workflowId)
+    }
+
+    private fun scheduleTimeTrigger(workflowId: String, trigger: TriggerConfig.Time) {
+        scheduler?.schedule(workflowId, trigger)
+            ?: android.util.Log.w("TriggerRegistry", "Scheduler not initialized — cannot schedule time trigger")
     }
 }
 

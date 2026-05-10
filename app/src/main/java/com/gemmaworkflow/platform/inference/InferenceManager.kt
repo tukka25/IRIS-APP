@@ -33,7 +33,7 @@ object InferenceManager {
     private var initialized = false
 
     /**
-     * Load the default LiteRT-LM model with GPU backend.
+     * Load the default LiteRT-LM model, preferring GPU then falling back to CPU.
      * Safe to call multiple times — subsequent calls are no-ops if already loaded.
      */
     suspend fun initialize(context: Context) {
@@ -50,26 +50,30 @@ object InferenceManager {
                 Log.i(TAG, "Loading model: ${modelFile.absolutePath}")
                 logMemory("Before load")
 
-                // Try GPU first — puts model in VRAM, saves system RAM
-                try {
-                    val config = EngineConfig(
+                // Try GPU first; fall back to CPU if unavailable.
+                val gpuResult = runCatching {
+                    val gpuConfig = EngineConfig(
                         modelPath = modelFile.absolutePath,
                         backend = Backend.GPU(),
                         cacheDir = context.cacheDir.absolutePath
                     )
-                    engine = Engine(config).also { it.initialize() }
-                    Log.i(TAG, "Model loaded on GPU")
-                    logMemory("After GPU load")
-                } catch (gpuError: Exception) {
-                    Log.w(TAG, "GPU failed, falling back to CPU", gpuError)
-                    val config = EngineConfig(
+                    Engine(gpuConfig).also { it.initialize() }
+                }
+
+                engine = if (gpuResult.isSuccess) {
+                    Log.i(TAG, "Model loaded successfully on GPU")
+                    gpuResult.getOrThrow().also { logMemory("After GPU load") }
+                } else {
+                    Log.w(TAG, "GPU unavailable (${gpuResult.exceptionOrNull()?.message}), falling back to CPU")
+                    val cpuConfig = EngineConfig(
                         modelPath = modelFile.absolutePath,
                         backend = Backend.CPU(),
                         cacheDir = context.cacheDir.absolutePath
                     )
-                    engine = Engine(config).also { it.initialize() }
-                    Log.i(TAG, "Model loaded on CPU (GPU unavailable)")
-                    logMemory("After CPU load")
+                    Engine(cpuConfig).also { it.initialize() }.also {
+                        Log.i(TAG, "Model loaded successfully on CPU")
+                        logMemory("After CPU load")
+                    }
                 }
 
                 _state.value = InferenceState.Ready
@@ -86,7 +90,9 @@ object InferenceManager {
 
                 message.contains("GPU", ignoreCase = true) ||
                 message.contains("OpenCL", ignoreCase = true) ||
-                message.contains("Vulkan", ignoreCase = true) ->
+                message.contains("Vulkan", ignoreCase = true) ||
+                message.contains("WebGPU", ignoreCase = true) ||
+                message.contains("No adapters found", ignoreCase = true) ->
                     InferenceState.GpuUnavailable(message)
 
                 else -> InferenceState.Error(message)

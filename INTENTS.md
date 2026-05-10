@@ -68,7 +68,7 @@ Extra mapping: message -> sms_body
 Flags: FLAG_ACTIVITY_NEW_TASK
 ```
 
-## MVP ActionSpecs
+## ActionSpecs (Implemented)
 
 - `browser.open_url`
 - `maps.open_place`
@@ -77,6 +77,7 @@ Flags: FLAG_ACTIVITY_NEW_TASK
 - `sms.compose`
 - `alarm.set_alarm`
 - `calendar.create_event`
+- `clipboard.copy_text`
 
 ## Prompt Boundary
 

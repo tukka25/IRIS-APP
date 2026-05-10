@@ -161,6 +161,20 @@ sealed interface ExecutionSpec {
     data class InternalTool(
         val toolName: String
     ) : ExecutionSpec
+
+    /**
+     * Chrome Custom Tabs — opens the URL in an in-app browser tab.
+     * Falls back to [fallbackActionIds] when Chrome is not available.
+     */
+    data class CustomTab(
+        val urlTemplate: String,
+        val toolbarColor: Int? = null
+    ) : ExecutionSpec
+
+    /**
+     * Built-in action handled directly by the app's internal executors.
+     */
+    data object BuiltIn : ExecutionSpec
 }
 
 data class ExtraSpec(
@@ -191,13 +205,12 @@ object ActionSpecRegistry {
         ActionSpec(
             id = "browser.open_url",
             label = "Open URL",
-            description = "Open a web URL in an installed browser.",
+            description = "Open a web URL in a Chrome Custom Tab inside the app (no app switch). Falls back to external browser if Chrome is unavailable.",
             params = listOf(
                 ParamSpec("url", ParamType.Url, description = "Full http or https URL to open")
             ),
-            execution = ExecutionSpec.AndroidIntent(
-                action = Intent.ACTION_VIEW,
-                dataTemplate = "{url}"
+            execution = ExecutionSpec.CustomTab(
+                urlTemplate = "{url}"
             ),
             triggerCompatible = setOf("manual", "time", "nfc"),
             logicalActions = setOf(LogicalAction.Search, LogicalAction.GetInfo),
@@ -280,17 +293,13 @@ object ActionSpecRegistry {
         ),
         ActionSpec(
             id = "share.share_text",
-            label = "Share text",
-            description = "Open the Android share sheet with text so the user can choose a target app.",
+            label = "Copy text to clipboard",
+            description = "Silently copy text to the system clipboard.",
             params = listOf(
-                ParamSpec("text", ParamType.String, description = "Text content to share")
+                ParamSpec("text", ParamType.String, description = "Text content to copy to clipboard")
             ),
-            execution = ExecutionSpec.AndroidIntent(
-                action = Intent.ACTION_SEND,
-                mimeType = "text/plain",
-                extras = listOf(ExtraSpec("text", Intent.EXTRA_TEXT, ParamType.String)),
-                chooserTitle = "Share via"
-            ),
+            execution = ExecutionSpec.BuiltIn,
+            availability = AvailabilitySpec.Always,
             triggerCompatible = setOf("manual", "time", "share_sheet", "nfc"),
             requiresConfirmation = true,
             logicalActions = setOf(LogicalAction.Share, LogicalAction.SendMessage),
@@ -305,18 +314,13 @@ object ActionSpecRegistry {
         ),
         ActionSpec(
             id = "share.share_image",
-            label = "Share image",
-            description = "Open the Android share sheet with an image content URI.",
+            label = "Copy image to clipboard",
+            description = "Silently copy an image URI to the clipboard.",
             params = listOf(
-                ParamSpec("uri", ParamType.Uri, description = "Content URI of the image")
+                ParamSpec("uri", ParamType.Uri, description = "Content URI of the image to copy")
             ),
-            execution = ExecutionSpec.AndroidIntent(
-                action = Intent.ACTION_SEND,
-                mimeType = "image/*",
-                extras = listOf(ExtraSpec("uri", Intent.EXTRA_STREAM, ParamType.Uri)),
-                flags = listOf(IntentFlag.NewTask, IntentFlag.GrantReadUriPermission),
-                chooserTitle = "Share image via"
-            ),
+            execution = ExecutionSpec.BuiltIn,
+            availability = AvailabilitySpec.Always,
             triggerCompatible = setOf("manual", "share_sheet"),
             requiresConfirmation = true,
             logicalActions = setOf(LogicalAction.Share),
@@ -431,21 +435,15 @@ object ActionSpecRegistry {
         ),
         ActionSpec(
             id = "alarm.set_alarm",
-            label = "Set alarm",
-            description = "Open the alarm app to create or confirm an alarm.",
+            label = "Set silent alarm",
+            description = "Set a silent alarm via AlarmManager — no alarm app UI is opened.",
             params = listOf(
                 ParamSpec("hour", ParamType.Int, description = "Hour in 24-hour time, 0-23"),
                 ParamSpec("minutes", ParamType.Int, description = "Minutes, 0-59"),
                 ParamSpec("message", ParamType.String, required = false, description = "Optional alarm label")
             ),
-            execution = ExecutionSpec.AndroidIntent(
-                action = AlarmClock.ACTION_SET_ALARM,
-                extras = listOf(
-                    ExtraSpec("hour", AlarmClock.EXTRA_HOUR, ParamType.Int),
-                    ExtraSpec("minutes", AlarmClock.EXTRA_MINUTES, ParamType.Int),
-                    ExtraSpec("message", AlarmClock.EXTRA_MESSAGE, ParamType.String)
-                )
-            ),
+            execution = ExecutionSpec.BuiltIn,
+            availability = AvailabilitySpec.Always,
             triggerCompatible = setOf("manual", "time", "nfc"),
             requiresConfirmation = true,
             logicalActions = setOf(LogicalAction.SetAlarm),
@@ -493,9 +491,29 @@ object ActionSpecRegistry {
             )
         ),
         ActionSpec(
+            id = "clipboard.copy_text",
+            label = "Copy text to clipboard",
+            description = "Silently copy text to the system clipboard without showing any chooser or share sheet.",
+            params = listOf(
+                ParamSpec("text", ParamType.String, description = "Text content to copy to clipboard")
+            ),
+            execution = ExecutionSpec.BuiltIn,
+            availability = AvailabilitySpec.Always,
+            triggerCompatible = setOf("manual", "time", "nfc"),
+            logicalActions = setOf(LogicalAction.Share, LogicalAction.TakeNote),
+            appKeywords = setOf("clipboard", "copy", "text"),
+            sharedToolGroups = setOf(SharedToolGroup.Validation),
+            examples = listOf(
+                buildJsonObject {
+                    put("id", "clipboard.copy_text")
+                    put("params", buildJsonObject { put("text", "https://example.com") })
+                }
+            )
+        ),
+        ActionSpec(
             id = "calendar.create_event",
             label = "Create calendar event",
-            description = "Open the calendar app to create an event with prefilled details.",
+            description = "Silently create a calendar event via CalendarProvider. Requires WRITE_CALENDAR permission.",
             params = listOf(
                 ParamSpec("title", ParamType.String, description = "Event title"),
                 ParamSpec(
@@ -514,19 +532,10 @@ object ActionSpecRegistry {
                 ParamSpec("location", ParamType.String, required = false, description = "Event location"),
                 ParamSpec("description", ParamType.String, required = false, description = "Event notes")
             ),
-            execution = ExecutionSpec.AndroidIntent(
-                action = Intent.ACTION_INSERT,
-                dataTemplate = "content://com.android.calendar/events",
-                extras = listOf(
-                    ExtraSpec("title", CalendarContract.Events.TITLE, ParamType.String),
-                    ExtraSpec("begin_time_millis", CalendarContract.EXTRA_EVENT_BEGIN_TIME, ParamType.DateTimeMillis),
-                    ExtraSpec("end_time_millis", CalendarContract.EXTRA_EVENT_END_TIME, ParamType.DateTimeMillis),
-                    ExtraSpec("location", CalendarContract.Events.EVENT_LOCATION, ParamType.String),
-                    ExtraSpec("description", CalendarContract.Events.DESCRIPTION, ParamType.String)
-                )
-            ),
+            execution = ExecutionSpec.BuiltIn,
+            availability = AvailabilitySpec.Always,
             triggerCompatible = setOf("manual", "time", "nfc"),
-            requiresConfirmation = true,
+            requiresConfirmation = false,
             logicalActions = setOf(LogicalAction.CreateEvent, LogicalAction.SetReminder),
             appKeywords = setOf("calendar", "event", "meeting", "schedule"),
             fallbackActionIds = listOf("share.share_text"),

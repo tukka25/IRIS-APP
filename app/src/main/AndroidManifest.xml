@@ -1,14 +1,28 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
-    <uses-permission android:name="android.permission.READ_CALENDAR" />
-    <uses-permission android:name="android.permission.WRITE_CALENDAR" />
     <uses-permission android:name="android.permission.READ_CONTACTS" />
     <uses-permission android:name="android.permission.READ_SMS" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- Media access for domain entity search (playlists, songs, files) -->
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+    <!-- Required for AlarmManager.setExactAndAllowWhileIdle().  On Android 12+ the
+         system gates this behind Settings; the app redirects via
+         ACTION_REQUEST_SCHEDULE_EXACT_ALARM when canScheduleExactAlarms() returns false. -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <!-- Required on Android 12+ to confirm the user has granted exact alarm permission via Settings. -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <!-- Required to reschedule time-triggered workflows after a device reboot. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Required for reading/writing calendar events silently. -->
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
+    <uses-permission android:name="android.permission.WRITE_CALENDAR" />
+
+    <!-- NFC: read and write NFC tags to trigger workflows. -->
+    <uses-permission android:name="android.permission.NFC" />
+    <!-- NFC hardware feature — not required; app works without NFC but can't write tags. -->
+    <uses-feature android:name="android.hardware.nfc" android:required="false" />
 
     <!-- Package visibility for the declarative ActionSpec registry. -->
     <queries>
@@ -77,6 +91,10 @@
         </intent>
         <package android:name="com.whatsapp" />
         <package android:name="com.spotify.music" />
+        <!-- Required to open Android 12+ exact alarm Settings page. -->
+        <intent>
+            <action android:name="android.intent.action.REQUEST_SCHEDULE_EXACT_ALARM" />
+        </intent>
     </queries>
 
     <application
@@ -99,10 +117,99 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!-- Deep-link: gemmaworkflow://workflow/{workflowId} — used by NFC tags -->
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="gemmaworkflow"
+                    android:host="workflow" />
+            </intent-filter>
+
+            <!-- NFC tag discovered while app is in foreground (prioritized over broadcast) -->
+            <intent-filter>
+                <action android:name="android.nfc.action.NDEF_DISCOVERED" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="gemmaworkflow" android:host="workflow" />
+            </intent-filter>
+
+            <!-- Share sheet: receive text and images from other apps -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/*" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+            </intent-filter>
         </activity>
 
         <receiver
             android:name="com.gemmaworkflow.platform.tools.impl.ReminderReceiver"
             android:exported="false" />
+
+        <!-- Receives the broadcast from AlarmManager when a silent alarm fires. -->
+        <receiver
+            android:name=".platform.alarm.AlarmReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.gemmaworkflow.platform.alarm.ACTION_ALARM_FIRE" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Fires when a scheduled time trigger reaches its trigger time. -->
+        <receiver
+            android:name=".platform.alarm.TimeTriggerReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.gemmaworkflow.platform.alarm.ACTION_TIME_TRIGGER" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Receives time trigger confirm/run intents from the notification action buttons. -->
+        <activity
+            android:name=".ui.trigger.TimeTriggerConfirmationActivity"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:taskAffinity="">
+            <intent-filter>
+                <action android:name="com.gemmaworkflow.ui.trigger.ACTION_TIME_TRIGGER_CONFIRM" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.gemmaworkflow.ui.trigger.ACTION_TIME_TRIGGER_RUN" />
+            </intent-filter>
+            <!-- Also handle direct-run action from notification "Run Now" button. -->
+            <intent-filter>
+                <action android:name="com.gemmaworkflow.platform.nfc.ACTION_RUN_WORKFLOW" />
+            </intent-filter>
+        </activity>
+
+        <!-- Reschedules time-triggered workflows after a device reboot. -->
+        <receiver
+            android:name=".platform.alarm.BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Receives NFC tag scan events when the app is backgrounded. -->
+        <receiver
+            android:name=".platform.nfc.NfcTriggerHandler"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.gemmaworkflow.platform.nfc.ACTION_NFC_SCANNED" />
+            </intent-filter>
+        </receiver>
+
     </application>
 </manifest>

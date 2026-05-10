@@ -1,0 +1,24 @@
+Silent Calendar and Alarm - Android API Research
+
+## CALENDAR
+
+ContentResolver.insert(CalendarContract.Events.CONTENT_URI, values)
+
+Required Permissions:
+  - WRITE_CALENDAR
+  - READ_CALENDAR
+
+Android Version: API 14+ (Android 4.0+)
+
+ContentValues Required Fields:
+  - CALENDAR_ID (must be valid, synced/visible calendar)
+  - TITLE
+  - EVENT_START_TIME (epoch millis)
+  - EVENT_END_TIME (epoch millis)
+  - EVENT_TIMEZONE
+
+CRITICAL: Calendar MUST be synced and visible.
+
+## ALARM
+
+AlarmManager.setExactAndAllowWhileIdle() - API 23+

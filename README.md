@@ -1,132 +1,176 @@
-# GemmaWorkflow — Android On-Device AI
+# GemmaWorkflow — Android On-Device AI Workflow Automation
 
 > **Platform:** Android (Kotlin + Jetpack Compose + LiteRT-LM)
-> **Goal:** On-device SLM that turns natural language into executable cross-app workflows.
+> **Goal:** On-device SLM turns natural language into executable cross-app workflows.
 
 ---
 
-## Current State (Built & Working)
-
-This is a **LiteRT-LM GPU smoke-test app**. It loads a Gemma 4 model on the phone GPU and runs local inference — no cloud, no JNI, no C++.
+## Architecture
 
 ```
-User prompt  →  LiteRT-LM GPU inference  →  Generated text in UI
-```
-
-### What's Built
-
-| Layer | File | Purpose |
-|-------|------|---------|
-| Inference | `LitertLmEngine.kt` | Wraps LiteRT-LM `Engine` + `Conversation` API. `Backend.GPU()` by default. |
-| Model locator | `ModelFileLocator.kt` | Resolves `.litertlm` path on device (`gemma-4-E2B-it.litertlm`) |
-| ViewModel | `LlamaSmokeViewModel.kt` | `loadModel()` → `engine.initialize()` → `engine.generate()` |
-| UI state | `LlamaSmokeUiState.kt` | Holds model path, prompt, response, load/error state |
-| Screen | `MainActivity.kt` | Compose: model path display, load button, prompt input, generate button, response output |
-| Theme | `GemmaWorkflowTheme.kt` | Material 3 dark theme |
-| Manifest | `AndroidManifest.xml` | GPU lib declarations (`libOpenCL.so`, `libVulkan.so`) |
-| App class | `GemmaWorkflowApp.kt` | Empty Application class |
-
-### What's Stubbed (`.gitkeep` placeholders, not built)
-
-```
-domain/planner/     domain/parser/    domain/runner/
-domain/safety/      domain/triggers/
-data/local/dao/     data/local/database/   data/local/entity/
-data/repository/    data/settings/
-platform/dispatch/  platform/nfc/    platform/tasker/
-ui/workflows/       ui/triggers/     ui/components/
+User prompt
+    │
+    ▼
+┌─────────────────────┐
+│   LiteRT-LM          │  ← Gemma 4 2B on-device via LiteRT-LM
+│   Planner Pipeline   │  ← 4-stage: RequestAnalysis → Capability → ActionPlan → JSON
+└────────┬────────────┘
+         │ JSON workflow
+         ▼
+┌─────────────────────┐
+│  Validator          │  ← ActionSpec allowlist, param types, trigger compat
+│  Parser             │
+└────────┬────────────┘
+         │ PlannedWorkflow
+         ▼
+┌─────────────────────┐
+│  WorkflowRepository │  ← JSON file storage, survives restart
+│  (JsonFileStorage)  │
+└────────┬────────────┘
+         │
+    ┌────┴────┐
+    │         │
+    ▼         ▼
+ Run Now   Trigger
+    │         │
+    ▼         ▼
+WorkflowRunner   NFC / Time / Share Sheet
+    │           │
+    ▼           ▼
+ IntentFactory  AlarmManager / NDEF / ACTION_SEND
+    │
+    ▼
+ Android OS — execute cross-app actions
 ```
 
 ---
 
-## Why LiteRT-LM Instead of llama.cpp
+## Action Catalog
 
-| | llama.cpp (DELETED) | LiteRT-LM (ACTIVE) |
+| Action | Description | Silent |
 |---|---|---|
-| Integration | C++ JNI + CMake + NDK | Pure Kotlin AAR (`com.google.ai.edge.litertlm:litertlm-android:0.10.0`) |
-| GPU | Vulkan only, manual | OpenCL + Vulkan, auto-selected |
-| Model | `.gguf` (community format) | `.litertlm` (Google's optimized format) |
-| Build | Cross-compile C++, link native libs | One Gradle dependency, zero native code |
-| API | Manual tokenize/sample/decode | `Engine.initialize()` → `Conversation.sendMessage()` |
+| `browser.open_url` | Open URL in Chrome Custom Tab | No |
+| `maps.open_place` | Open a place in Maps | No |
+| `share.share_text` | Copy text to clipboard | Yes |
+| `share.share_image` | Copy image URI to clipboard | Yes |
+| `sms.compose` | Open SMS composer | No |
+| `alarm.set_alarm` | Set silent alarm via AlarmManager | Yes |
+| `clipboard.copy_text` | Copy text to clipboard | Yes |
+| `calendar.create_event` | Create calendar event via CalendarProvider | Yes |
 
 ---
 
-## Technology Stack
+## Trigger System
 
-| Layer | Choice | Why |
-|-------|--------|-----|
-| Language | Kotlin 2.3.20 | Coroutines, sealed classes, null safety |
-| UI | Jetpack Compose + Material 3 | Declarative, fast iteration |
-| State | ViewModel + StateFlow | Survives rotation, observable |
-| Inference | LiteRT-LM 0.10.0 | Google's on-device LLM framework, GPU-accelerated |
-| Model | Gemma 4 E2B IT `.litertlm` | Google's edge-optimized SLM, 2.4 GB |
-| GPU backend | OpenCL / Vulkan | Auto-selected by LiteRT-LM on device |
-| Build | Gradle Kotlin DSL | Standard Android, no CMake/NDK |
-| Min SDK | 26 (Android 8) | Covers 95%+ of active devices |
+| Trigger | Setup | Execution |
+|---|---|---|
+| **Manual** | Always available | Tap "Run Now" in workflow detail |
+| **Time** | TimeTriggerSetupScreen → schedule via AlarmManager | Notification → Confirm / Dismiss / Run Now |
+| **NFC** | NfcSetupScreen → write tag with `gemmaworkflow://workflow/{id}` | Scan tag → confirm → run |
+| **Share Sheet** | ShareSheetSetupScreen → enable for workflow | Share content → pick workflow → confirm → run |
+
+**Time trigger persistence:** `BootReceiver` reschedules all time triggers after device reboot. `GemmaWorkflowApp.onCreate()` reschedules on every cold start.
 
 ---
 
-## Source Tree (What Actually Exists)
+## Source Tree
 
 ```
 app/src/main/java/com/gemmaworkflow/
 ├── app/
-│   └── GemmaWorkflowApp.kt                  # Application class
-├── platform/inference/litert/
-│   ├── LitertLmEngine.kt                    # LiteRT-LM wrapper (GPU)
-│   └── ModelFileLocator.kt                  # Locates .litertlm on device
+│   └── GemmaWorkflowApp.kt                    # Cold-start: reschedule time triggers
+├── data/
+│   ├── local/storage/
+│   │   └── JsonFileStorage.kt                 # Generic JSON file CRUD
+│   ├── repository/
+│   │   ├── WorkflowRepository.kt              # Workflow save/load/delete
+│   │   └── ExecutionHistoryRepository.kt      # Append-only execution log
+│   └── seed/
+│       └── DemoWorkflowSeeder.kt             # Seed demo workflows on first run
+├── domain/
+│   ├── catalog/
+│   │   └── ActionSpecRegistry.kt             # Action specs + IntentFactory dispatch
+│   ├── model/
+│   │   ├── WorkflowModels.kt                 # PlannedWorkflow, WorkflowStep, TriggerConfig
+│   │   └── SharedContent.kt                  # Share sheet content: Text / Image
+│   ├── parser/
+│   │   └── WorkflowJsonParser.kt             # JSON → typed workflow
+│   ├── planner/
+│   │   ├── PlannerService.kt                 # Orchestrates planner stages
+│   │   ├── PlannerAgents.kt                  # 4-stage prompt agents
+│   │   └── PromptBuilder.kt                 # System prompt builder
+│   ├── runner/
+│   │   ├── WorkflowRunner.kt                 # Step-by-step execution + confirmation
+│   │   ├── IntentFactory.kt                  # Intent + CustomTab + BuiltIn dispatch
+│   │   └── FallbackParamMapper.kt           # Fallback chains per action
+│   ├── safety/
+│   │   └── WorkflowValidator.kt              # Schema + allowlist validation
+│   └── triggers/
+│       └── TriggerCatalog.kt                # TriggerCatalog + TriggerRegistry
+├── platform/
+│   ├── alarm/
+│   │   ├── AlarmApiExecutor.kt               # Silent AlarmManager scheduling
+│   │   ├── AlarmReceiver.kt                 # Fires notification on alarm
+│   │   ├── BootReceiver.kt                  # Reschedules after reboot
+│   │   ├── TimeTriggerReceiver.kt           # Time trigger broadcast receiver
+│   │   └── TimeTriggerScheduler.kt          # AlarmManager scheduling + reschedule
+│   ├── calendar/
+│   │   └── CalendarApiExecutor.kt           # ContentResolver.insert for calendar
+│   ├── capability/
+│   │   ├── ChromeCustomTabOpener.kt         # CustomTabsIntent in-app browser
+│   │   ├── ClipboardApiExecutor.kt          # ClipboardManager silent copy
+│   │   ├── IntentDiscoveryEngine.kt         # Dynamic intent discovery
+│   │   └── PackageCapabilityScanner.kt      # Installed app capability scanning
+│   ├── inference/
+│   │   └── InferenceManager.kt              # Singleton model lifecycle
+│   ├── nfc/
+│   │   ├── DeepLinkRouter.kt                # gemmaworkflow:// routing + foreground NFC
+│   │   ├── NfcTriggerHandler.kt             # Background NFC scan receiver
+│   │   └── NfcTriggerWriter.kt              # NDEF tag writer
+│   └── share/
+│       └── ShareSheetTriggerHandler.kt       # Share → workflow matching
 └── ui/
-    ├── MainActivity.kt                      # Compose smoke-test screen
+    ├── MainActivity.kt                      # Navigation + confirmation dialog
     ├── home/
-    │   ├── LlamaSmokeViewModel.kt           # Load + generate
-    │   └── LlamaSmokeUiState.kt             # UI state
-    └── theme/
-        └── GemmaWorkflowTheme.kt            # Material 3 theme
-
-LiteRT-LM/                                    # Cloned sibling (GPU libs + CLI)
-└── prebuilt/android_arm64/
-
-local_models/
-└── gemma-4-E2B-it.litertlm                   # 2.4 GB model (gitignored)
+    │   ├── WorkflowGenerationUiState.kt    # UI state + trigger state
+    │   ├── WorkflowGenerationViewModel.kt  # Generation + trigger setup logic
+    │   ├── NfcTriggerSetupScreen.kt        # NFC tag writing UI
+    │   ├── ShareSheetSetupScreen.kt        # Share sheet trigger UI
+    │   └── TimeTriggerSetupScreen.kt       # Time picker + scheduling UI
+    ├── nfc/
+    │   └── NfcSetupScreen.kt               # NFC tag writing composable
+    └── trigger/
+        ├── TimeTriggerConfirmationActivity.kt  # Notification action: confirm/dismiss/run
+        ├── TimeTriggerNotification.kt          # Notification channel + builder
+        └── TimeTriggerPicker.kt                # Time picker UI
 ```
 
 ---
 
-## Build & Run
+## Build
 
 ```bash
-# 1. Push the model to your phone (2.4 GB)
+# Push model to device (one-time)
 adb push local_models/gemma-4-E2B-it.litertlm \
   /sdcard/Android/data/com.gemmaworkflow/files/models/
 
-# 2. Build and install
-JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" \
-  ./gradlew installDebug
+# Build
+./gradlew installDebug
 
-# 3. Open app → tap "Load model" → status shows "Loaded — GPU (LiteRT-LM)"
-# 4. Enter prompt → tap "Generate"
+# Or from PowerShell on Windows (no Java in WSL)
+.\gradlew installDebug
 ```
-
----
-
-## Planned (Next Milestones)
-
-The full architecture is designed in `ARCHITECTURE.md`. The smoke test is step one. After GPU inference is stable:
-
-1. **Mock planner** — hardcoded JSON workflows for UI/runner testing
-2. **Workflow parser + validator** — extract JSON from model output, validate against action allowlist
-3. **Workflow runner** — dispatch Android intents and URL schemes
-4. **Persistence** — Room DB for saved workflows and execution history
-5. **Triggers** — NFC tag, manual run, optional Tasker plugin
-6. **Full LiteRT-LM planner** — replace mock with real SLM-generated workflows
 
 ---
 
 ## Docs
 
 | File | What |
-|------|------|
-| `ARCHITECTURE.md` | Full design: packages, contracts, milestones, risk table |
-| `TASKS.md` | Day-by-day task breakdown for hackathon build |
-| `docs/demo/litert_lm_android_gpu_spike.md` | This branch's spike notes |
-| `docs/demo/emulator_smoke_test.md` | Smoke test checklist |
+|---|---|
+| `docs/MILESTONE_6_STATUS.md` | Full milestone status vs. Issue #7 checklist |
+| `docs/research/silent_calendar_alarm_api.txt` | Silent calendar + alarm Android API research |
+| `docs/research/browser_share_silent_actions.md` | Chrome Custom Tabs + clipboard silent research |
+| `ARCHITECTURE.md` | Design doc — architecture, packages, contracts |
+| `INTENTS.md` | Declarative intent planning — ActionSpec contracts |
+| `WORKFLOW_FEATURE.md` | Planner pipeline design |
+| `TASKS.md` | Hackathon task breakdown |

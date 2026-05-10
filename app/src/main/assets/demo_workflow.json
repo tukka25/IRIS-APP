@@ -1,0 +1,24 @@
+{
+  "name": "Coffee & Note",
+  "summary": "Finds the nearest coffee shop on Maps, then shares a note.",
+  "trigger": {
+    "type": "manual"
+  },
+  "actions": [
+    {
+      "id": "maps.open_place",
+      "params": {
+        "query": "coffee shop near me"
+      },
+      "requires_confirmation": false
+    },
+    {
+      "id": "share.share_text",
+      "params": {
+        "text": "Coffee stop — found a shop nearby. Good work session ahead."
+      },
+      "requires_confirmation": true
+    }
+  ],
+  "missing_setup": []
+}

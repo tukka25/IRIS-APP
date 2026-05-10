@@ -20,6 +20,18 @@ import kotlinx.serialization.json.longOrNull
 
 class IntentFactory {
 
+    /**
+     * Returns the resolved URL string for a CustomTab execution spec, or null if
+     * the spec is not a CustomTab.
+     */
+    fun buildCustomTabParams(spec: ActionSpec, params: JsonObject): CustomTabParams? {
+        val execution = spec.execution as? ExecutionSpec.CustomTab ?: return null
+        val url = resolveTemplate(spec, execution.urlTemplate, params)
+        return CustomTabParams(url = url, toolbarColor = execution.toolbarColor)
+    }
+
+    data class CustomTabParams(val url: String, val toolbarColor: Int?)
+
     fun buildSampleIntent(spec: ActionSpec): Intent? {
         val exampleParams = spec.examples.firstOrNull()?.get("params") as? JsonObject ?: JsonObject(emptyMap())
         return buildBaseIntent(spec, exampleParams, includeChooser = false)
@@ -38,7 +50,9 @@ class IntentFactory {
         return when (val execution = spec.execution) {
             is ExecutionSpec.AndroidIntent -> buildAndroidIntent(execution, spec, params, includeChooser)
             is ExecutionSpec.PackageLaunch,
-            is ExecutionSpec.InternalTool -> null
+            is ExecutionSpec.InternalTool,
+            is ExecutionSpec.CustomTab -> null // handled separately in WorkflowRunner
+            ExecutionSpec.BuiltIn -> null // handled separately in WorkflowRunner
         }
     }
 
