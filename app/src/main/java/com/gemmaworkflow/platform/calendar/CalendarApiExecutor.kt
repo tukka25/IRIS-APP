@@ -29,15 +29,21 @@ class CalendarApiExecutor(private val context: Context) {
 
     companion object {
         private const val TAG = "CalendarApiExecutor"
+        private const val DEFAULT_EVENT_DURATION_MILLIS = 60 * 60 * 1000L
+        const val PERMISSION_READ_CALENDAR = Manifest.permission.READ_CALENDAR
         const val PERMISSION_WRITE_CALENDAR = Manifest.permission.WRITE_CALENDAR
     }
 
     /**
-     * Returns true if WRITE_CALENDAR permission is already granted.
+     * Returns true if calendar permissions are already granted.
      */
     fun hasPermission(): Boolean {
         return ContextCompat.checkSelfPermission(
             context,
+            PERMISSION_READ_CALENDAR
+        ) == PackageManager.PERMISSION_GRANTED &&
+            ContextCompat.checkSelfPermission(
+                context,
             PERMISSION_WRITE_CALENDAR
         ) == PackageManager.PERMISSION_GRANTED
     }
@@ -149,6 +155,19 @@ class CalendarApiExecutor(private val context: Context) {
      * Maps JSON params to calendar event fields.
      */
     private fun buildContentValues(params: JsonObject, calendarId: Long): ContentValues {
+        val beginTimeMillis = params["begin_time_millis"]
+            ?.let { it as? JsonPrimitive }
+            ?.longOrNull
+        val requestedEndTimeMillis = params["end_time_millis"]
+            ?.let { it as? JsonPrimitive }
+            ?.longOrNull
+        val endTimeMillis = when {
+            beginTimeMillis == null -> null
+            requestedEndTimeMillis == null -> beginTimeMillis + DEFAULT_EVENT_DURATION_MILLIS
+            requestedEndTimeMillis <= beginTimeMillis -> beginTimeMillis + DEFAULT_EVENT_DURATION_MILLIS
+            else -> requestedEndTimeMillis
+        }
+
         return ContentValues().apply {
             put(CalendarContract.Events.CALENDAR_ID, calendarId)
             put(CalendarContract.Events.EVENT_TIMEZONE, java.util.TimeZone.getDefault().id)
@@ -159,15 +178,14 @@ class CalendarApiExecutor(private val context: Context) {
             }
 
             // begin_time_millis -> EVENT_BEGIN
-            params["begin_time_millis"]?.let { v ->
-                val millis = (v as? JsonPrimitive)?.longOrNull
-                millis?.let { put(CalendarContract.Events.DTSTART, it) }
+            beginTimeMillis?.let {
+                put(CalendarContract.Events.DTSTART, it)
             }
 
-            // end_time_millis -> EVENT_END
-            params["end_time_millis"]?.let { v ->
-                val millis = (v as? JsonPrimitive)?.longOrNull
-                millis?.let { put(CalendarContract.Events.DTEND, it) }
+            // end_time_millis -> EVENT_END. CalendarProvider needs an end
+            // time or duration, so default to a one-hour event when absent.
+            endTimeMillis?.let {
+                put(CalendarContract.Events.DTEND, it)
             }
 
             // location

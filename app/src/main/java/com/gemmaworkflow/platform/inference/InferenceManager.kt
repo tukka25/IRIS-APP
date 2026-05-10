@@ -2,10 +2,12 @@ package com.gemmaworkflow.platform.inference
 
 import android.content.Context
 import android.util.Log
+import com.gemmaworkflow.BuildConfig
 import com.google.ai.edge.litertlm.Backend
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
 import com.gemmaworkflow.platform.inference.litert.ModelFileLocator
+import com.gemmaworkflow.platform.tools.ToolInitializer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -32,7 +34,11 @@ object InferenceManager {
     private var initialized = false
 
     /**
-     * Load the default LiteRT-LM model, preferring GPU then falling back to CPU.
+     * Load the default LiteRT-LM model, preferring GPU.
+     *
+     * When BuildConfig.FORCE_GPU_INFERENCE is true, GPU init failure becomes
+     * GpuUnavailable instead of silently falling back to CPU. This is useful for
+     * physical-phone validation where we need to prove the model is really on GPU.
      * Safe to call multiple times — subsequent calls are no-ops if already loaded.
      */
     suspend fun initialize(context: Context) {
@@ -47,6 +53,7 @@ object InferenceManager {
                 val modelFile = locator.requireDefaultModel()
 
                 Log.i(TAG, "Loading model: ${modelFile.absolutePath}")
+                logMemory("Before load")
 
                 // Try GPU first; fall back to CPU if unavailable.
                 val gpuResult = runCatching {
@@ -58,24 +65,39 @@ object InferenceManager {
                     Engine(gpuConfig).also { it.initialize() }
                 }
 
+                val loadedBackend: InferenceBackend
+
                 engine = if (gpuResult.isSuccess) {
                     Log.i(TAG, "Model loaded successfully on GPU")
-                    gpuResult.getOrThrow()
+                    loadedBackend = InferenceBackend.GPU
+                    gpuResult.getOrThrow().also { logMemory("After GPU load") }
                 } else {
-                    Log.w(TAG, "GPU unavailable (${gpuResult.exceptionOrNull()?.message}), falling back to CPU")
+                    val gpuError = gpuResult.exceptionOrNull()
+                    if (BuildConfig.FORCE_GPU_INFERENCE) {
+                        throw IllegalStateException(
+                            "GPU inference is required for this build, but LiteRT-LM GPU init failed: ${gpuError?.message}",
+                            gpuError
+                        )
+                    }
+
+                    Log.w(TAG, "GPU unavailable (${gpuError?.message}), falling back to CPU")
                     val cpuConfig = EngineConfig(
                         modelPath = modelFile.absolutePath,
                         backend = Backend.CPU(),
                         cacheDir = context.cacheDir.absolutePath
                     )
+                    loadedBackend = InferenceBackend.CPU
                     Engine(cpuConfig).also { it.initialize() }.also {
                         Log.i(TAG, "Model loaded successfully on CPU")
+                        logMemory("After CPU load")
                     }
                 }
 
-                _state.value = InferenceState.Ready
+                _state.value = InferenceState.Ready(loadedBackend)
+                ToolInitializer.initialize(context)
             }
         }.onFailure { throwable ->
+            initialized = false
             Log.e(TAG, "Failed to load model", throwable)
             val message = throwable.message ?: "Unknown error"
 
@@ -102,13 +124,26 @@ object InferenceManager {
         _state.value = InferenceState.Idle
         initialized = false
     }
+
+    /** Log current memory usage. Helps diagnose OOM kills. */
+    private fun logMemory(label: String) {
+        val runtime = Runtime.getRuntime()
+        val used = (runtime.totalMemory() - runtime.freeMemory()) / (1024 * 1024)
+        val max = runtime.maxMemory() / (1024 * 1024)
+        Log.i(TAG, "$label: ${used}MB used, ${max}MB max heap")
+    }
+}
+
+enum class InferenceBackend {
+    GPU,
+    CPU
 }
 
 /** Observable inference states for the UI. */
 sealed class InferenceState {
     data object Idle : InferenceState()
     data object Loading : InferenceState()
-    data object Ready : InferenceState()
+    data class Ready(val backend: InferenceBackend) : InferenceState()
     data object MissingModel : InferenceState()
     data class GpuUnavailable(val reason: String) : InferenceState()
     data class Error(val message: String) : InferenceState()

@@ -108,7 +108,56 @@ object WorkflowJsonParser {
         repaired = capPattern.replace(repaired) { result ->
             "\"${result.groupValues[1]}\":\"${result.groupValues[2].trim().trimEnd(',').trimEnd('"').trimEnd(',')}\""
         }
-        return repaired
+        repaired = foldSimpleIntegerArithmetic(repaired)
+        return stripTrailingCommas(repaired)
+    }
+
+    private fun foldSimpleIntegerArithmetic(json: String): String {
+        var repaired = json
+        val arithmeticPattern = Regex("""(:\s*)(-?\d+)\s*([+-])\s*(\d+)(\s*[,}\]])""")
+        while (true) {
+            var changed = false
+            repaired = arithmeticPattern.replace(repaired) { result ->
+                val left = result.groupValues[2].toLongOrNull()
+                val right = result.groupValues[4].toLongOrNull()
+                if (left == null || right == null) {
+                    result.value
+                } else {
+                    val value = if (result.groupValues[3] == "+") left + right else left - right
+                    changed = true
+                    "${result.groupValues[1]}$value${result.groupValues[5]}"
+                }
+            }
+            if (!changed) return repaired
+        }
+    }
+
+    private fun stripTrailingCommas(json: String): String {
+        val output = StringBuilder(json.length)
+        var i = 0
+        var inString = false
+        while (i < json.length) {
+            val c = json[i]
+            if (!inString && c == ',') {
+                var j = i + 1
+                while (j < json.length && json[j].isWhitespace()) j++
+                if (j < json.length && (json[j] == '}' || json[j] == ']')) {
+                    i++
+                    continue
+                }
+            }
+
+            output.append(c)
+            when {
+                c == '\\' && inString && i + 1 < json.length -> {
+                    i++
+                    output.append(json[i])
+                }
+                c == '"' -> inString = !inString
+            }
+            i++
+        }
+        return output.toString()
     }
 
     private fun extractJsonBlock(text: String): String {

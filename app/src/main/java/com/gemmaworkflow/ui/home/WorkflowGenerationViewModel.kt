@@ -12,9 +12,8 @@ import com.gemmaworkflow.domain.model.PlannedWorkflow
 import com.gemmaworkflow.domain.model.SharedContent
 import com.gemmaworkflow.domain.model.TriggerConfig
 import com.gemmaworkflow.domain.parser.WorkflowJsonParser
-import com.gemmaworkflow.domain.planner.PlannerAgents
-import com.gemmaworkflow.domain.planner.PromptBuilder
 import com.gemmaworkflow.domain.planner.RequestAnalysisParser
+import com.gemmaworkflow.domain.planner.RetoWorkflowPlanner
 import com.gemmaworkflow.domain.runner.ConfirmationRequired
 import com.gemmaworkflow.domain.runner.WorkflowRunner
 import com.gemmaworkflow.domain.safety.WorkflowValidator
@@ -25,6 +24,7 @@ import com.gemmaworkflow.widget.WorkflowWidgetGlance
 import com.gemmaworkflow.platform.capability.PackageCapabilityScanner
 import com.gemmaworkflow.platform.inference.InferenceManager
 import com.gemmaworkflow.platform.inference.InferenceState
+import com.gemmaworkflow.platform.tools.reto.RetoTrace
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -102,91 +102,90 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
             }
             appendDebug("User request", prompt)
 
-            val agents = PlannerAgents(engine)
             val installedAppsSummary = capabilityScanner.installedAppsPromptSummary()
             val resolvableIds = capabilityScanner.resolvableActions(ActionSpecRegistry.allIds)
             val availableActions = ActionSpecRegistry.all.filter { it.id in resolvableIds }
-            val capabilitySummary = ActionSpecRegistry.toPromptSummary(availableActions)
-
-            val combinedCapabilities = buildString {
-                appendLine("=== Available Android Actions ===")
-                appendLine("You may select these by their exact action ID. Parameters are exactly as listed.")
-                appendLine()
-                append(capabilitySummary)
-            }
 
             appendDebug("Available tools", availableActions.joinToString { it.id })
             appendDebug("Installed app list sent to AI", installedAppsSummary)
 
             try {
-                // Stage 1
-                markStage(0, StageStatus.Running)
-                _uiState.update { it.copy(stage = "Analysing request...") }
-                val analysisRaw = withContext(Dispatchers.Default) {
-                    agents.requestAnalysis(
-                        PromptBuilder.buildRequestAnalysisPrompt(
-                            userRequest = prompt,
-                            installedApps = installedAppsSummary
-                        )
-                    )
-                }
-                delay(16)
-                appendDebug("AI output: request analysis", analysisRaw)
-                val analysis = RequestAnalysisParser.parse(analysisRaw)
-                val triggerHint = analysis.normalizedTriggerHint
-                appendDebug("Parsed analysis goal", analysis.goal)
-                appendDebug("Trigger hint", triggerHint)
-                appendDebug("Applications from request", analysis.applications.joinToString {
-                    "${it.requestedName} -> ${it.selectedAppLabel} (${it.packageName}, ${it.confidence})"
-                }.ifBlank { "none" })
-                appendDebug("Candidate categories", analysis.candidateAppCategories.joinToString().ifBlank { "none" })
-                appendDebug("Missing info", analysis.missingInfo.joinToString().ifBlank { "none" })
-                markStage(0, StageStatus.Done)
-                delay(16)
+                appendDebug("Pipeline", "RETO orchestration active (requirement-led)")
 
-                // Stage 2 (deterministic, no model call)
-                markStage(1, StageStatus.Running)
-                _uiState.update { it.copy(stage = "Grounding capabilities...") }
-                val nativeDiscovery = capabilityScanner.nativeDiscoverySummary(
-                    requestedApplications = analysis.applicationSearchTerms,
-                    availableActionIds = resolvableIds
+                val retoPlanner = RetoWorkflowPlanner(
+                    engine = engine,
+                    capabilityScanner = capabilityScanner
                 )
-                appendDebug("Native discovery", nativeDiscovery)
-                appendDebug("Full capabilities sent to AI", combinedCapabilities.take(200) + "...")
-                markStage(1, StageStatus.Done)
-                delay(16)
 
-                // Stage 3
+                markStage(0, StageStatus.Running)
+                markStage(1, StageStatus.Running)
                 markStage(2, StageStatus.Running)
-                _uiState.update { it.copy(stage = "Planning actions...") }
-                val actionPlanRaw = withContext(Dispatchers.Default) {
-                    agents.actionPlan(
-                        PromptBuilder.buildActionPlanPrompt(
-                            goal = prompt,
-                            triggerHint = triggerHint,
-                            availableActions = combinedCapabilities,
-                            nativeDiscovery = nativeDiscovery
-                        )
+                markStage(3, StageStatus.Running)
+                _uiState.update { it.copy(stage = "Phase 0: Extracting requirements...") }
+
+                val retoResult = withContext(Dispatchers.Default) {
+                    retoPlanner.generateWorkflow(
+                        userRequest = prompt,
+                        onTrace = { trace -> appendRetoDebug(trace) },
+                        onPhase = { label, detail -> appendDebug(label, detail) }
                     )
                 }
-                delay(16)
-                appendDebug("AI output: action plan", actionPlanRaw)
-                markStage(2, StageStatus.Done)
-                delay(16)
 
-                // Stage 4
-                markStage(3, StageStatus.Running)
-                _uiState.update { it.copy(stage = "Generating JSON...") }
-                val jsonRaw = withContext(Dispatchers.Default) {
-                    agents.workflowJson(
-                        PromptBuilder.buildWorkflowJsonPrompt(prompt, actionPlanRaw, capabilitySummary))
+                (0..3).forEach { markStage(it, StageStatus.Done); delay(8) }
+
+                val analysisRaw = retoResult.analysisRaw
+                val actionPlanRaw = retoResult.actionPlanRaw
+                val jsonRaw = retoResult.workflowJsonRaw
+
+                appendDebug("══ PHASE 0 — DECOMPOSITION ══", retoResult.debugTrace)
+
+                val decomposition = retoPlanner.lastDecomposition
+                if (decomposition != null) {
+                    appendDebug("══ TASK DECOMPOSITION ══", "${decomposition.tasks.size} logical tasks identified")
+                    decomposition.tasks.forEach { task ->
+                        appendDebug("  ${task.id}", "${task.action}: ${task.description} (target: \"${task.target}\")")
+                    }
                 }
-                delay(16)
-                appendDebug("AI output: final workflow JSON", jsonRaw)
-                markStage(3, StageStatus.Done)
-                delay(16)
 
-                // Parse + validate
+                val binding = retoPlanner.lastBinding
+                if (binding != null) {
+                    appendDebug("══ CAPABILITY BINDING ══", "${binding.boundActions.size} tasks mapped to actions")
+                    binding.boundActions.forEach { b ->
+                        val emoji = when (b.status) {
+                            com.gemmaworkflow.platform.tools.reto.CapabilityBinder.BindingStatus.SUPPORTED -> "✅"
+                            com.gemmaworkflow.platform.tools.reto.CapabilityBinder.BindingStatus.WORKAROUND -> "🔄"
+                            com.gemmaworkflow.platform.tools.reto.CapabilityBinder.BindingStatus.UNSUPPORTED -> "❌"
+                            com.gemmaworkflow.platform.tools.reto.CapabilityBinder.BindingStatus.NEEDS_CLARIFICATION -> "❓"
+                        }
+                        appendDebug("  $emoji ${b.taskId}", "${b.taskDescription} → ${b.actionId ?: "unsupported"} (${b.reason.take(60)})")
+                    }
+                }
+
+                val ledger = retoResult.ledger
+                appendDebug("══ REQUIREMENT LEDGER ══", "${ledger.requirements.size} requirements, ${ledger.blockingRequirements.size} blocking, ${ledger.actionCandidates.size} actions")
+                ledger.literalSlots.forEach { slot ->
+                    appendDebug("  📝 literal ${slot.sourceAction}.${slot.slot}", "${slot.value} (${slot.reason.ifBlank { "from user request" }})")
+                }
+                ledger.requirements.forEach { req ->
+                    val emoji = when (req.status) {
+                        com.gemmaworkflow.platform.tools.reto.RequirementStatus.RESOLVED -> "✅"
+                        com.gemmaworkflow.platform.tools.reto.RequirementStatus.FAILED -> "❌"
+                        com.gemmaworkflow.platform.tools.reto.RequirementStatus.PENDING -> "⏳"
+                        else -> "⚠️"
+                    }
+                    appendDebug("  $emoji ${req.id}", "${req.factType.label} from \"${req.mention}\" via ${req.resolverTool ?: req.factType.resolverTool} args=${req.toolArgs} → ${req.status} (${if (req.blocking) "blocking" else "optional"})")
+                }
+
+                appendDebug("══ PHASE 2 — Analysis ══", analysisRaw)
+                appendDebug("══ PHASE 3 — Action Plan ══", actionPlanRaw)
+                appendDebug("══ PHASE 4 — Final JSON ══", jsonRaw)
+
+                val analysis = RequestAnalysisParser.parse(analysisRaw)
+                appendDebug("Parsed analysis goal", analysis.goal)
+                appendDebug("Trigger hint", analysis.normalizedTriggerHint)
+                appendDebug("Missing info", analysis.missingInfo.joinToString().ifBlank { "none" })
+
+                // Parse + validate (shared between both paths)
                 _uiState.update { it.copy(stage = "Validating...") }
                 val workflow = WorkflowJsonParser.parse(jsonRaw)
                 val errors = WorkflowValidator.validate(workflow, resolvableIds)
@@ -652,6 +651,24 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
                 debugMessages = (state.debugMessages + DebugMessage(label = label, message = message))
                     .takeLast(80)
             )
+        }
+    }
+
+    /**
+     * RETO orchestration trace logging for debug panel.
+     * Shows layers, tool calls, observations, and repairs.
+     */
+    private fun appendRetoDebug(trace: RetoTrace) {
+        appendDebug("\uD83D\uDCCB RETO", "${trace.layerSketch.layers.size} layers planned")
+        trace.layerSketch.layers.forEach { layer ->
+            appendDebug("  Layer ${layer.index}", "${layer.objective} [${layer.allowedTools.joinToString()}]")
+        }
+        trace.observations.forEachIndexed { i, obs ->
+            val emoji = if (obs.success) "\u2705" else "\u274C"
+            appendDebug("  $emoji Obs $i", "${obs.toolName} → ${obs.output.take(100)}")
+        }
+        trace.repairs.forEach { repair ->
+            appendDebug("  \uD83D\uDD27 Repair", "${repair.toolName} L${repair.layerIndex} attempt ${repair.attempt}: ${if (repair.success) "fixed" else "failed"}")
         }
     }
 

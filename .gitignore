@@ -5,14 +5,18 @@ build/
 **/build/
 local.properties
 captures/
+docs/testing/results/
 .externalNativeBuild/
 .cxx/
+.hermes/
 
 # Build artifacts
 *.apk
 *.aab
 *.ap_
 *.dex
+__pycache__/
+*.pyc
 
 # Native model assets (LiteRT-LM)
 *.gguf
