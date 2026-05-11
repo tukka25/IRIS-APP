@@ -25,6 +25,7 @@ import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
+import com.gemmaworkflow.R
 import com.gemmaworkflow.data.repository.ExecutionHistoryRepository
 import com.gemmaworkflow.data.repository.WorkflowRepository
 import com.gemmaworkflow.domain.catalog.ActionSpecRegistry
@@ -87,14 +88,14 @@ private fun buildSnapshot(context: Context, workflowName: String): WidgetSnapsho
 
     val triggerDisplay = when (val t = workflow?.trigger) {
         is TriggerConfig.Time -> {
-            val days = if (t.repeatDays.isEmpty()) "daily"
+            val days = if (t.repeatDays.isEmpty()) context.getString(R.string.widget_trigger_daily)
                        else t.repeatDays.joinToString("·") { dayAbbrev(it) }
             "⏰ %02d:%02d %s".format(t.hour, t.minute, days)
         }
-        is TriggerConfig.Nfc -> "NFC tag"
-        is TriggerConfig.ShareSheet -> "Share sheet"
-        is TriggerConfig.TaskerRequired -> "Tasker"
-        is TriggerConfig.Manual, null -> "Manual"
+        is TriggerConfig.Nfc -> context.getString(R.string.widget_trigger_nfc)
+        is TriggerConfig.ShareSheet -> context.getString(R.string.widget_trigger_share_sheet)
+        is TriggerConfig.TaskerRequired -> context.getString(R.string.widget_trigger_tasker)
+        is TriggerConfig.Manual, null -> context.getString(R.string.widget_trigger_manual)
     }
 
     val actionLabels = workflow?.actions
@@ -130,6 +131,7 @@ private fun dayAbbrev(dayOfWeek: Int): String = when (dayOfWeek) {
 
 @Composable
 private fun UnconfiguredContent() {
+    val context = LocalContext.current
     Column(
         modifier = GlanceModifier
             .fillMaxSize()
@@ -137,7 +139,7 @@ private fun UnconfiguredContent() {
             .padding(12.dp)
     ) {
         Text(
-            text = "GemmaWorkflow",
+            text = context.getString(R.string.app_name),
             style = TextStyle(
                 fontWeight = FontWeight.Bold,
                 fontSize = 14.sp,
@@ -145,7 +147,7 @@ private fun UnconfiguredContent() {
             )
         )
         Text(
-            text = "Long-press → Edit to pick a workflow",
+            text = context.getString(R.string.widget_unconfigured_instruction),
             style = TextStyle(fontSize = 11.sp, color = ColorProvider(Color.Gray)),
             modifier = GlanceModifier.padding(top = 4.dp)
         )
@@ -183,7 +185,12 @@ private fun DashboardContent(s: WidgetSnapshot) {
         )
 
         // Trigger + created subtitle
-        val createdStr = if (s.createdAtMillis > 0L) "  ·  created ${formatRelativeTime(s.createdAtMillis)} ago" else ""
+        val createdStr = if (s.createdAtMillis > 0L) {
+            "  ·  " + context.getString(
+                R.string.widget_created_ago,
+                formatRelativeTime(context, s.createdAtMillis)
+            )
+        } else ""
         Text(
             text = s.triggerDisplay + createdStr,
             style = TextStyle(fontSize = 10.sp, color = ColorProvider(Color(0xFF007AFF))),
@@ -198,9 +205,11 @@ private fun DashboardContent(s: WidgetSnapshot) {
             else -> Color(0xFFFF3B30)
         }
         val statsText = buildString {
-            append("${s.totalRuns} runs")
-            if (s.totalRuns > 0) append("  ·  ${s.successRate}% success")
-            if (s.lastRunMillis > 0L) append("  ·  last ${formatRelativeTime(s.lastRunMillis)} ago")
+            append(context.getString(R.string.widget_stats_runs, s.totalRuns))
+            if (s.totalRuns > 0) append("  ·  ${context.getString(R.string.widget_stats_success, s.successRate)}")
+            if (s.lastRunMillis > 0L) {
+                append("  ·  ${context.getString(R.string.widget_stats_last, formatRelativeTime(context, s.lastRunMillis))}")
+            }
         }
         Text(
             text = statsText,
@@ -226,7 +235,10 @@ private fun DashboardContent(s: WidgetSnapshot) {
         // ── Last run detail ───────────────────────────────────────────────────
         if (s.lastRunResults.isNotEmpty()) {
             Text(
-                text = "Last run  ${formatRelativeTime(s.lastRunMillis)} ago",
+                text = context.getString(
+                    R.string.widget_last_run_ago,
+                    formatRelativeTime(context, s.lastRunMillis)
+                ),
                 style = TextStyle(
                     fontWeight = FontWeight.Bold,
                     fontSize = 10.sp,
@@ -257,7 +269,7 @@ private fun DashboardContent(s: WidgetSnapshot) {
             }
         } else {
             Text(
-                text = "No runs yet",
+                text = context.getString(R.string.widget_empty),
                 style = TextStyle(fontSize = 11.sp, color = ColorProvider(Color.Gray)),
                 modifier = GlanceModifier.padding(top = 6.dp)
             )
@@ -270,7 +282,7 @@ private fun DashboardContent(s: WidgetSnapshot) {
                 verticalAlignment = Alignment.Vertical.CenterVertically
             ) {
                 Text(
-                    text = "History ",
+                    text = context.getString(R.string.widget_history_label),
                     style = TextStyle(fontSize = 10.sp, color = ColorProvider(Color.Gray))
                 )
                 s.recentHistory.forEach { ok ->
@@ -289,13 +301,13 @@ private fun DashboardContent(s: WidgetSnapshot) {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-private fun formatRelativeTime(timestampMillis: Long): String {
+private fun formatRelativeTime(context: Context, timestampMillis: Long): String {
     val diffMs = System.currentTimeMillis() - timestampMillis
     val mins = diffMs / 60_000
     val hours = mins / 60
     val days = hours / 24
     return when {
-        mins < 1 -> "just now"
+        mins < 1 -> context.getString(R.string.widget_time_just_now)
         mins < 60 -> "${mins}m"
         hours < 24 -> "${hours}h"
         else -> "${days}d"

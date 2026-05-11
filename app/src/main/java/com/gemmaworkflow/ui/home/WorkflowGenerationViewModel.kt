@@ -41,6 +41,7 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
     private val workflowRepo = WorkflowRepository(application)
     private val historyRepo = ExecutionHistoryRepository(application)
     private var timerJob: Job? = null
+    private var generationJob: Job? = null
     /** The active runner, retained across confirmation pauses. */
     private var currentRunner: WorkflowRunner? = null
 
@@ -84,7 +85,8 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
      * inference calls. This prevents the ANR "not responding" dialog.
      */
     fun generate() {
-        viewModelScope.launch {
+        generationJob?.cancel()
+        generationJob = viewModelScope.launch {
             val prompt = uiState.value.prompt
             val engine = InferenceManager.engine ?: run {
                 _uiState.update { it.copy(error = "Model not loaded yet") }
@@ -219,6 +221,8 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
                 }
                 appendDebug("Generation error", e.stackTraceToString())
                 _uiState.update { it.copy(isBusy = false, error = e.message, stage = "Failed") }
+            } finally {
+                generationJob = null
             }
         }
     }
@@ -617,6 +621,10 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
     }
 
     fun clearPreview() {
+        timerJob?.cancel()
+        timerJob = null
+        generationJob?.cancel()
+        generationJob = null
         _uiState.update { it.copy(workflowPreview = null, rawJson = null, isBusy = false,
             stage = "", stageTimeline = emptyList(), error = null, runResults = emptyList(), saved = false) }
     }
@@ -682,6 +690,7 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
 
     override fun onCleared() {
         timerJob?.cancel()
+        generationJob?.cancel()
         super.onCleared()
     }
 }

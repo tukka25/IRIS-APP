@@ -13,19 +13,24 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.lifecycle.lifecycleScope
+import com.gemmaworkflow.R
 import com.gemmaworkflow.data.repository.WorkflowRepository
+import com.gemmaworkflow.ui.theme.GemmaWorkflowTheme
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class WorkflowWidgetConfigActivity : ComponentActivity() {
 
@@ -46,13 +51,16 @@ class WorkflowWidgetConfigActivity : ComponentActivity() {
         // Cancel result so backing out doesn't add the widget
         setResult(RESULT_CANCELED)
 
-        val workflowNames = WorkflowRepository(this).listNames()
-
         setContent {
-            MaterialTheme {
+            val workflowNames by produceState<List<String>>(initialValue = emptyList()) {
+                value = withContext(Dispatchers.IO) {
+                    WorkflowRepository(this@WorkflowWidgetConfigActivity).listNames()
+                }
+            }
+            GemmaWorkflowTheme {
                 Scaffold(
                     topBar = {
-                        TopAppBar(title = { Text("Select a workflow") })
+                        TopAppBar(title = { Text(stringResource(R.string.widget_configure_title)) })
                     }
                 ) { innerPadding ->
                     if (workflowNames.isEmpty()) {
@@ -60,7 +68,7 @@ class WorkflowWidgetConfigActivity : ComponentActivity() {
                             modifier = Modifier.fillMaxSize().padding(innerPadding),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("No saved workflows found.\nCreate one in the app first.")
+                            Text(stringResource(R.string.widget_configure_empty))
                         }
                     } else {
                         LazyColumn(
