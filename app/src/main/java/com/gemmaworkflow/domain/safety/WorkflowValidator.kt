@@ -139,5 +139,12 @@ object WorkflowValidator {
         is TriggerConfig.Nfc -> "nfc"
         is TriggerConfig.ShareSheet -> "share_sheet"
         is TriggerConfig.TaskerRequired -> "tasker_setup_required"
+        is TriggerConfig.Battery -> "battery"
+        is TriggerConfig.Charger -> "charger"
+        is TriggerConfig.WiFi -> "wifi"
+        is TriggerConfig.Bluetooth -> "bluetooth"
+        is TriggerConfig.AirplaneMode -> "airplane_mode"
+        is TriggerConfig.DoNotDisturb -> "do_not_disturb"
+        is TriggerConfig.Geofence -> "geofence"
     }
 }

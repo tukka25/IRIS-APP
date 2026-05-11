@@ -14,9 +14,12 @@ import androidx.activity.viewModels
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -36,8 +39,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -63,11 +70,14 @@ import com.gemmaworkflow.platform.nfc.DeepLink
 import com.gemmaworkflow.platform.nfc.DeepLinkRouter
 import com.gemmaworkflow.platform.nfc.NfcTriggerWriter
 import com.gemmaworkflow.platform.share.ShareSheetTriggerHandler
+import com.gemmaworkflow.platform.trigger.TriggerRegistry
 import com.gemmaworkflow.ui.home.ConfirmationRequest
 import com.gemmaworkflow.ui.home.StageStatus
 import com.gemmaworkflow.ui.home.TimeTriggerSetupScreen
 import com.gemmaworkflow.ui.home.ShareSheetSetupScreen
+import com.gemmaworkflow.ui.home.ManualWorkflowEditorScreen
 import com.gemmaworkflow.ui.home.WorkflowGenerationViewModel
+import com.gemmaworkflow.ui.home.WorkflowGenerationUiState
 import com.gemmaworkflow.ui.nfc.NfcSetupScreen
 import com.gemmaworkflow.ui.theme.GemmaWorkflowTheme
 import com.gemmaworkflow.ui.trigger.formatTriggerSummary
@@ -221,6 +231,18 @@ class MainActivity : ComponentActivity() {
                 }
                 return@launch
             }
+
+            // Handle confirmation/dismiss from TriggerRegistry notification (background triggers).
+            val action = intent.getStringExtra(TriggerRegistry.EXTRA_ACTION)
+            if (action == TriggerRegistry.ACTION_CONFIRM || action == TriggerRegistry.ACTION_DISMISS) {
+                val workflowName = intent.getStringExtra(TriggerRegistry.EXTRA_WORKFLOW_NAME) ?: return@launch
+                if (action == TriggerRegistry.ACTION_CONFIRM) {
+                    TriggerRegistry.confirmAndResume(this@MainActivity, workflowName)
+                } else {
+                    TriggerRegistry.dismissConfirmation(this@MainActivity, workflowName)
+                }
+                return@launch
+            }
         }
     }
 
@@ -274,6 +296,16 @@ class MainActivity : ComponentActivity() {
 private fun WorkflowGenerationScreen(viewModel: WorkflowGenerationViewModel) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
+    // Show the manual editor if open
+    state.editingWorkflow?.let { workflow ->
+        ManualWorkflowEditorScreen(
+            initialWorkflow = if (state.isNewWorkflow) null else workflow,
+            onSave = { viewModel.saveEditedWorkflow(it) },
+            onCancel = viewModel::cancelEditWorkflow
+        )
+        return
+    }
+
     // Show a confirmation dialog whenever a step requires user consent before executing.
     // This is placed before the early return so it shows even on the detail screen.
     state.pendingConfirmation?.let { request ->
@@ -297,7 +329,8 @@ private fun WorkflowGenerationScreen(viewModel: WorkflowGenerationViewModel) {
                     is TriggerConfig.ShareSheet -> viewModel.showShareSheetSetup(detail)
                     else -> { /* other triggers (Nfc, TaskerRequired) not yet supported */ }
                 }
-            }
+            },
+            onEdit = { viewModel.openEditWorkflowEditor(detail) }
         )
         return
     }
@@ -335,6 +368,48 @@ private fun WorkflowGenerationScreen(viewModel: WorkflowGenerationViewModel) {
         return
     }
 
+    Scaffold(
+        bottomBar = {
+            NavigationBar {
+                NavigationBarItem(
+                    selected = state.selectedTab == 0,
+                    onClick = { viewModel.selectTab(0) },
+                    icon = { Text("\u2699") },
+                    label = { Text("Generate") }
+                )
+                NavigationBarItem(
+                    selected = state.selectedTab == 1,
+                    onClick = { viewModel.selectTab(1) },
+                    icon = { Text("\u2630") },
+                    label = { Text("Workflows") }
+                )
+                NavigationBarItem(
+                    selected = state.selectedTab == 2,
+                    onClick = { viewModel.selectTab(2) },
+                    icon = { Text("\u2713") },
+                    label = { Text("Debug") }
+                )
+            }
+        }
+    ) { paddingValues ->
+        // Use paddingValues to avoid content under nav bar
+        Box(modifier = Modifier.padding(paddingValues).fillMaxSize()) {
+            when (state.selectedTab) {
+                0 -> GenerateTabContent(viewModel, state)
+                1 -> WorkflowsTabContent(
+                    workflows = state.savedWorkflows,
+                    onSelect = { wf -> viewModel.loadWorkflowDetail(wf.name) },
+                    onEdit = viewModel::openEditWorkflowEditor,
+                    onNew = viewModel::openNewWorkflowEditor
+                )
+                2 -> DebugTabContent(state)
+            }
+        }
+    }
+}
+
+@Composable
+private fun GenerateTabContent(viewModel: WorkflowGenerationViewModel, state: WorkflowGenerationUiState) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -547,23 +622,142 @@ private fun WorkflowGenerationScreen(viewModel: WorkflowGenerationViewModel) {
         }
 
         if (state.debugMessages.isNotEmpty()) {
+            var debugExpanded by remember { mutableStateOf(false) }
             HorizontalDivider()
-            Text("Debug Trace", style = MaterialTheme.typography.titleMedium)
-            SelectionContainer {
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-                    Column(
-                        modifier = Modifier.padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        state.debugMessages.forEach { message ->
-                            Column {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Debug Trace (${state.debugMessages.size} messages)", style = MaterialTheme.typography.titleMedium)
+                TextButton(onClick = { debugExpanded = !debugExpanded }) {
+                    Text(if (debugExpanded) "Hide" else "Show")
+                }
+            }
+            if (debugExpanded) {
+                SelectionContainer {
+                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                        Column(
+                            modifier = Modifier.padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            state.debugMessages.forEach { message ->
+                                Column {
+                                    Text(
+                                        message.label,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Text(
+                                        message.message,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
+    }
+}
+
+@Composable
+private fun WorkflowsTabContent(
+    workflows: List<PlannedWorkflow>,
+    onSelect: (PlannedWorkflow) -> Unit,
+    onEdit: (PlannedWorkflow) -> Unit,
+    onNew: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Saved Workflows", style = MaterialTheme.typography.titleLarge)
+            Button(onClick = onNew) {
+                Text("+ New")
+            }
+        }
+
+        if (workflows.isEmpty()) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text("No workflows yet", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Create one with AI or build manually",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
+            }
+        } else {
+            workflows.forEach { workflow ->
+                WorkflowListCard(
+                    workflow = workflow,
+                    onSelect = { onSelect(workflow) },
+                    onEdit = { onEdit(workflow) }
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
+    }
+}
+
+@Composable
+private fun DebugTabContent(state: WorkflowGenerationUiState) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Text("Debug Trace", style = MaterialTheme.typography.headlineMedium)
+
+        if (state.debugMessages.isEmpty()) {
+            Text("No debug messages yet.", style = MaterialTheme.typography.bodyMedium)
+            return
+        }
+
+        // Group by label prefix
+        val grouped = state.debugMessages.groupBy { msg ->
+            msg.label.substringBefore(":").ifBlank { msg.label }
+        }
+
+        grouped.forEach { (group, messages) ->
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(group, style = MaterialTheme.typography.titleSmall)
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                    messages.forEach { msg ->
+                        Column(modifier = Modifier.padding(vertical = 4.dp)) {
+                            Text(
+                                msg.label,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            SelectionContainer {
                                 Text(
-                                    message.label,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                                Text(
-                                    message.message,
+                                    msg.message,
                                     style = MaterialTheme.typography.bodySmall,
                                     fontFamily = FontFamily.Monospace
                                 )
@@ -574,7 +768,89 @@ private fun WorkflowGenerationScreen(viewModel: WorkflowGenerationViewModel) {
             }
         }
 
+        if (state.runResults.isNotEmpty()) {
+            HorizontalDivider()
+            Text("Execution Results", style = MaterialTheme.typography.titleMedium)
+            state.runResults.forEach { result ->
+                RunResultRow(result)
+            }
+        }
+
+        if (state.stageTimeline.isNotEmpty()) {
+            HorizontalDivider()
+            Text("Stage Timeline", style = MaterialTheme.typography.titleMedium)
+            state.stageTimeline.forEachIndexed { index, stage ->
+                val tokenInfo = state.stageTokenUsage.getOrNull(index)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    val icon = when (stage.status) {
+                        StageStatus.Done -> "\u2713"
+                        StageStatus.Running -> "\u25B6"
+                        StageStatus.Pending -> "\u25CB"
+                    }
+                    val color = when (stage.status) {
+                        StageStatus.Done -> MaterialTheme.colorScheme.primary
+                        StageStatus.Running -> MaterialTheme.colorScheme.tertiary
+                        StageStatus.Pending -> MaterialTheme.colorScheme.outline
+                    }
+                    Text(icon, color = color)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(stage.label, color = color, style = MaterialTheme.typography.bodyMedium)
+                    if (tokenInfo != null) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            "${tokenInfo.estimatedTokens} tokens",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                }
+            }
+        }
+
         Spacer(modifier = Modifier.height(32.dp))
+    }
+}
+
+@Composable
+private fun WorkflowListCard(
+    workflow: PlannedWorkflow,
+    onSelect: () -> Unit,
+    onEdit: () -> Unit
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(workflow.name, style = MaterialTheme.typography.titleMedium)
+                if (workflow.summary.isNotBlank()) {
+                    Text(
+                        workflow.summary,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline,
+                        maxLines = 1
+                    )
+                }
+                Text(
+                    triggerLabel(workflow),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            OutlinedButton(onClick = onSelect) {
+                Text("View")
+            }
+            OutlinedButton(onClick = onEdit) {
+                Text("Edit")
+            }
+        }
     }
 }
 
@@ -680,6 +956,16 @@ private fun triggerLabel(workflow: com.gemmaworkflow.domain.model.PlannedWorkflo
         is com.gemmaworkflow.domain.model.TriggerConfig.Nfc -> "NFC"
         is com.gemmaworkflow.domain.model.TriggerConfig.ShareSheet -> "Share Sheet (${t.setupState})"
         is com.gemmaworkflow.domain.model.TriggerConfig.TaskerRequired -> "Tasker (${t.setupState})"
+        is com.gemmaworkflow.domain.model.TriggerConfig.Battery -> "Battery ${t.condition.name.lowercase()} ${t.levelThreshold}%"
+        is com.gemmaworkflow.domain.model.TriggerConfig.Charger -> "Charger (${t.connectionType.name})"
+        is com.gemmaworkflow.domain.model.TriggerConfig.WiFi -> if (t.ssid.isNullOrBlank()) "WiFi" else "WiFi (${t.ssid})"
+        is com.gemmaworkflow.domain.model.TriggerConfig.Bluetooth -> if (t.deviceAddress.isNullOrBlank()) "Bluetooth" else "Bluetooth (${t.deviceAddress})"
+        is com.gemmaworkflow.domain.model.TriggerConfig.AirplaneMode -> "Airplane Mode (${if (t.enabled) "on" else "off"})"
+        is com.gemmaworkflow.domain.model.TriggerConfig.DoNotDisturb -> "Do Not Disturb"
+        is com.gemmaworkflow.domain.model.TriggerConfig.Geofence -> {
+            val loc = "(${String.format("%.4f", t.latitude)}, ${String.format("%.4f", t.longitude)})"
+            "Geofence $loc"
+        }
     }
 }
 
@@ -705,7 +991,8 @@ private fun WorkflowDetailScreen(
     isBusy: Boolean,
     onBack: () -> Unit,
     onRun: () -> Unit,
-    onSetupTrigger: () -> Unit
+    onSetupTrigger: () -> Unit,
+    onEdit: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -720,8 +1007,13 @@ private fun WorkflowDetailScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text("Workflow Detail", style = MaterialTheme.typography.headlineSmall)
-            OutlinedButton(onClick = onBack) {
-                Text("Back")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = onEdit) {
+                    Text("Edit")
+                }
+                OutlinedButton(onClick = onBack) {
+                    Text("Back")
+                }
             }
         }
 

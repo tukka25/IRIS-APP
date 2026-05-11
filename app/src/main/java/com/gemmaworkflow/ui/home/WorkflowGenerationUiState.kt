@@ -96,7 +96,16 @@ data class WorkflowGenerationUiState(
     /** The name of the workflow selected for NFC writing. */
     val nfcWriteWorkflowId: String? = null,
     /** Pending NFC scan awaiting user confirmation to run. */
-    val nfcScanConfirmation: NfcScanConfirmation? = null
+    val nfcScanConfirmation: NfcScanConfirmation? = null,
+
+    // ── Manual editor state ─────────────────────────────────────────────
+    /** Non-null when the manual workflow editor should be shown. */
+    val editingWorkflow: PlannedWorkflow? = null,
+    /** True when the editor is for a new workflow (not editing existing). */
+    val isNewWorkflow: Boolean = false,
+
+    // ── Navigation tabs ────────────────────────────────────────────────
+    val selectedTab: Int = 0  // 0 = Generate, 1 = Workflows, 2 = Editor
 ) {
     val canGenerate: Boolean get() = isModelReady && !isBusy && prompt.isNotBlank()
     val hasWorkflow: Boolean get() = workflowPreview != null

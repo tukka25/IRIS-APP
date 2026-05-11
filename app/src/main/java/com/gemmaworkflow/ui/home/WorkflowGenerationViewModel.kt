@@ -21,6 +21,12 @@ import com.gemmaworkflow.domain.triggers.TriggerRegistry
 import com.gemmaworkflow.domain.triggers.TriggerRegistrationResult
 import com.gemmaworkflow.platform.alarm.TimeTriggerScheduler
 import com.gemmaworkflow.platform.capability.PackageCapabilityScanner
+import com.gemmaworkflow.platform.trigger.BatteryTriggerManager
+import com.gemmaworkflow.platform.trigger.BluetoothTriggerManager
+import com.gemmaworkflow.platform.trigger.ChargerTriggerManager
+import com.gemmaworkflow.platform.trigger.DndTriggerManager
+import com.gemmaworkflow.platform.trigger.WiFiTriggerManager
+import com.gemmaworkflow.platform.trigger.AirplaneModeTriggerManager
 import com.gemmaworkflow.platform.inference.InferenceManager
 import com.gemmaworkflow.platform.inference.InferenceState
 import com.gemmaworkflow.platform.tools.reto.RetoTrace
@@ -253,12 +259,52 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
                 is com.gemmaworkflow.domain.model.TriggerConfig.ShareSheet -> "share_sheet"
                 is com.gemmaworkflow.domain.model.TriggerConfig.TaskerRequired -> "tasker_setup_required"
                 is com.gemmaworkflow.domain.model.TriggerConfig.Manual -> "manual"
+                is com.gemmaworkflow.domain.model.TriggerConfig.Battery -> {
+                    BatteryTriggerManager.registerWorkflow(
+                        getApplication(),
+                        workflow.name,
+                        workflow.trigger as com.gemmaworkflow.domain.model.TriggerConfig.Battery
+                    )
+                    null  // handled — no TriggerRegistry.register call
+                }
+                is com.gemmaworkflow.domain.model.TriggerConfig.Charger -> {
+                    val chargerTrigger = workflow.trigger as com.gemmaworkflow.domain.model.TriggerConfig.Charger
+                    ChargerTriggerManager.registerWorkflow(getApplication(), workflow.name, chargerTrigger)
+                    null  // handled — no TriggerRegistry.register call
+                }
+                is com.gemmaworkflow.domain.model.TriggerConfig.WiFi -> {
+                    val wifiTrigger = workflow.trigger as com.gemmaworkflow.domain.model.TriggerConfig.WiFi
+                    WiFiTriggerManager.registerWorkflow(getApplication(), workflow.name, wifiTrigger)
+                    null  // handled — no TriggerRegistry.register call
+                }
+                is com.gemmaworkflow.domain.model.TriggerConfig.Bluetooth -> {
+                    val btTrigger = workflow.trigger as com.gemmaworkflow.domain.model.TriggerConfig.Bluetooth
+                    BluetoothTriggerManager.registerWorkflow(getApplication(), workflow.name, btTrigger)
+                    null  // handled — no TriggerRegistry.register call
+                }
+                is com.gemmaworkflow.domain.model.TriggerConfig.AirplaneMode -> {
+                    val apTrigger = workflow.trigger as com.gemmaworkflow.domain.model.TriggerConfig.AirplaneMode
+                    AirplaneModeTriggerManager.registerWorkflow(getApplication(), workflow.name, apTrigger)
+                    null  // handled — no TriggerRegistry.register call
+                }
+                is com.gemmaworkflow.domain.model.TriggerConfig.DoNotDisturb -> {
+                    val dndTrigger = workflow.trigger as com.gemmaworkflow.domain.model.TriggerConfig.DoNotDisturb
+                    DndTriggerManager.registerWorkflow(getApplication(), workflow.name, dndTrigger)
+                    null  // handled — no TriggerRegistry.register call
+                }
+                is com.gemmaworkflow.domain.model.TriggerConfig.Geofence -> {
+                    val geoTrigger = workflow.trigger as com.gemmaworkflow.domain.model.TriggerConfig.Geofence
+                    com.gemmaworkflow.platform.location.GeofenceManager.registerWorkflow(getApplication(), workflow.name, geoTrigger)
+                    null  // handled — no TriggerRegistry.register call
+                }
             }
-            val result = TriggerRegistry.register(workflow.name, triggerType, workflow.trigger)
-            if (result.success) {
-                appendDebug("TriggerRegistry", "Registered '$workflow.name' with trigger '$triggerType'")
-            } else {
-                appendDebug("TriggerRegistry", "Could not register trigger '$triggerType': ${result.message}")
+            if (triggerType != null) {
+                val result = TriggerRegistry.register(workflow.name, triggerType, workflow.trigger)
+                if (result.success) {
+                    appendDebug("TriggerRegistry", "Registered '$workflow.name' with trigger '$triggerType'")
+                } else {
+                    appendDebug("TriggerRegistry", "Could not register trigger '$triggerType': ${result.message}")
+                }
             }
 
             _uiState.update { it.copy(saved = true) }
@@ -311,6 +357,16 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
                         params = params
                     ),
                     resumeStepIndex = e.stepIndex
+                )
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Workflow execution failed", e)
+            _uiState.update {
+                it.copy(
+                    isBusy = false,
+                    error = "Execution failed: ${e.message}",
+                    pendingConfirmation = null,
+                    runningWorkflow = null
                 )
             }
         }
@@ -377,7 +433,15 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
     }
 
     fun clearWorkflowDetail() {
-        _uiState.update { it.copy(selectedWorkflowDetail = null) }
+        viewModelScope.launch(Dispatchers.IO) {
+            val fresh = workflowRepo.loadAll()
+            _uiState.update {
+                it.copy(
+                    selectedWorkflowDetail = null,
+                    savedWorkflows = fresh
+                )
+            }
+        }
     }
 
     // ── NFC trigger setup ───────────────────────────────────────────────────
@@ -577,6 +641,51 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
      */
     fun cancelShareSheetSetup() {
         _uiState.update { it.copy(shareSheetSetupWorkflow = null) }
+    }
+
+    /** Open the manual workflow editor for creating a new workflow. */
+    fun openNewWorkflowEditor() {
+        _uiState.update { it.copy(editingWorkflow = null, isNewWorkflow = true) }
+    }
+
+    /** Open the manual workflow editor for editing an existing workflow. */
+    fun openEditWorkflowEditor(workflow: PlannedWorkflow) {
+        _uiState.update { it.copy(editingWorkflow = workflow, isNewWorkflow = false) }
+    }
+
+    /** Save a manually-built workflow (from the editor) and close the editor. */
+    fun saveEditedWorkflow(workflow: PlannedWorkflow) {
+        viewModelScope.launch(Dispatchers.IO) {
+            // Preserve rawModelOutput from the original workflow if editing.
+            val originalRawOutput = uiState.value.editingWorkflow?.rawModelOutput ?: ""
+            val toSave = workflow.copy(rawModelOutput = originalRawOutput)
+            workflowRepo.save(toSave)
+
+            // Re-register battery trigger if applicable.
+            val trigger = toSave.trigger as? com.gemmaworkflow.domain.model.TriggerConfig.Battery
+            if (trigger != null) {
+                BatteryTriggerManager.registerWorkflow(getApplication(), toSave.name, trigger)
+            }
+
+            val saved = workflowRepo.loadAll()
+            _uiState.update {
+                it.copy(
+                    savedWorkflows = saved,
+                    editingWorkflow = null,
+                    isNewWorkflow = false
+                )
+            }
+        }
+    }
+
+    /** Close the manual editor without saving. */
+    fun cancelEditWorkflow() {
+        _uiState.update { it.copy(editingWorkflow = null, isNewWorkflow = false) }
+    }
+
+    /** Switch the bottom tab: 0=Generate, 1=Workflows, 2=Manual Editor */
+    fun selectTab(index: Int) {
+        _uiState.update { it.copy(selectedTab = index) }
     }
 
     /** Called by MainActivity when the app receives an ACTION_SEND intent. */

@@ -1,9 +1,15 @@
 package com.gemmaworkflow.domain.triggers
 
 import android.content.Context
+import android.util.Log
+import com.gemmaworkflow.domain.model.PlannedWorkflow
 import com.gemmaworkflow.domain.model.TriggerConfig
 import com.gemmaworkflow.domain.model.SetupState
 import com.gemmaworkflow.platform.alarm.TimeTriggerScheduler
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 /**
  * Catalog of supported trigger types.
@@ -48,6 +54,48 @@ object TriggerCatalog {
             description = "Requires Tasker app to create the automation profile.",
             setupState = SetupState.NeedsSetup,
             requiresTasker = true
+        ),
+        TriggerInfo(
+            type = "battery",
+            label = "Battery level",
+            description = "Run when battery level goes above or below a threshold.",
+            setupState = SetupState.NeedsSetup
+        ),
+        TriggerInfo(
+            type = "charger",
+            label = "Charger connected",
+            description = "Run when the device is plugged in or unplugged.",
+            setupState = SetupState.Ready
+        ),
+        TriggerInfo(
+            type = "wifi",
+            label = "WiFi connected",
+            description = "Run when WiFi connects or disconnects.",
+            setupState = SetupState.Ready
+        ),
+        TriggerInfo(
+            type = "bluetooth",
+            label = "Bluetooth device",
+            description = "Run when a Bluetooth device connects or disconnects.",
+            setupState = SetupState.Ready
+        ),
+        TriggerInfo(
+            type = "airplane_mode",
+            label = "Airplane mode",
+            description = "Run when airplane mode is toggled on or off.",
+            setupState = SetupState.Ready
+        ),
+        TriggerInfo(
+            type = "dnd",
+            label = "Do Not Disturb",
+            description = "Run when Do Not Disturb mode changes.",
+            setupState = SetupState.Ready
+        ),
+        TriggerInfo(
+            type = "geofence",
+            label = "Arrive / Leave",
+            description = "Run when the device enters, exits, or dwells at a location.",
+            setupState = SetupState.NeedsSetup
         )
     )
 
@@ -65,6 +113,7 @@ object TriggerCatalog {
 object TriggerRegistry {
 
     private var scheduler: TimeTriggerScheduler? = null
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     fun initialize(context: Context) {
         if (scheduler == null) {
@@ -104,6 +153,16 @@ object TriggerRegistry {
     private fun scheduleTimeTrigger(workflowId: String, trigger: TriggerConfig.Time) {
         scheduler?.schedule(workflowId, trigger)
             ?: android.util.Log.w("TriggerRegistry", "Scheduler not initialized — cannot schedule time trigger")
+    }
+
+    /**
+     * Fires a workflow — delegates to [com.gemmaworkflow.platform.trigger.TriggerRegistry].
+     * Kept here for backward compatibility with any code that references
+     * domain.triggers.TriggerRegistry.fireWorkflow.
+     */
+    @Deprecated("Use platform.trigger.TriggerRegistry.fire() directly", ReplaceWith("com.gemmaworkflow.platform.trigger.TriggerRegistry.fire(context, workflow)"))
+    fun fireWorkflow(context: Context, workflow: PlannedWorkflow) {
+        com.gemmaworkflow.platform.trigger.TriggerRegistry.fire(context, workflow)
     }
 }
 

@@ -82,12 +82,25 @@ class ChromeCustomTabOpener(private val context: Context) {
      * @param toolbarColor Optional toolbar color (0xRRGGBB). Pass null for default.
      */
     fun openUrl(url: String, toolbarColor: Int? = null): ExecutionResult {
+        // Custom Tabs launched from a non-Activity context (e.g. a Service or
+        // broadcast receiver) require FLAG_ACTIVITY_NEW_TASK or they crash.
+        val launchFlags = Intent.FLAG_ACTIVITY_NEW_TASK
+
+        // If the CustomTabsService hasn't connected yet (bindService was called
+        // but the async callback hasn't fired), customTabsSession is null and
+        // launchUrl will fail. Fall back to a direct browser intent immediately.
+        if (customTabsSession == null) {
+            Log.d(TAG, "CustomTabsSession not ready — falling back to direct browser intent")
+            return fallbackToBrowser(url)
+        }
+
         return try {
             val builder = CustomTabsIntent.Builder(customTabsSession)
             builder.setShowTitle(true)
             toolbarColor?.let { builder.setToolbarColor(it) }
 
             val customTabsIntent = builder.build()
+            customTabsIntent.intent.flags = launchFlags
             customTabsIntent.launchUrl(context, Uri.parse(url))
 
             Log.d(TAG, "Custom Tab opened: $url")
