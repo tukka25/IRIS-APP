@@ -108,7 +108,12 @@ fun TimeTriggerSetupScreen(
         Text("Schedule Time Trigger", style = MaterialTheme.typography.headlineSmall)
 
         // Time picker
-        Card(modifier = Modifier.fillMaxWidth()) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = androidx.compose.material3.CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            )
+        ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -254,7 +259,8 @@ fun TimeTriggerSetupScreen(
                     )
                 },
                 enabled = repeatMode != RepeatMode.Custom || selectedDays.isNotEmpty(),
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(50)
             ) {
                 Text("Save")
             }

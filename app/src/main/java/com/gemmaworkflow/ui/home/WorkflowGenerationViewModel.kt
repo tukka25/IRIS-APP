@@ -20,6 +20,7 @@ import com.gemmaworkflow.domain.safety.WorkflowValidator
 import com.gemmaworkflow.domain.triggers.TriggerRegistry
 import com.gemmaworkflow.domain.triggers.TriggerRegistrationResult
 import com.gemmaworkflow.platform.alarm.TimeTriggerScheduler
+import com.gemmaworkflow.widget.WorkflowWidgetGlance
 import com.gemmaworkflow.platform.capability.PackageCapabilityScanner
 import com.gemmaworkflow.platform.inference.InferenceManager
 import com.gemmaworkflow.platform.inference.InferenceState
@@ -40,6 +41,7 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
     private val workflowRepo = WorkflowRepository(application)
     private val historyRepo = ExecutionHistoryRepository(application)
     private var timerJob: Job? = null
+    private var generationJob: Job? = null
     /** The active runner, retained across confirmation pauses. */
     private var currentRunner: WorkflowRunner? = null
 
@@ -69,7 +71,8 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
         viewModelScope.launch(Dispatchers.IO) {
             DemoWorkflowSeeder.seedIfNeeded(application, workflowRepo)
             val saved = workflowRepo.loadAll()
-            _uiState.update { it.copy(savedWorkflows = saved) }
+            val (summaries, activity) = buildHistoryState(saved)
+            _uiState.update { it.copy(savedWorkflows = saved, workflowSummaries = summaries, recentActivity = activity) }
         }
     }
 
@@ -82,7 +85,8 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
      * inference calls. This prevents the ANR "not responding" dialog.
      */
     fun generate() {
-        viewModelScope.launch {
+        generationJob?.cancel()
+        generationJob = viewModelScope.launch {
             val prompt = uiState.value.prompt
             val engine = InferenceManager.engine ?: run {
                 _uiState.update { it.copy(error = "Model not loaded yet") }
@@ -217,6 +221,8 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
                 }
                 appendDebug("Generation error", e.stackTraceToString())
                 _uiState.update { it.copy(isBusy = false, error = e.message, stage = "Failed") }
+            } finally {
+                generationJob = null
             }
         }
     }
@@ -290,10 +296,14 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
                 appendDebug(label, message)
             }
             historyRepo.log(workflow.name, results)
+            WorkflowWidgetGlance.updateAll(getApplication())
             currentRunner = null
+            val saved = workflowRepo.loadAll()
+            val (summaries, activity) = buildHistoryState(saved)
             _uiState.update {
                 it.copy(isBusy = false, saved = true, runResults = results,
                     pendingConfirmation = null, runningWorkflow = null,
+                    savedWorkflows = saved, workflowSummaries = summaries, recentActivity = activity,
                     stage = if (results.all { r -> r.success }) "All steps completed" else "Some steps failed")
             }
         } catch (e: ConfirmationRequired) {
@@ -610,6 +620,46 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
         }
     }
 
+    fun clearPreview() {
+        timerJob?.cancel()
+        timerJob = null
+        generationJob?.cancel()
+        generationJob = null
+        _uiState.update { it.copy(workflowPreview = null, rawJson = null, isBusy = false,
+            stage = "", stageTimeline = emptyList(), error = null, runResults = emptyList(), saved = false) }
+    }
+
+    private fun buildHistoryState(
+        workflows: List<PlannedWorkflow>
+    ): Pair<Map<String, WorkflowRunSummary>, List<RecentRun>> {
+        val workflowNames = workflows.map { it.name }.toSet()
+        val historyByWorkflow = historyRepo.getAll()
+            .groupBy { it.workflowName }
+
+        val summaries = workflows.associate { wf ->
+            val history = historyByWorkflow[wf.name].orEmpty()
+            wf.name to WorkflowRunSummary(
+                recentHistory = history.takeLast(6).map { it.allSuccess },
+                totalRuns = history.size,
+                lastRunMillis = history.lastOrNull()?.timestampMillis ?: 0L
+            )
+        }
+        val activity = historyByWorkflow
+            .filterKeys { it in workflowNames }
+            .flatMap { (workflowName, history) ->
+                history.map { entry ->
+                    RecentRun(
+                        workflowName = workflowName,
+                        success = entry.allSuccess,
+                        timestampMillis = entry.timestampMillis
+                    )
+                }
+            }
+            .sortedByDescending { it.timestampMillis }
+            .take(8)
+        return Pair(summaries, activity)
+    }
+
     private fun appendDebug(label: String, message: String) {
         Log.d(TAG, "$label: $message")
         _uiState.update { state ->
@@ -640,6 +690,7 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
 
     override fun onCleared() {
         timerJob?.cancel()
+        generationJob?.cancel()
         super.onCleared()
     }
 }
