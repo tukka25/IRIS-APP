@@ -1,5 +1,5 @@
 <resources>
-    <string name="widget_description">Shows the last 5 run results for a workflow</string>
+    <string name="widget_description">Shows the latest run step results and 5-run success history for a workflow</string>
     <string name="widget_empty">No runs yet</string>
     <string name="widget_configure_title">Select a workflow for this widget</string>
 </resources>
