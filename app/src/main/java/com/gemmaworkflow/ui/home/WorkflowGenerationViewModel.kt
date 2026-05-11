@@ -624,23 +624,31 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
     private fun buildHistoryState(
         workflows: List<PlannedWorkflow>
     ): Pair<Map<String, WorkflowRunSummary>, List<RecentRun>> {
+        val workflowNames = workflows.map { it.name }.toSet()
+        val historyByWorkflow = historyRepo.getAll()
+            .groupBy { it.workflowName }
+
         val summaries = workflows.associate { wf ->
-            val history = historyRepo.forWorkflow(wf.name)
+            val history = historyByWorkflow[wf.name].orEmpty()
             wf.name to WorkflowRunSummary(
                 recentHistory = history.takeLast(6).map { it.allSuccess },
                 totalRuns = history.size,
                 lastRunMillis = history.lastOrNull()?.timestampMillis ?: 0L
             )
         }
-        val activity = workflows.flatMap { wf ->
-            historyRepo.forWorkflow(wf.name).map { entry ->
-                RecentRun(
-                    workflowName = wf.name,
-                    success = entry.allSuccess,
-                    timestampMillis = entry.timestampMillis
-                )
+        val activity = historyByWorkflow
+            .filterKeys { it in workflowNames }
+            .flatMap { (workflowName, history) ->
+                history.map { entry ->
+                    RecentRun(
+                        workflowName = workflowName,
+                        success = entry.allSuccess,
+                        timestampMillis = entry.timestampMillis
+                    )
+                }
             }
-        }.sortedByDescending { it.timestampMillis }.take(8)
+            .sortedByDescending { it.timestampMillis }
+            .take(8)
         return Pair(summaries, activity)
     }
 
