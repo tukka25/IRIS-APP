@@ -5,5 +5,7 @@
     android:targetCellHeight="3"
     android:updatePeriodMillis="1800000"
     android:configure="com.gemmaworkflow.widget.WorkflowWidgetConfigActivity"
+    android:initialLayout="@layout/workflow_widget"
+    android:initialKeyguardLayout="@layout/workflow_widget"
     android:description="@string/widget_description"
     android:widgetCategory="home_screen" />
