@@ -21,6 +21,7 @@ import com.gemmaworkflow.platform.trigger.TriggerRegistry
 class SmsNotificationListener : NotificationListenerService() {
 
     private val TAG = "SmsNotificationListener"
+    private val CACHE_EXPIRY_MS = 30_000L
 
     /** Known package names per category. */
     private val SMS_PACKAGES = setOf(
@@ -149,7 +150,7 @@ class SmsNotificationListener : NotificationListenerService() {
 
     private fun getTriggerWorkflows(): List<com.gemmaworkflow.domain.model.PlannedWorkflow> {
         val now = System.currentTimeMillis()
-        if (now - lastCacheLoadMs < 30_000L && cachedTriggerWorkflows.isNotEmpty()) {
+        if (now - lastCacheLoadMs < CACHE_EXPIRY_MS && cachedTriggerWorkflows.isNotEmpty()) {
             return cachedTriggerWorkflows
         }
         val repository = WorkflowRepository(applicationContext)

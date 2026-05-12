@@ -91,6 +91,7 @@ object AirplaneModeTriggerManager {
 
             val toFire = synchronized(activeWorkflows) {
                 activeWorkflows.filter { (_, trigger) ->
+                    // TriggerConfig.AirplaneMode.enabled is non-nullable; exact match is required.
                     trigger.enabled == enabled
             }.toList() }
 

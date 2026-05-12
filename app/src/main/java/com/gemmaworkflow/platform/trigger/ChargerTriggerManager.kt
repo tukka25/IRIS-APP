@@ -109,6 +109,8 @@ private fun fireWorkflow(context: Context, workflowName: String) {
                     ChargerType.WIRELESS -> plugged == BatteryManager.BATTERY_PLUGGED_WIRELESS
                 }
 
+                // On disconnect broadcasts, EXTRA_PLUGGED may not identify the prior charger type.
+                // Fire by default so unplug workflows are not missed.
                 val shouldFire = if (connected) validType else true
 
                 if (shouldFire) {
