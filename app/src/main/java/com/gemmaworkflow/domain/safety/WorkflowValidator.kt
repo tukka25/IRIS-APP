@@ -144,6 +144,13 @@ object WorkflowValidator {
         is TriggerConfig.Bluetooth -> "bluetooth"
         is TriggerConfig.AirplaneMode -> "airplane_mode"
         is TriggerConfig.DoNotDisturb -> "do_not_disturb"
+        is TriggerConfig.AlarmStopped -> "alarm_stopped"
+        is TriggerConfig.AppOpened -> "app_opened"
+        is TriggerConfig.AppClosed -> "app_closed"
+        is TriggerConfig.SmsReceived -> "sms_received"
+        is TriggerConfig.NotificationListenerConfig -> "messaging_notification"
+        is TriggerConfig.EmailReceived -> "email_received"
+        is TriggerConfig.SleepProxy -> "sleep_proxy"
         is TriggerConfig.Geofence -> "geofence"
     }
 }

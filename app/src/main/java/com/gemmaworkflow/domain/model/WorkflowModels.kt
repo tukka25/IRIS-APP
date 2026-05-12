@@ -87,6 +87,63 @@ sealed class TriggerConfig {
         val interruptionFilter: Int? = null
     ) : TriggerConfig()
 
+    /** Run when a GemmaWorkflow-scheduled alarm is cancelled/stopped by the user. */
+    @Serializable
+    data class AlarmStopped(
+        val alarmType: String = "default"
+    ) : TriggerConfig()
+
+    /** Run when an app opens or closes (via AccessibilityService). */
+    @Serializable
+    data class AppOpened(
+        val appPackagePatterns: List<String> = emptyList(),
+        val triggerOnOpen: Boolean = true,
+        val triggerOnClose: Boolean = false
+    ) : TriggerConfig()
+
+    /** Alias for AppOpened — kept for UI compatibility. */
+    @Serializable
+    data class AppClosed(
+        val appPackagePatterns: List<String> = emptyList(),
+        val triggerOnOpen: Boolean = false,
+        val triggerOnClose: Boolean = true
+    ) : TriggerConfig()
+
+    /** Run when an SMS is received. */
+    @Serializable
+    data class SmsReceived(
+        val senderPattern: String? = null,
+        val bodyPattern: String? = null
+    ) : TriggerConfig()
+
+    /** Run when a notification arrives from a messaging app (WhatsApp, Telegram, etc.). */
+    @Serializable
+    data class NotificationListenerConfig(
+        val appPackagePatterns: List<String> = emptyList(),
+        val senderPattern: String? = null,
+        val bodyPattern: String? = null,
+        val triggerOnDismiss: Boolean = false
+    ) : TriggerConfig()
+
+    /** Run when an email notification arrives. */
+    @Serializable
+    data class EmailReceived(
+        val senderPattern: String? = null,
+        val subjectPattern: String? = null,
+        val appPackage: String = "com.google.android.gm"
+    ) : TriggerConfig()
+
+    /** Run when Do Not Disturb activates within a bedtime window. */
+    @Serializable
+    data class SleepProxy(
+        val startTimeHour: Int = 22,
+        val startTimeMinute: Int = 0,
+        val endTimeHour: Int = 7,
+        val endTimeMinute: Int = 0,
+        val requireChargerDisconnected: Boolean = true,
+        val requireDndActive: Boolean = true
+    ) : TriggerConfig()
+
     /** Run when device enters/exits/dwells in a geographic zone. */
     @Serializable
     data class Geofence(
