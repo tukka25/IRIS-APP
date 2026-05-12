@@ -707,12 +707,14 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
             }
 
             val saved = workflowRepo.loadAll()
-            _uiState.update {
-                it.copy(
-                    savedWorkflows = saved,
-                    editingWorkflow = null,
-                    isNewWorkflow = false
-                )
+            withContext(Dispatchers.Main) {
+                _uiState.update {
+                    it.copy(
+                        savedWorkflows = saved,
+                        editingWorkflow = null,
+                        isNewWorkflow = false
+                    )
+                }
             }
         }
     }
