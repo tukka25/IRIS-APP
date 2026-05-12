@@ -71,6 +71,10 @@ dependencies {
     // Pin 0.10.0 (latest stable on Google Maven as of May 2026)
     implementation("com.google.ai.edge.litertlm:litertlm-android:0.10.0")
 
+    // TensorFlow Lite: YAMNet sound classification
+    implementation("org.tensorflow:tensorflow-lite:2.14.0")
+    implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
+
     // Location: Geofencing API (Arrive/Leave trigger)
     implementation("com.google.android.gms:play-services-location:21.3.0")
 
