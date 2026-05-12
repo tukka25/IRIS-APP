@@ -46,7 +46,17 @@ object TriggerRegistry {
     private const val CHANNEL_NAME = "Workflow Confirmation"
     private const val NOTIFICATION_ID_BASE = 1000
 
-    // Per-workflow pending execution state.
+    /**
+     * Guards against the same workflow being fired multiple times concurrently
+     * (e.g. alarm + manual run at the same moment). A workflow with a runner in
+     * [activeRunners] is skipped rather than creating a duplicate runner.
+     */
+    private val activeRunners = mutableSetOf<String>()
+
+    /**
+     * Per-workflow pending execution state — stored when a background trigger
+     * hits a confirmation-gated step and needs to hand off to the UI.
+     */
     private data class PendingExecution(
         val workflowName: String,
         val runner: WorkflowRunner,
@@ -75,6 +85,15 @@ object TriggerRegistry {
 
         Log.i(TAG, "Firing workflow: ${workflow.name}")
 
+        // Guard: prevent duplicate concurrent runners for the same workflow.
+        synchronized(activeRunners) {
+            if (workflow.name in activeRunners) {
+                Log.w(TAG, "Workflow '${workflow.name}' is already running — ignoring duplicate fire")
+                return
+            }
+            activeRunners.add(workflow.name)
+        }
+
         scope.launch(Dispatchers.Default) {
             val runner = WorkflowRunner(context = context)
             try {
@@ -97,6 +116,8 @@ object TriggerRegistry {
                 } else {
                     Log.e(TAG, "Workflow '${workflow.name}' crashed", t)
                 }
+            } finally {
+                synchronized(activeRunners) { activeRunners.remove(workflow.name) }
             }
         }
     }

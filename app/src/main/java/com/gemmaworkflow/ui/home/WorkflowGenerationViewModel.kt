@@ -15,6 +15,7 @@ import com.gemmaworkflow.domain.parser.WorkflowJsonParser
 import com.gemmaworkflow.domain.planner.RequestAnalysisParser
 import com.gemmaworkflow.domain.planner.RetoWorkflowPlanner
 import com.gemmaworkflow.domain.runner.ConfirmationRequired
+import com.gemmaworkflow.domain.runner.PermissionRequired
 import com.gemmaworkflow.domain.runner.WorkflowRunner
 import com.gemmaworkflow.domain.safety.WorkflowValidator
 import com.gemmaworkflow.domain.triggers.TriggerRegistry
@@ -299,6 +300,13 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
                     com.gemmaworkflow.platform.location.GeofenceManager.registerWorkflow(getApplication(), workflow.name, workflow.trigger)
                     null  // handled — no TriggerRegistry.register call
                 }
+                is com.gemmaworkflow.domain.model.TriggerConfig.AlarmStopped -> null  // handled by AlarmTriggerManager
+                is com.gemmaworkflow.domain.model.TriggerConfig.AppOpened,
+                is com.gemmaworkflow.domain.model.TriggerConfig.AppClosed -> null  // handled by AppMonitorAccessibilityService
+                is com.gemmaworkflow.domain.model.TriggerConfig.SmsReceived -> null  // handled by SmsTriggerManager
+                is com.gemmaworkflow.domain.model.TriggerConfig.NotificationListenerConfig -> null  // handled by SmsNotificationListener
+                is com.gemmaworkflow.domain.model.TriggerConfig.EmailReceived -> null  // handled by SmsNotificationListener
+                is com.gemmaworkflow.domain.model.TriggerConfig.SleepProxy -> null  // handled by SleepTriggerManager
             }
             if (triggerType != null) {
                 val result = TriggerRegistry.register(workflow.name, triggerType, workflow.trigger)
@@ -368,6 +376,22 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
                     resumeStepIndex = e.stepIndex
                 )
             }
+        } catch (e: PermissionRequired) {
+            val spec = ActionSpecRegistry.find(e.step.id)
+            val stepLabel = spec?.label ?: e.step.id
+            currentRunner = runner
+            appendDebug("Runner", "Permission required for step ${e.stepIndex}: ${e.step.id}: ${e.permissions}")
+            _uiState.update {
+                it.copy(
+                    isBusy = false,
+                    pendingPermission = PermissionRequest(
+                        stepId = e.step.id,
+                        stepLabel = stepLabel,
+                        permissions = e.permissions
+                    ),
+                    resumeStepIndex = e.stepIndex
+                )
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Workflow execution failed", e)
             _uiState.update {
@@ -408,7 +432,7 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
         val resumeIndex = uiState.value.resumeStepIndex
         // Mark as dismissed so resume skips this step without re-throwing
         runner.dismissPendingStep()
-        _uiState.update { it.copy(pendingConfirmation = null, isBusy = true) }
+        _uiState.update { it.copy(pendingConfirmation = null, pendingPermission = null, isBusy = true) }
         viewModelScope.launch(Dispatchers.Default) {
             // Record the skipped step and resume from the next index
             val skippedResults = listOf(
@@ -419,6 +443,40 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
                 )
             )
             runWorkflowWithRunner(runner, workflow, startIndex = resumeIndex + 1, initialResults = skippedResults)
+        }
+    }
+
+    /**
+     * Called after the user has been prompted for and granted the required permissions.
+     * Calls [WorkflowRunner.grantPermissionsAndResume] to verify all permissions are now
+     * granted, then resumes execution. If any permission was denied, the step is skipped.
+     */
+    fun grantPendingPermissions() {
+        val runner = currentRunner ?: return
+        val workflow = uiState.value.runningWorkflow ?: return
+        val resumeIndex = uiState.value.resumeStepIndex
+        val context = getApplication<Application>()
+
+        // Clear the permission request UI immediately so the dialog closes
+        _uiState.update { it.copy(pendingPermission = null, isBusy = true) }
+
+        viewModelScope.launch(Dispatchers.Default) {
+            try {
+                runner.grantPermissionsAndResume(context)
+                // All permissions now granted — resume from the permission step
+                runWorkflowWithRunner(runner, workflow, startIndex = resumeIndex)
+            } catch (e: PermissionRequired) {
+                // Some permissions were still denied — skip the step
+                val skippedResults = listOf(
+                    com.gemmaworkflow.domain.model.ExecutionResult(
+                        stepId = workflow.actions.getOrNull(resumeIndex)?.id ?: "",
+                        success = false,
+                        message = "Permission denied by user"
+                    )
+                )
+                runner.dismissPendingStep()
+                runWorkflowWithRunner(runner, workflow, startIndex = resumeIndex + 1, initialResults = skippedResults)
+            }
         }
     }
 
@@ -714,6 +772,13 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
                     GeofenceManager.registerWorkflow(getApplication(), toSave.name, trigger)
                     appendDebug("TriggerRegistry", "Re-registered geofence trigger")
                 }
+                is TriggerConfig.AlarmStopped -> { /* handled by AlarmTriggerManager */ }
+                is TriggerConfig.AppOpened,
+                is TriggerConfig.AppClosed -> { /* handled by AppMonitorAccessibilityService */ }
+                is TriggerConfig.SmsReceived -> { /* handled by SmsTriggerManager */ }
+                is TriggerConfig.NotificationListenerConfig -> { /* handled by SmsNotificationListener */ }
+                is TriggerConfig.EmailReceived -> { /* handled by SmsNotificationListener */ }
+                is TriggerConfig.SleepProxy -> { /* handled by SleepTriggerManager */ }
             }
 
             val saved = workflowRepo.loadAll()

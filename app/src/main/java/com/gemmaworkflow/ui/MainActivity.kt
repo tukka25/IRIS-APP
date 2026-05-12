@@ -72,6 +72,7 @@ import com.gemmaworkflow.platform.nfc.NfcTriggerWriter
 import com.gemmaworkflow.platform.share.ShareSheetTriggerHandler
 import com.gemmaworkflow.platform.trigger.TriggerRegistry
 import com.gemmaworkflow.ui.home.ConfirmationRequest
+import com.gemmaworkflow.ui.home.PermissionRequest
 import com.gemmaworkflow.ui.home.StageStatus
 import com.gemmaworkflow.ui.home.TimeTriggerSetupScreen
 import com.gemmaworkflow.ui.home.ShareSheetSetupScreen
@@ -312,8 +313,14 @@ private fun WorkflowGenerationScreen(viewModel: WorkflowGenerationViewModel) {
         ConfirmationDialog(
             request = request,
             onConfirm = viewModel::confirmPending,
-            onDismiss = viewModel::dismissPending
-        )
+            onDismiss = viewModel::dismissPending)
+    }
+
+    state.pendingPermission?.let { request ->
+        PermissionDialog(
+            request = request,
+            onGrant = viewModel::grantPendingPermissions,
+            onDismiss = viewModel::dismissPending)
     }
 
     state.selectedWorkflowDetail?.let { detail ->
@@ -949,6 +956,103 @@ private fun ConfirmationDialog(
     )
 }
 
+/**
+ * Displays the step label and the list of permissions that need to be granted
+ * before the step can execute. Calls [onGrant] if the user accepts, or [onDismiss]
+ * if they skip the step.
+ */
+@Composable
+private fun PermissionDialog(
+    request: PermissionRequest,
+    onGrant: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    // Human-readable permission descriptions for common Android runtime permissions.
+    val permissionDescriptions = request.permissions.map { permission ->
+        val description = when (permission) {
+            Manifest.permission.READ_CONTACTS -> "Read contacts"
+            Manifest.permission.WRITE_CONTACTS -> "Write contacts"
+            Manifest.permission.READ_SMS -> "Read SMS messages"
+            Manifest.permission.SEND_SMS -> "Send SMS messages"
+            Manifest.permission.RECEIVE_SMS -> "Receive SMS messages"
+            Manifest.permission.READ_CALL_LOG -> "Read call log"
+            Manifest.permission.CALL_PHONE -> "Make phone calls"
+            Manifest.permission.READ_EXTERNAL_STORAGE -> "Read storage"
+            Manifest.permission.WRITE_EXTERNAL_STORAGE -> "Write storage"
+            Manifest.permission.ACCESS_FINE_LOCATION -> "Precise location"
+            Manifest.permission.ACCESS_COARSE_LOCATION -> "Approximate location"
+            Manifest.permission.CAMERA -> "Camera"
+            Manifest.permission.RECORD_AUDIO -> "Microphone"
+            Manifest.permission.READ_PHONE_STATE -> "Phone state"
+            else -> permission.substringAfterLast(".")
+        }
+        description to permission
+    }
+
+    AlertDialog(
+        onDismissRequest = { /* Force explicit action */ },
+        title = { Text("Permission Required") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    "Action: ${request.stepLabel}",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text("This action needs the following permissions to run:")
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    shape = MaterialTheme.shapes.small,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(8.dp)) {
+                        permissionDescriptions.forEach { (desc, _) ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(vertical = 2.dp)
+                            ) {
+                                Text("\uD83D\uDD12", style = MaterialTheme.typography.bodySmall) // lock emoji
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(desc, style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                    }
+                }
+                Text(
+                    "Granting allows this workflow to execute without errors.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.outline
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val activity = context as? android.app.Activity
+                    if (request.permissions.isNotEmpty() && activity != null) {
+                        ActivityCompat.requestPermissions(
+                            activity,
+                            request.permissions.toTypedArray(),
+                            /* requestCode = */ 2001
+                        )
+                    }
+                    // Resume regardless — runner re-checks perms when execution continues.
+                    onGrant()
+                }
+            ) {
+                Text("Grant Permissions")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Skip Step")
+            }
+        }
+    )
+}
+
 private fun triggerLabel(workflow: com.gemmaworkflow.domain.model.PlannedWorkflow): String {
     return when (val t = workflow.trigger) {
         is com.gemmaworkflow.domain.model.TriggerConfig.Manual -> "Manual"
@@ -965,6 +1069,14 @@ private fun triggerLabel(workflow: com.gemmaworkflow.domain.model.PlannedWorkflo
             val loc = "(${String.format("%.4f", t.latitude)}, ${String.format("%.4f", t.longitude)})"
             "Geofence $loc"
         }
+        is com.gemmaworkflow.domain.model.TriggerConfig.AlarmStopped -> "Alarm Stopped"
+        is com.gemmaworkflow.domain.model.TriggerConfig.AppOpened -> "App Opened"
+        is com.gemmaworkflow.domain.model.TriggerConfig.AppClosed -> "App Closed"
+        is com.gemmaworkflow.domain.model.TriggerConfig.SmsReceived -> "SMS Received"
+        is com.gemmaworkflow.domain.model.TriggerConfig.NotificationListenerConfig -> "Messaging Notification"
+        is com.gemmaworkflow.domain.model.TriggerConfig.EmailReceived -> "Email Received"
+        is com.gemmaworkflow.domain.model.TriggerConfig.SleepProxy -> "Sleep Proxy"
+        else -> "Unknown trigger"
     }
 }
 

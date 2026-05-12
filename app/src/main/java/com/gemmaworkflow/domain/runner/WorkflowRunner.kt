@@ -5,6 +5,7 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
 import android.net.Uri
 import android.provider.Settings
 import android.util.Log
@@ -37,6 +38,30 @@ class ConfirmationRequired(
 ) : Exception("Confirmation required for step: ${step.id}")
 
 /**
+ * Thrown by [WorkflowRunner.executeStep] when a step requires runtime permissions
+ * that have not been granted. The UI calls [WorkflowRunner.grantPermissionsAndResume]
+ * after prompting the user, or [WorkflowRunner.dismissPendingStep] to skip.
+ */
+class PermissionRequired(
+    val step: WorkflowStep,
+    val stepIndex: Int,
+    val permissions: List<String>
+) : Exception("Permission required for step: ${step.id}: $permissions")
+
+/**
+ * Holds the step that is waiting for user input plus the context that caused the wait.
+ */
+private data class PendingStepInfo(
+    val step: WorkflowStep,
+    val kind: PendingKind
+)
+
+private sealed class PendingKind {
+    data object Confirmation : PendingKind()
+    data class Permission(val missingPermissions: List<String>) : PendingKind()
+}
+
+/**
  * Executes a validated PlannedWorkflow step by step.
  */
 class WorkflowRunner(
@@ -47,7 +72,7 @@ class WorkflowRunner(
     private val clipboardApiExecutor: ClipboardApiExecutor = ClipboardApiExecutor(context),
     private val chromeCustomTabOpener: ChromeCustomTabOpener = ChromeCustomTabOpener(context)
 ) {
-    private var pendingStep: WorkflowStep? = null
+    private var pendingStepInfo: PendingStepInfo? = null
     private var pendingStepIndex: Int = -1
     /** Step indices the user has already confirmed — skip re-confirmation on resume. */
     private val confirmedSteps = mutableSetOf<Int>()
@@ -109,16 +134,41 @@ class WorkflowRunner(
 
     fun confirmPendingStep(): WorkflowStep? {
         pendingStepIndex.let { confirmedSteps.add(it) }
-        val step = pendingStep
-        pendingStep = null
+        val step = pendingStepInfo?.step
+        pendingStepInfo = null
         pendingStepIndex = -1
         return step
     }
 
+    /**
+     * Called after the user grants the required permissions. Re-checks whether all
+     * permissions are now granted; if so, clears pending state and returns the step so
+     * the caller can re-execute it. If permissions are still missing, throws again.
+     */
+    fun grantPermissionsAndResume(context: Context): WorkflowStep? {
+        val info = pendingStepInfo ?: return null
+        val missingPermissions = (info.kind as? PendingKind.Permission)?.missingPermissions ?: emptyList()
+
+        val stillMissing = missingPermissions.filter { permission ->
+            ContextCompat.checkSelfPermission(context, permission) != PackageManager.PERMISSION_GRANTED
+        }
+        if (stillMissing.isNotEmpty()) {
+            // Update pending info with remaining missing permissions and re-throw
+            pendingStepInfo = info.copy(kind = PendingKind.Permission(stillMissing))
+            throw PermissionRequired(info.step, pendingStepIndex, stillMissing)
+        }
+
+        // All granted — confirm the step and clear pending state
+        pendingStepIndex.let { confirmedSteps.add(it) }
+        pendingStepInfo = null
+        pendingStepIndex = -1
+        return info.step
+    }
+
     fun dismissPendingStep(): WorkflowStep? {
         pendingStepIndex.let { confirmedSteps.add(it) }
-        val step = pendingStep
-        pendingStep = null
+        val step = pendingStepInfo?.step
+        pendingStepInfo = null
         pendingStepIndex = -1
         return step
     }
@@ -135,10 +185,22 @@ class WorkflowRunner(
         val spec = ActionSpecRegistry.find(resolvedStep.id)
             ?: return ExecutionResult(stepId = step.id, success = false, message = "Unknown action")
 
+        // Check and request runtime permissions before executing.
+        // grantedPermissions filters spec.requiredPermissions to only those NOT yet granted.
+        val grantedPermissions = spec.requiredPermissions.filter { permission ->
+            ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+        }
+        val missingPermissions = spec.requiredPermissions - grantedPermissions.toSet()
+        if (missingPermissions.isNotEmpty()) {
+            pendingStepInfo = PendingStepInfo(step, PendingKind.Permission(missingPermissions))
+            pendingStepIndex = stepIndex
+            throw PermissionRequired(step, stepIndex, missingPermissions)
+        }
+
         // Pause and request user confirmation before executing sensitive steps
         if (spec.requiresConfirmation || step.requiresConfirmation) {
             if (stepIndex !in confirmedSteps) {
-                pendingStep = step
+                pendingStepInfo = PendingStepInfo(step, PendingKind.Confirmation)
                 pendingStepIndex = stepIndex
                 throw ConfirmationRequired(step, stepIndex)
             }
@@ -259,7 +321,7 @@ class WorkflowRunner(
             },
             onFailure = { error ->
                 Log.e(TAG, "Tool failed ${step.id}", error)
-                if (error is ConfirmationRequired) throw error
+                if (error is ConfirmationRequired || error is PermissionRequired) throw error
                 if (error is ActivityNotFoundException || error is IllegalArgumentException) {
                     tryFallback(step, spec, onDebug, error.message ?: "Failed to start ${spec.label}")
                 } else {
