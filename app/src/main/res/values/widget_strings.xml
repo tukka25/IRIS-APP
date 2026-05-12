@@ -1,0 +1,19 @@
+<resources>
+    <string name="widget_description">Shows the latest run step results and 5-run success history for a workflow</string>
+    <string name="widget_empty">No runs yet</string>
+    <string name="widget_configure_title">Select a workflow for this widget</string>
+    <string name="widget_configure_empty">No saved workflows found.\nCreate one in the app first.</string>
+    <string name="widget_unconfigured_instruction">Long-press → Edit to pick a workflow</string>
+    <string name="widget_trigger_daily">daily</string>
+    <string name="widget_trigger_nfc">NFC tag</string>
+    <string name="widget_trigger_share_sheet">Share sheet</string>
+    <string name="widget_trigger_tasker">Tasker</string>
+    <string name="widget_trigger_manual">Manual</string>
+    <string name="widget_created_ago">created %1$s ago</string>
+    <string name="widget_stats_runs">%1$d runs</string>
+    <string name="widget_stats_success">%1$d%% success</string>
+    <string name="widget_stats_last">last %1$s ago</string>
+    <string name="widget_last_run_ago">Last run %1$s ago</string>
+    <string name="widget_history_label">History </string>
+    <string name="widget_time_just_now">just now</string>
+</resources>

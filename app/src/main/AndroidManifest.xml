@@ -236,7 +236,7 @@
             </intent-filter>
         </receiver>
 
-        <!-- Fires when airplane mode is toggled. -->
+        <!-- Our: trigger receivers -->
         <receiver
             android:name=".platform.trigger.AirplaneModeTriggerReceiver"
             android:exported="false">
@@ -245,7 +245,6 @@
             </intent-filter>
         </receiver>
 
-        <!-- Fires when Do Not Disturb mode changes. -->
         <receiver
             android:name=".platform.trigger.DndTriggerReceiver"
             android:exported="false">
@@ -254,7 +253,6 @@
             </intent-filter>
         </receiver>
 
-        <!-- Fires when WiFi connects or disconnects. -->
         <receiver
             android:name=".platform.trigger.WiFiTriggerReceiver"
             android:exported="false">
@@ -263,7 +261,6 @@
             </intent-filter>
         </receiver>
 
-        <!-- Fires when a Bluetooth device connects or disconnects. -->
         <receiver
             android:name=".platform.trigger.BluetoothTriggerReceiver"
             android:exported="false">
@@ -272,6 +269,28 @@
                 <action android:name="android.bluetooth.device.action.ACL_DISCONNECTED" />
             </intent-filter>
         </receiver>
+
+        <!-- Their: widget -->
+        <receiver
+            android:name=".widget.WorkflowWidgetReceiver"
+            android:exported="true"
+            android:permission="android.permission.BIND_APPWIDGET">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/workflow_widget_info" />
+        </receiver>
+
+        <activity
+            android:name=".widget.WorkflowWidgetConfigActivity"
+            android:exported="true"
+            android:theme="@style/Theme.GemmaWorkflow">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
 
     </application>
 </manifest>
