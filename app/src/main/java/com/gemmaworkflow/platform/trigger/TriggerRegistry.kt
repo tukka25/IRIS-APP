@@ -11,6 +11,7 @@ import androidx.core.app.NotificationCompat
 import com.gemmaworkflow.data.repository.WorkflowRepository
 import com.gemmaworkflow.domain.model.PlannedWorkflow
 import com.gemmaworkflow.domain.runner.ConfirmationRequired
+import com.gemmaworkflow.domain.runner.PermissionRequired
 import com.gemmaworkflow.domain.runner.WorkflowRunner
 import com.gemmaworkflow.ui.MainActivity
 import kotlinx.coroutines.CoroutineScope
@@ -44,6 +45,8 @@ object TriggerRegistry {
 
     private const val CHANNEL_ID = "workflow_confirm"
     private const val CHANNEL_NAME = "Workflow Confirmation"
+    private const val PERMISSION_CHANNEL_ID = "workflow_permission"
+    private const val PERMISSION_CHANNEL_NAME = "Workflow Permissions"
     private const val NOTIFICATION_ID_BASE = 1000
 
     /**
@@ -113,6 +116,17 @@ object TriggerRegistry {
                         )
                     }
                     showConfirmationNotification(context, workflow.name, t.step.id, t.stepIndex)
+                } else if (t is PermissionRequired) {
+                    Log.w(TAG, "Workflow '${workflow.name}' needs permissions: ${t.permissions.joinToString()}")
+                    synchronized(pendingExecutions) {
+                        pendingExecutions[workflow.name] = PendingExecution(
+                            workflowName = workflow.name,
+                            runner = runner,
+                            workflow = workflow,
+                            startIndex = t.stepIndex
+                        )
+                    }
+                    showPermissionNotification(context, workflow.name, t.permissions)
                 } else {
                     Log.e(TAG, "Workflow '${workflow.name}' crashed", t)
                 }
@@ -230,9 +244,49 @@ object TriggerRegistry {
             ).apply {
                 description = "Prompts you to confirm workflow steps triggered in the background"
             }
+            val permissionChannel = NotificationChannel(
+                PERMISSION_CHANNEL_ID,
+                PERMISSION_CHANNEL_NAME,
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Prompts you to grant runtime permissions required by background workflows"
+            }
             val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             nm.createNotificationChannel(channel)
+            nm.createNotificationChannel(permissionChannel)
         }
+    }
+
+    private fun showPermissionNotification(
+        context: Context,
+        workflowName: String,
+        permissions: List<String>
+    ) {
+        ensureChannel(context)
+
+        val openIntent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(EXTRA_WORKFLOW_NAME, workflowName)
+        }
+        val openPending = PendingIntent.getActivity(
+            context,
+            2,
+            openIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = NotificationCompat.Builder(context, PERMISSION_CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_dialog_alert)
+            .setContentTitle("Permission needed: $workflowName")
+            .setContentText("Open GemmaWorkflow and grant: ${permissions.joinToString()}")
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_ERROR)
+            .setContentIntent(openPending)
+            .setAutoCancel(true)
+            .build()
+
+        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        nm.notify(NOTIFICATION_ID_BASE + workflowName.hashCode() + 1, notification)
     }
 
     const val EXTRA_WORKFLOW_NAME = "extra_workflow_name"

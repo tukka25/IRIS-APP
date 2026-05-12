@@ -28,7 +28,7 @@ class SmsNotificationListener : NotificationListenerService() {
         "com.samsung.android.messaging",
         "com.android.mms",
         "com.oneplus.messaging",
-        "com小米.mms",
+        "com.miui.mms",
     )
 
     private val MESSAGING_PACKAGES = setOf(
@@ -47,6 +47,11 @@ class SmsNotificationListener : NotificationListenerService() {
         "com.sony.smartexplorer",            // Sony email
     )
 
+    @Volatile
+    private var cachedTriggerWorkflows: List<com.gemmaworkflow.domain.model.PlannedWorkflow> = emptyList()
+    @Volatile
+    private var lastCacheLoadMs: Long = 0L
+
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
         if (sbn == null) return
 
@@ -60,8 +65,7 @@ class SmsNotificationListener : NotificationListenerService() {
 
         Log.d(TAG, "Notification from $packageName: title='$title' body='${body.take(60)}'")
 
-        val repository = WorkflowRepository(applicationContext)
-        val allWorkflows = repository.loadAll()
+        val allWorkflows = getTriggerWorkflows()
 
         // ── SMS workflows ────────────────────────────────────────────────
         val smsWorkflows = allWorkflows.filter { it.trigger is TriggerConfig.SmsReceived }
@@ -141,5 +145,21 @@ class SmsNotificationListener : NotificationListenerService() {
 
     override fun onNotificationRemoved(sbn: StatusBarNotification?) {
         // Nothing to do — we only act on incoming notifications
+    }
+
+    private fun getTriggerWorkflows(): List<com.gemmaworkflow.domain.model.PlannedWorkflow> {
+        val now = System.currentTimeMillis()
+        if (now - lastCacheLoadMs < 30_000L && cachedTriggerWorkflows.isNotEmpty()) {
+            return cachedTriggerWorkflows
+        }
+        val repository = WorkflowRepository(applicationContext)
+        val refreshed = repository.loadAll().filter {
+            it.trigger is TriggerConfig.SmsReceived ||
+                it.trigger is TriggerConfig.NotificationListenerConfig ||
+                it.trigger is TriggerConfig.EmailReceived
+        }
+        cachedTriggerWorkflows = refreshed
+        lastCacheLoadMs = now
+        return refreshed
     }
 }

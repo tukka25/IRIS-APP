@@ -31,7 +31,7 @@ class BrightnessApiExecutor(private val context: Context) {
             return ExecutionResult(
                 stepId = "brightness.set",
                 success = false,
-                message = "WRITE_SETTINGS permission not granted. Open Settings → Display → Bend brightness slider to grant."
+                message = "WRITE_SETTINGS permission not granted. Open Settings → Display → Adjust the brightness slider to grant."
             )
         }
 

@@ -5,14 +5,17 @@ import android.util.Log
 import com.gemmaworkflow.data.repository.WorkflowRepository
 import com.gemmaworkflow.domain.model.TriggerConfig
 import com.gemmaworkflow.platform.alarm.TimeTriggerScheduler
+import com.gemmaworkflow.platform.alarm.AlarmTriggerManager
 import com.gemmaworkflow.platform.trigger.BatteryTriggerManager
 import com.gemmaworkflow.platform.trigger.BluetoothTriggerManager
 import com.gemmaworkflow.platform.trigger.ChargerTriggerManager
 import com.gemmaworkflow.platform.trigger.DndTriggerManager
+import com.gemmaworkflow.platform.trigger.SleepTriggerManager
 import com.gemmaworkflow.platform.trigger.TriggerRegistry
 import com.gemmaworkflow.platform.trigger.WiFiTriggerManager
 import com.gemmaworkflow.platform.trigger.AirplaneModeTriggerManager
 import com.gemmaworkflow.platform.location.GeofenceManager
+import com.gemmaworkflow.platform.sms.SmsTriggerManager
 import com.gemmaworkflow.ui.trigger.TimeTriggerNotification
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -91,8 +94,17 @@ class GemmaWorkflowApp : Application() {
                 // ── DND triggers: interruption filter receiver ────────────────
                 DndTriggerManager.registerAll(this@GemmaWorkflowApp)
 
+                // ── Sleep proxy triggers: DND + charger state ─────────────────
+                SleepTriggerManager.registerAll(this@GemmaWorkflowApp)
+
                 // ── Geofence triggers: location manager ─────────────────────────
                 GeofenceManager.registerAll(this@GemmaWorkflowApp)
+
+                // ── SMS trigger index (receiver/listener use this cache) ───────
+                SmsTriggerManager.registerAll(this@GemmaWorkflowApp)
+
+                // ── Alarm stopped triggers ──────────────────────────────────────
+                AlarmTriggerManager.registerAll(this@GemmaWorkflowApp)
 
             } catch (e: Exception) {
                 Log.e(TAG, "Error rescheduling triggers", e)
