@@ -58,6 +58,7 @@ import com.gemmaworkflow.domain.model.BatteryCondition
 import com.gemmaworkflow.domain.model.GeofenceTransition
 import com.gemmaworkflow.domain.model.ChargerType
 import com.gemmaworkflow.domain.model.PlannedWorkflow
+import com.gemmaworkflow.domain.model.SetupState
 import com.gemmaworkflow.domain.model.TriggerConfig
 import com.gemmaworkflow.domain.model.WorkflowStep
 import kotlinx.serialization.json.buildJsonObject
@@ -75,7 +76,16 @@ private val TRIGGER_TYPES = listOf(
     "Bluetooth" to TriggerConfig.Bluetooth(null),
     "Airplane Mode" to TriggerConfig.AirplaneMode(true),
     "Do Not Disturb" to TriggerConfig.DoNotDisturb(null),
-    "Geofence" to TriggerConfig.Geofence(0.0, 0.0, 100f, GeofenceTransition.ENTER),
+    "Geofence" to TriggerConfig.Geofence(0.0, 0.0, 100f, GeofenceTransition.ENTER_EXIT),
+    "Alarm Stopped" to TriggerConfig.AlarmStopped("default"),
+    "App Opened" to TriggerConfig.AppOpened(emptyList(), true, false),
+    "App Closed" to TriggerConfig.AppClosed(emptyList(), false, true),
+    "SMS Received" to TriggerConfig.SmsReceived(null, null),
+    "Notification" to TriggerConfig.NotificationListenerConfig(emptyList(), null, null, false),
+    "Email Received" to TriggerConfig.EmailReceived(null, null),
+    "Sleep Proxy" to TriggerConfig.SleepProxy(22, 0, 7, 0, true, true),
+    "NFC Tag" to TriggerConfig.Nfc(null),
+    "Share Sheet" to TriggerConfig.ShareSheet(SetupState.NeedsSetup),
 )
 
 private val CHARGER_TYPES = listOf("Any", "USB", "AC", "Wireless")
@@ -187,7 +197,98 @@ fun ManualWorkflowEditorScreen(
         mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.Geofence)?.radiusMeters ?: 100f)
     }
     var geofenceTransitionType by remember {
-        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.Geofence)?.transitionType ?: GeofenceTransition.ENTER)
+        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.Geofence)?.transitionType ?: GeofenceTransition.ENTER_EXIT)
+    }
+    var geofenceName by remember {
+        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.Geofence)?.name ?: "")
+    }
+    var geofenceDwellDelay by remember {
+        mutableIntStateOf((initialWorkflow?.trigger as? TriggerConfig.Geofence)?.dwellDelaySeconds ?: 0)
+    }
+
+    // AlarmStopped trigger state
+    var alarmStoppedType by remember {
+        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.AlarmStopped)?.alarmType ?: "default")
+    }
+
+    // AppOpened/AppClosed trigger state
+    var appTriggerPatterns by remember {
+        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.AppOpened)?.appPackagePatterns
+            ?: (initialWorkflow?.trigger as? TriggerConfig.AppClosed)?.appPackagePatterns
+            ?: emptyList())
+    }
+    var appTriggerOnOpen by remember {
+        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.AppOpened)?.triggerOnOpen
+            ?: (initialWorkflow?.trigger as? TriggerConfig.AppClosed)?.triggerOnOpen
+            ?: true)
+    }
+    var appTriggerOnClose by remember {
+        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.AppOpened)?.triggerOnClose
+            ?: (initialWorkflow?.trigger as? TriggerConfig.AppClosed)?.triggerOnClose
+            ?: false)
+    }
+
+    // SmsReceived trigger state
+    var smsSenderPattern by remember {
+        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.SmsReceived)?.senderPattern ?: "")
+    }
+    var smsBodyPattern by remember {
+        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.SmsReceived)?.bodyPattern ?: "")
+    }
+
+    // NotificationListenerConfig trigger state
+    var notifAppPatterns by remember {
+        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.NotificationListenerConfig)?.appPackagePatterns ?: emptyList())
+    }
+    var notifSenderPattern by remember {
+        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.NotificationListenerConfig)?.senderPattern ?: "")
+    }
+    var notifBodyPattern by remember {
+        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.NotificationListenerConfig)?.bodyPattern ?: "")
+    }
+    var notifTriggerOnDismiss by remember {
+        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.NotificationListenerConfig)?.triggerOnDismiss ?: false)
+    }
+
+    // EmailReceived trigger state
+    var emailSenderPattern by remember {
+        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.EmailReceived)?.senderPattern ?: "")
+    }
+    var emailSubjectPattern by remember {
+        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.EmailReceived)?.subjectPattern ?: "")
+    }
+    var emailAppPackage by remember {
+        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.EmailReceived)?.appPackage ?: "com.google.android.gm")
+    }
+
+    // SleepProxy trigger state
+    var sleepStartHour by remember {
+        mutableIntStateOf((initialWorkflow?.trigger as? TriggerConfig.SleepProxy)?.startTimeHour ?: 22)
+    }
+    var sleepStartMinute by remember {
+        mutableIntStateOf((initialWorkflow?.trigger as? TriggerConfig.SleepProxy)?.startTimeMinute ?: 0)
+    }
+    var sleepEndHour by remember {
+        mutableIntStateOf((initialWorkflow?.trigger as? TriggerConfig.SleepProxy)?.endTimeHour ?: 7)
+    }
+    var sleepEndMinute by remember {
+        mutableIntStateOf((initialWorkflow?.trigger as? TriggerConfig.SleepProxy)?.endTimeMinute ?: 0)
+    }
+    var sleepRequireChargerDisconnected by remember {
+        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.SleepProxy)?.requireChargerDisconnected ?: true)
+    }
+    var sleepRequireDndActive by remember {
+        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.SleepProxy)?.requireDndActive ?: true)
+    }
+
+    // Nfc trigger state
+    var nfcTagId by remember {
+        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.Nfc)?.tagId ?: "")
+    }
+
+    // ShareSheet trigger state
+    var shareSheetState by remember {
+        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.ShareSheet)?.setupState ?: SetupState.NeedsSetup)
     }
 
     // ── Actions ─────────────────────────────────────────────────────────────
@@ -383,7 +484,34 @@ fun ManualWorkflowEditorScreen(
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text("Geofence trigger", style = MaterialTheme.typography.bodyMedium)
 
-                        // Tap map to set location
+                        // Name field
+                        OutlinedTextField(
+                            value = geofenceName,
+                            onValueChange = { geofenceName = it },
+                            label = { Text("Location name (optional)") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+
+                        // Lat/Lon text fields
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedTextField(
+                                value = if (geofenceLatitude == 0.0) "" else geofenceLatitude.toString(),
+                                onValueChange = { geofenceLatitude = it.toDoubleOrNull() ?: 0.0 },
+                                label = { Text("Latitude") },
+                                modifier = Modifier.weight(1f),
+                                singleLine = true
+                            )
+                            OutlinedTextField(
+                                value = if (geofenceLongitude == 0.0) "" else geofenceLongitude.toString(),
+                                onValueChange = { geofenceLongitude = it.toDoubleOrNull() ?: 0.0 },
+                                label = { Text("Longitude") },
+                                modifier = Modifier.weight(1f),
+                                singleLine = true
+                            )
+                        }
+
+                        // Map picker (tap to set)
                         OsmMapPicker(
                             latitude = geofenceLatitude,
                             longitude = geofenceLongitude,
@@ -394,18 +522,19 @@ fun ManualWorkflowEditorScreen(
                             }
                         )
 
-                        Text("Radius: ${geofenceRadiusMeters.toInt()} meters", style = MaterialTheme.typography.bodyMedium)
+                        Text("Radius: ${geofenceRadiusMeters.toInt()} m", style = MaterialTheme.typography.bodyMedium)
                         Slider(
                             value = geofenceRadiusMeters,
                             onValueChange = { geofenceRadiusMeters = it },
-                            valueRange = 50f..1000f,
+                            valueRange = 50f..2000f,
                         )
                         Text("Trigger when:", style = MaterialTheme.typography.bodyMedium)
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             listOf(
                                 GeofenceTransition.ENTER to "Arriving",
                                 GeofenceTransition.EXIT to "Leaving",
-                                GeofenceTransition.DWELL to "Staying"
+                                GeofenceTransition.DWELL to "Staying",
+                                GeofenceTransition.ENTER_EXIT to "Either"
                             ).forEach { (type, label) ->
                                 FilterChip(
                                     selected = geofenceTransitionType == type,
@@ -414,6 +543,273 @@ fun ManualWorkflowEditorScreen(
                                 )
                             }
                         }
+                        if (geofenceTransitionType == GeofenceTransition.DWELL) {
+                            Text("Dwell delay: ${geofenceDwellDelay}s", style = MaterialTheme.typography.bodyMedium)
+                            Slider(
+                                value = geofenceDwellDelay.toFloat(),
+                                onValueChange = { geofenceDwellDelay = it.toInt() },
+                                valueRange = 0f..300f,
+                                steps = 29,
+                            )
+                        }
+                    }
+                }
+            }
+            is TriggerConfig.AlarmStopped -> {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Alarm Stopped", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            "Fires when a GemmaWorkflow alarm is dismissed or cancelled by the user.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                        OutlinedTextField(
+                            value = alarmStoppedType,
+                            onValueChange = { alarmStoppedType = it },
+                            label = { Text("Alarm type filter (optional)") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            placeholder = { Text("e.g. default, reminder, timer") }
+                        )
+                    }
+                }
+            }
+            is TriggerConfig.AppOpened, is TriggerConfig.AppClosed -> {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(
+                            if (currentTriggerType.second is TriggerConfig.AppOpened) "App Opened" else "App Closed",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        OutlinedTextField(
+                            value = appTriggerPatterns.joinToString(", "),
+                            onValueChange = {
+                                appTriggerPatterns = it.split(",").map { s -> s.trim() }.filter { s -> s.isNotEmpty() }
+                            },
+                            label = { Text("App package patterns (comma-separated)") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            placeholder = { Text("e.g. com.instagram.android") }
+                        )
+                        Text("Trigger on:", style = MaterialTheme.typography.bodySmall)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FilterChip(
+                                selected = appTriggerOnOpen,
+                                onClick = { appTriggerOnOpen = !appTriggerOnOpen },
+                                label = { Text("Open") }
+                            )
+                            FilterChip(
+                                selected = appTriggerOnClose,
+                                onClick = { appTriggerOnClose = !appTriggerOnClose },
+                                label = { Text("Close") }
+                            )
+                        }
+                    }
+                }
+            }
+            is TriggerConfig.SmsReceived -> {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("SMS Received", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            "Fires when an SMS matching the patterns is received. Requires notification access.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                        OutlinedTextField(
+                            value = smsSenderPattern,
+                            onValueChange = { smsSenderPattern = it },
+                            label = { Text("Sender pattern (optional)") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            placeholder = { Text("e.g. +1 or ABC") }
+                        )
+                        OutlinedTextField(
+                            value = smsBodyPattern,
+                            onValueChange = { smsBodyPattern = it },
+                            label = { Text("Body pattern (optional)") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            placeholder = { Text("e.g. OTP or verification") }
+                        )
+                    }
+                }
+            }
+            is TriggerConfig.NotificationListenerConfig -> {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("App Notification", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            "Fires on notifications from specific apps. Requires notification access.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                        OutlinedTextField(
+                            value = notifAppPatterns.joinToString(", "),
+                            onValueChange = {
+                                notifAppPatterns = it.split(",").map { s -> s.trim() }.filter { s -> s.isNotEmpty() }
+                            },
+                            label = { Text("App package patterns (comma-separated)") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            placeholder = { Text("e.g. com.whatsapp, org.telegram") }
+                        )
+                        OutlinedTextField(
+                            value = notifSenderPattern,
+                            onValueChange = { notifSenderPattern = it },
+                            label = { Text("Sender pattern (optional)") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                        OutlinedTextField(
+                            value = notifBodyPattern,
+                            onValueChange = { notifBodyPattern = it },
+                            label = { Text("Body pattern (optional)") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Also on dismiss")
+                            Switch(
+                                checked = notifTriggerOnDismiss,
+                                onCheckedChange = { notifTriggerOnDismiss = it }
+                            )
+                        }
+                    }
+                }
+            }
+            is TriggerConfig.EmailReceived -> {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Email Received", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            "Fires on email notifications. Requires notification access.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                        OutlinedTextField(
+                            value = emailSenderPattern,
+                            onValueChange = { emailSenderPattern = it },
+                            label = { Text("From / sender pattern (optional)") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            placeholder = { Text("e.g. @company.com") }
+                        )
+                        OutlinedTextField(
+                            value = emailSubjectPattern,
+                            onValueChange = { emailSubjectPattern = it },
+                            label = { Text("Subject pattern (optional)") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            placeholder = { Text("e.g. Invoice or Urgent") }
+                        )
+                        OutlinedTextField(
+                            value = emailAppPackage,
+                            onValueChange = { emailAppPackage = it },
+                            label = { Text("Email app package") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                    }
+                }
+            }
+            is TriggerConfig.SleepProxy -> {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text("Sleep Proxy", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            "Fires when bedtime conditions are met (DND active, charger disconnected).",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedTextField(
+                                value = String.format("%02d:%02d", sleepStartHour, sleepStartMinute),
+                                onValueChange = {
+                                    val parts = it.split(":")
+                                    sleepStartHour = parts.getOrNull(0)?.toIntOrNull()?.coerceIn(0, 23) ?: sleepStartHour
+                                    sleepStartMinute = parts.getOrNull(1)?.toIntOrNull()?.coerceIn(0, 59) ?: sleepStartMinute
+                                },
+                                label = { Text("Start") },
+                                modifier = Modifier.weight(1f),
+                                singleLine = true
+                            )
+                            OutlinedTextField(
+                                value = String.format("%02d:%02d", sleepEndHour, sleepEndMinute),
+                                onValueChange = {
+                                    val parts = it.split(":")
+                                    sleepEndHour = parts.getOrNull(0)?.toIntOrNull()?.coerceIn(0, 23) ?: sleepEndHour
+                                    sleepEndMinute = parts.getOrNull(1)?.toIntOrNull()?.coerceIn(0, 59) ?: sleepEndMinute
+                                },
+                                label = { Text("End") },
+                                modifier = Modifier.weight(1f),
+                                singleLine = true
+                            )
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Require charger disconnected")
+                            Switch(
+                                checked = sleepRequireChargerDisconnected,
+                                onCheckedChange = { sleepRequireChargerDisconnected = it }
+                            )
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Require DND active")
+                            Switch(
+                                checked = sleepRequireDndActive,
+                                onCheckedChange = { sleepRequireDndActive = it }
+                            )
+                        }
+                    }
+                }
+            }
+            is TriggerConfig.Nfc -> {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("NFC Tag", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            "Fires when a specific NFC tag is scanned. Requires NFC enabled.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                        OutlinedTextField(
+                            value = nfcTagId,
+                            onValueChange = { nfcTagId = it },
+                            label = { Text("Tag ID (leave blank for any)") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                    }
+                }
+            }
+            is TriggerConfig.ShareSheet -> {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Share Sheet", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            "Fires when content is shared to GemmaWorkflow from any app.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                        val stateLabel = when (shareSheetState) {
+                            SetupState.Ready -> "Ready"
+                            SetupState.NeedsSetup -> "Needs setup"
+                            SetupState.Unsupported -> "Unsupported"
+                        }
+                        Text("Status: $stateLabel", style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
@@ -484,7 +880,30 @@ fun ManualWorkflowEditorScreen(
                         geofenceLatitude = geofenceLatitude,
                         geofenceLongitude = geofenceLongitude,
                         geofenceRadiusMeters = geofenceRadiusMeters,
-                        geofenceTransitionType = geofenceTransitionType
+                        geofenceTransitionType = geofenceTransitionType,
+                        geofenceName = geofenceName,
+                        geofenceDwellDelay = geofenceDwellDelay,
+                        alarmStoppedType = alarmStoppedType,
+                        appTriggerPatterns = appTriggerPatterns,
+                        appTriggerOnOpen = appTriggerOnOpen,
+                        appTriggerOnClose = appTriggerOnClose,
+                        smsSenderPattern = smsSenderPattern,
+                        smsBodyPattern = smsBodyPattern,
+                        notifAppPatterns = notifAppPatterns,
+                        notifSenderPattern = notifSenderPattern,
+                        notifBodyPattern = notifBodyPattern,
+                        notifTriggerOnDismiss = notifTriggerOnDismiss,
+                        emailSenderPattern = emailSenderPattern,
+                        emailSubjectPattern = emailSubjectPattern,
+                        emailAppPackage = emailAppPackage,
+                        sleepStartHour = sleepStartHour,
+                        sleepStartMinute = sleepStartMinute,
+                        sleepEndHour = sleepEndHour,
+                        sleepEndMinute = sleepEndMinute,
+                        sleepRequireChargerDisconnected = sleepRequireChargerDisconnected,
+                        sleepRequireDndActive = sleepRequireDndActive,
+                        nfcTagId = nfcTagId,
+                        shareSheetState = shareSheetState
                     )
                     onSave(
                         PlannedWorkflow(
@@ -704,6 +1123,13 @@ private fun triggerConfigMatches(a: TriggerConfig, b: TriggerConfig): Boolean {
         a is TriggerConfig.AirplaneMode && b is TriggerConfig.AirplaneMode -> true
         a is TriggerConfig.DoNotDisturb && b is TriggerConfig.DoNotDisturb -> true
         a is TriggerConfig.Geofence && b is TriggerConfig.Geofence -> true
+        a is TriggerConfig.AlarmStopped && b is TriggerConfig.AlarmStopped -> true
+        a is TriggerConfig.AppOpened && b is TriggerConfig.AppOpened -> true
+        a is TriggerConfig.AppClosed && b is TriggerConfig.AppClosed -> true
+        a is TriggerConfig.SmsReceived && b is TriggerConfig.SmsReceived -> true
+        a is TriggerConfig.NotificationListenerConfig && b is TriggerConfig.NotificationListenerConfig -> true
+        a is TriggerConfig.EmailReceived && b is TriggerConfig.EmailReceived -> true
+        a is TriggerConfig.SleepProxy && b is TriggerConfig.SleepProxy -> true
         else -> false
     }
 }
@@ -775,7 +1201,30 @@ private fun buildTrigger(
     geofenceLatitude: Double,
     geofenceLongitude: Double,
     geofenceRadiusMeters: Float,
-    geofenceTransitionType: GeofenceTransition
+    geofenceTransitionType: GeofenceTransition,
+    geofenceName: String,
+    geofenceDwellDelay: Int,
+    alarmStoppedType: String,
+    appTriggerPatterns: List<String>,
+    appTriggerOnOpen: Boolean,
+    appTriggerOnClose: Boolean,
+    smsSenderPattern: String,
+    smsBodyPattern: String,
+    notifAppPatterns: List<String>,
+    notifSenderPattern: String,
+    notifBodyPattern: String,
+    notifTriggerOnDismiss: Boolean,
+    emailSenderPattern: String,
+    emailSubjectPattern: String,
+    emailAppPackage: String,
+    sleepStartHour: Int,
+    sleepStartMinute: Int,
+    sleepEndHour: Int,
+    sleepEndMinute: Int,
+    sleepRequireChargerDisconnected: Boolean,
+    sleepRequireDndActive: Boolean,
+    nfcTagId: String,
+    shareSheetState: SetupState
 ): TriggerConfig {
     return when (triggerType.second) {
         is TriggerConfig.Manual -> TriggerConfig.Manual
@@ -803,8 +1252,41 @@ private fun buildTrigger(
         is TriggerConfig.AirplaneMode -> TriggerConfig.AirplaneMode(airplaneEnabled)
         is TriggerConfig.DoNotDisturb -> TriggerConfig.DoNotDisturb(null)
         is TriggerConfig.Geofence -> TriggerConfig.Geofence(
-            geofenceLatitude, geofenceLongitude, geofenceRadiusMeters, geofenceTransitionType
+            geofenceLatitude, geofenceLongitude, geofenceRadiusMeters,
+            geofenceTransitionType, geofenceDwellDelay,
+            geofenceName.ifBlank { null }
         )
+        is TriggerConfig.AlarmStopped -> TriggerConfig.AlarmStopped(
+            alarmStoppedType.ifBlank { "default" }
+        )
+        is TriggerConfig.AppOpened -> TriggerConfig.AppOpened(
+            appTriggerPatterns, appTriggerOnOpen, appTriggerOnClose
+        )
+        is TriggerConfig.AppClosed -> TriggerConfig.AppClosed(
+            appTriggerPatterns, appTriggerOnOpen, appTriggerOnClose
+        )
+        is TriggerConfig.SmsReceived -> TriggerConfig.SmsReceived(
+            smsSenderPattern.ifBlank { null },
+            smsBodyPattern.ifBlank { null }
+        )
+        is TriggerConfig.NotificationListenerConfig -> TriggerConfig.NotificationListenerConfig(
+            notifAppPatterns,
+            notifSenderPattern.ifBlank { null },
+            notifBodyPattern.ifBlank { null },
+            notifTriggerOnDismiss
+        )
+        is TriggerConfig.EmailReceived -> TriggerConfig.EmailReceived(
+            emailSenderPattern.ifBlank { null },
+            emailSubjectPattern.ifBlank { null },
+            emailAppPackage
+        )
+        is TriggerConfig.SleepProxy -> TriggerConfig.SleepProxy(
+            sleepStartHour, sleepStartMinute,
+            sleepEndHour, sleepEndMinute,
+            sleepRequireChargerDisconnected, sleepRequireDndActive
+        )
+        is TriggerConfig.Nfc -> TriggerConfig.Nfc(nfcTagId.ifBlank { null })
+        is TriggerConfig.ShareSheet -> TriggerConfig.ShareSheet(shareSheetState)
         else -> TriggerConfig.Manual
     }
 }
