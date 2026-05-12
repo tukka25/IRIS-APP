@@ -9,6 +9,12 @@
     <string name="widget_trigger_share_sheet">Share sheet</string>
     <string name="widget_trigger_tasker">Tasker</string>
     <string name="widget_trigger_manual">Manual</string>
+    <string name="widget_trigger_alarm_stopped">Alarm stopped</string>
+    <string name="widget_trigger_app">App event</string>
+    <string name="widget_trigger_notification">Notification</string>
+    <string name="widget_trigger_sleep">Sleep proxy</string>
+    <string name="widget_trigger_geofence">Geofence</string>
+    <string name="widget_trigger_system">System event</string>
     <string name="widget_created_ago">created %1$s ago</string>
     <string name="widget_stats_runs">%1$d runs</string>
     <string name="widget_stats_success">%1$d%% success</string>
