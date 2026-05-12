@@ -31,7 +31,13 @@ data class RequestAnalysis(
             "time",
             "nfc",
             "share_sheet",
-            "tasker_setup_required"
+            "battery",
+            "charger",
+            "wifi",
+            "bluetooth",
+            "airplane_mode",
+            "dnd",
+            "geofence"
         )
     }
 }

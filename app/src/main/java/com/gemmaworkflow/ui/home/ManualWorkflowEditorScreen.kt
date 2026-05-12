@@ -427,10 +427,12 @@ fun ManualWorkflowEditorScreen(
 
         steps.forEachIndexed { index, step ->
             val spec = ActionSpecRegistry.find(step.id)
+            val stepValid = isStepValid(step)
             ActionStepCard(
                 step = step,
                 stepNumber = index + 1,
                 label = spec?.label ?: step.id,
+                isValid = spec != null && stepValid,
                 onEdit = { editingStepIndex = index },
                 onDelete = {
                     if (steps.size > 1) {
@@ -521,6 +523,7 @@ private fun ActionStepCard(
     step: WorkflowStep,
     stepNumber: Int,
     label: String,
+    isValid: Boolean = true,
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -538,7 +541,11 @@ private fun ActionStepCard(
                 color = MaterialTheme.colorScheme.primary
             )
             Column(modifier = Modifier.weight(1f)) {
-                Text(label, style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    label,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (isValid) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error
+                )
                 if (step.params.isNotEmpty()) {
                     SelectionContainer {
                         Text(
@@ -575,10 +582,18 @@ private fun ActionEditDialog(
                 .toMutableMap()
         )
     }
+    val validationErrors = remember(selectedActionId, params) {
+        val preview = WorkflowStep(id = selectedActionId, params = buildJsonObject {
+            params.forEach { (k, v) -> put(k, v) }
+        })
+        validateStep(preview)
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Edit Action") },
+        title = {
+            Text(if (validationErrors.isEmpty()) "Edit Action" else "Edit Action — ${validationErrors.size} issue${if (validationErrors.size != 1) "s" else ""}")
+        },
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
@@ -623,6 +638,7 @@ private fun ActionEditDialog(
                 if (spec != null) {
                     spec.params.forEach { param ->
                         val paramName = param.name
+                        val paramErrors = validationErrors.filter { it.paramName == paramName }
                         OutlinedTextField(
                             value = params[paramName] ?: "",
                             onValueChange = { params[paramName] = it },
@@ -633,22 +649,34 @@ private fun ActionEditDialog(
                             },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
-                            supportingText = if (param.description.isNotBlank()) {
-                                { Text(param.description, style = MaterialTheme.typography.labelSmall) }
-                            } else null
+                            isError = paramErrors.isNotEmpty(),
+                            supportingText = {
+                                if (paramErrors.isNotEmpty()) {
+                                    Text(paramErrors.joinToString { it.message }, color = MaterialTheme.colorScheme.error)
+                                } else if (param.description.isNotBlank()) {
+                                    Text(param.description, style = MaterialTheme.typography.labelSmall)
+                                }
+                            }
                         )
                     }
+                }
+                // Show ID-level errors (unknown action)
+                val idErrors = validationErrors.filter { it.paramName == "id" }
+                idErrors.forEach { error ->
+                    Text(error.message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelMedium)
                 }
             }
         },
         confirmButton = {
+            val canSave = validationErrors.isEmpty()
             Button(
                 onClick = {
                     val json = buildJsonObject {
                         params.forEach { (k, v) -> put(k, v) }
                     }
                     onSave(WorkflowStep(id = selectedActionId, params = json))
-                }
+                },
+                enabled = canSave
             ) {
                 Text("Save")
             }
@@ -669,7 +697,6 @@ private fun triggerConfigMatches(a: TriggerConfig, b: TriggerConfig): Boolean {
         a is TriggerConfig.Time && b is TriggerConfig.Time -> true
         a is TriggerConfig.Nfc && b is TriggerConfig.Nfc -> true
         a is TriggerConfig.ShareSheet && b is TriggerConfig.ShareSheet -> true
-        a is TriggerConfig.TaskerRequired && b is TriggerConfig.TaskerRequired -> true
         a is TriggerConfig.Battery && b is TriggerConfig.Battery -> true
         a is TriggerConfig.Charger && b is TriggerConfig.Charger -> true
         a is TriggerConfig.WiFi && b is TriggerConfig.WiFi -> true
@@ -680,6 +707,58 @@ private fun triggerConfigMatches(a: TriggerConfig, b: TriggerConfig): Boolean {
         else -> false
     }
 }
+
+// ── Action validation ────────────────────────────────────────────────────────
+
+private data class ActionValidationError(val paramName: String, val message: String)
+
+/** Validates a WorkflowStep against its ActionSpec. Returns empty list if valid. */
+private fun validateStep(step: WorkflowStep): List<ActionValidationError> {
+    val spec = ActionSpecRegistry.find(step.id)
+    if (spec == null) return listOf(ActionValidationError("id", "Unknown action: ${step.id}"))
+
+    val errors = mutableListOf<ActionValidationError>()
+    val params = step.params.entries.associate { it.key to it.value.toString().removeSurrounding("\"") }
+
+    // Check required params are present and non-empty
+    spec.params.filter { it.required }.forEach { param ->
+        val value = params[param.name]
+        if (value.isNullOrBlank()) {
+            errors.add(ActionValidationError(param.name, "${param.name} is required"))
+        }
+    }
+
+    // Validate param types
+    spec.params.forEach { param ->
+        val value = params[param.name] ?: return@forEach
+        if (value.isBlank()) return@forEach
+
+        when (param.type) {
+            com.gemmaworkflow.domain.catalog.ParamType.Url -> {
+                if (!value.startsWith("http://") && !value.startsWith("https://") && !value.startsWith("content://")) {
+                    errors.add(ActionValidationError(param.name, "Must be a valid URL (http:// or https://)"))
+                }
+            }
+            com.gemmaworkflow.domain.catalog.ParamType.Int -> {
+                if (value.toIntOrNull() == null) {
+                    errors.add(ActionValidationError(param.name, "Must be a whole number"))
+                }
+            }
+            com.gemmaworkflow.domain.catalog.ParamType.Long,
+            com.gemmaworkflow.domain.catalog.ParamType.DateTimeMillis -> {
+                if (value.toLongOrNull() == null) {
+                    errors.add(ActionValidationError(param.name, "Must be a number"))
+                }
+            }
+            else -> { /* string/uri/enum — no type check */ }
+        }
+    }
+
+    return errors
+}
+
+/** True if the step has no validation errors. */
+private fun isStepValid(step: WorkflowStep): Boolean = validateStep(step).isEmpty()
 
 private fun buildTrigger(
     triggerType: Pair<String, TriggerConfig>,

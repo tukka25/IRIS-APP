@@ -27,6 +27,7 @@ import com.gemmaworkflow.platform.trigger.ChargerTriggerManager
 import com.gemmaworkflow.platform.trigger.DndTriggerManager
 import com.gemmaworkflow.platform.trigger.WiFiTriggerManager
 import com.gemmaworkflow.platform.trigger.AirplaneModeTriggerManager
+import com.gemmaworkflow.platform.location.GeofenceManager
 import com.gemmaworkflow.platform.inference.InferenceManager
 import com.gemmaworkflow.platform.inference.InferenceState
 import com.gemmaworkflow.platform.tools.reto.RetoTrace
@@ -257,7 +258,6 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
                 is com.gemmaworkflow.domain.model.TriggerConfig.Time -> "time"
                 is com.gemmaworkflow.domain.model.TriggerConfig.Nfc -> "nfc"
                 is com.gemmaworkflow.domain.model.TriggerConfig.ShareSheet -> "share_sheet"
-                is com.gemmaworkflow.domain.model.TriggerConfig.TaskerRequired -> "tasker_setup_required"
                 is com.gemmaworkflow.domain.model.TriggerConfig.Manual -> "manual"
                 is com.gemmaworkflow.domain.model.TriggerConfig.Battery -> {
                     BatteryTriggerManager.registerWorkflow(
@@ -278,23 +278,19 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
                     null  // handled — no TriggerRegistry.register call
                 }
                 is com.gemmaworkflow.domain.model.TriggerConfig.Bluetooth -> {
-                    val btTrigger = workflow.trigger as com.gemmaworkflow.domain.model.TriggerConfig.Bluetooth
-                    BluetoothTriggerManager.registerWorkflow(getApplication(), workflow.name, btTrigger)
+                    BluetoothTriggerManager.registerWorkflow(getApplication(), workflow.name, workflow.trigger)
                     null  // handled — no TriggerRegistry.register call
                 }
                 is com.gemmaworkflow.domain.model.TriggerConfig.AirplaneMode -> {
-                    val apTrigger = workflow.trigger as com.gemmaworkflow.domain.model.TriggerConfig.AirplaneMode
-                    AirplaneModeTriggerManager.registerWorkflow(getApplication(), workflow.name, apTrigger)
+                    AirplaneModeTriggerManager.registerWorkflow(getApplication(), workflow.name, workflow.trigger)
                     null  // handled — no TriggerRegistry.register call
                 }
                 is com.gemmaworkflow.domain.model.TriggerConfig.DoNotDisturb -> {
-                    val dndTrigger = workflow.trigger as com.gemmaworkflow.domain.model.TriggerConfig.DoNotDisturb
-                    DndTriggerManager.registerWorkflow(getApplication(), workflow.name, dndTrigger)
+                    DndTriggerManager.registerWorkflow(getApplication(), workflow.name, workflow.trigger)
                     null  // handled — no TriggerRegistry.register call
                 }
                 is com.gemmaworkflow.domain.model.TriggerConfig.Geofence -> {
-                    val geoTrigger = workflow.trigger as com.gemmaworkflow.domain.model.TriggerConfig.Geofence
-                    com.gemmaworkflow.platform.location.GeofenceManager.registerWorkflow(getApplication(), workflow.name, geoTrigger)
+                    com.gemmaworkflow.platform.location.GeofenceManager.registerWorkflow(getApplication(), workflow.name, workflow.trigger)
                     null  // handled — no TriggerRegistry.register call
                 }
             }
@@ -307,7 +303,10 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
                 }
             }
 
-            _uiState.update { it.copy(saved = true) }
+            val saved = workflowRepo.loadAll()
+            withContext(Dispatchers.Main) {
+                _uiState.update { it.copy(saved = true, savedWorkflows = saved) }
+            }
         }
     }
 
@@ -661,10 +660,50 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
             val toSave = workflow.copy(rawModelOutput = originalRawOutput)
             workflowRepo.save(toSave)
 
-            // Re-register battery trigger if applicable.
-            val trigger = toSave.trigger as? com.gemmaworkflow.domain.model.TriggerConfig.Battery
-            if (trigger != null) {
-                BatteryTriggerManager.registerWorkflow(getApplication(), toSave.name, trigger)
+            // Re-register all trigger types (mirrors saveWorkflow)
+            val trigger = toSave.trigger
+            when (trigger) {
+                is TriggerConfig.Time -> {
+                    val result = TriggerRegistry.register(toSave.name, "time", trigger)
+                    if (result.success) appendDebug("TriggerRegistry", "Re-registered time trigger")
+                }
+                is TriggerConfig.Nfc -> {
+                    val result = TriggerRegistry.register(toSave.name, "nfc", trigger)
+                    if (result.success) appendDebug("TriggerRegistry", "Re-registered NFC trigger")
+                }
+                is TriggerConfig.ShareSheet -> {
+                    val result = TriggerRegistry.register(toSave.name, "share_sheet", trigger)
+                    if (result.success) appendDebug("TriggerRegistry", "Re-registered share sheet trigger")
+                }
+                is TriggerConfig.Manual -> { /* no registration needed */ }
+                is TriggerConfig.Battery -> {
+                    BatteryTriggerManager.registerWorkflow(getApplication(), toSave.name, trigger)
+                    appendDebug("TriggerRegistry", "Re-registered battery trigger")
+                }
+                is TriggerConfig.Charger -> {
+                    ChargerTriggerManager.registerWorkflow(getApplication(), toSave.name, trigger)
+                    appendDebug("TriggerRegistry", "Re-registered charger trigger")
+                }
+                is TriggerConfig.WiFi -> {
+                    WiFiTriggerManager.registerWorkflow(getApplication(), toSave.name, trigger)
+                    appendDebug("TriggerRegistry", "Re-registered WiFi trigger")
+                }
+                is TriggerConfig.Bluetooth -> {
+                    BluetoothTriggerManager.registerWorkflow(getApplication(), toSave.name, trigger)
+                    appendDebug("TriggerRegistry", "Re-registered Bluetooth trigger")
+                }
+                is TriggerConfig.AirplaneMode -> {
+                    AirplaneModeTriggerManager.registerWorkflow(getApplication(), toSave.name, trigger)
+                    appendDebug("TriggerRegistry", "Re-registered airplane mode trigger")
+                }
+                is TriggerConfig.DoNotDisturb -> {
+                    DndTriggerManager.registerWorkflow(getApplication(), toSave.name, trigger)
+                    appendDebug("TriggerRegistry", "Re-registered DND trigger")
+                }
+                is TriggerConfig.Geofence -> {
+                    GeofenceManager.registerWorkflow(getApplication(), toSave.name, trigger)
+                    appendDebug("TriggerRegistry", "Re-registered geofence trigger")
+                }
             }
 
             val saved = workflowRepo.loadAll()

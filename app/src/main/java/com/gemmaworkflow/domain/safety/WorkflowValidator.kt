@@ -138,7 +138,6 @@ object WorkflowValidator {
         is TriggerConfig.Time -> "time"
         is TriggerConfig.Nfc -> "nfc"
         is TriggerConfig.ShareSheet -> "share_sheet"
-        is TriggerConfig.TaskerRequired -> "tasker_setup_required"
         is TriggerConfig.Battery -> "battery"
         is TriggerConfig.Charger -> "charger"
         is TriggerConfig.WiFi -> "wifi"

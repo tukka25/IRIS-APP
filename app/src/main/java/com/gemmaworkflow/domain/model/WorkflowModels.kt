@@ -47,11 +47,6 @@ sealed class TriggerConfig {
         val setupState: SetupState = SetupState.NeedsSetup
     ) : TriggerConfig()
 
-    @Serializable
-    data class TaskerRequired(
-        val setupState: SetupState = SetupState.NeedsSetup
-    ) : TriggerConfig()
-
     /** Run when battery level crosses a threshold. */
     @Serializable
     data class Battery(

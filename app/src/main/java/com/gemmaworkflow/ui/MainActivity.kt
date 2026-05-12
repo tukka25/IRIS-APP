@@ -327,7 +327,7 @@ private fun WorkflowGenerationScreen(viewModel: WorkflowGenerationViewModel) {
                     is TriggerConfig.Time -> viewModel.showTimeTriggerSetup(detail)
                     is TriggerConfig.Manual -> viewModel.showTimeTriggerSetup(detail)
                     is TriggerConfig.ShareSheet -> viewModel.showShareSheetSetup(detail)
-                    else -> { /* other triggers (Nfc, TaskerRequired) not yet supported */ }
+                    else -> { /* other triggers not yet supported */ }
                 }
             },
             onEdit = { viewModel.openEditWorkflowEditor(detail) }
@@ -954,9 +954,8 @@ private fun triggerLabel(workflow: com.gemmaworkflow.domain.model.PlannedWorkflo
         is com.gemmaworkflow.domain.model.TriggerConfig.Manual -> "Manual"
         is com.gemmaworkflow.domain.model.TriggerConfig.Time -> formatTriggerSummary(t)
         is com.gemmaworkflow.domain.model.TriggerConfig.Nfc -> "NFC"
-        is com.gemmaworkflow.domain.model.TriggerConfig.ShareSheet -> "Share Sheet (${t.setupState})"
-        is com.gemmaworkflow.domain.model.TriggerConfig.TaskerRequired -> "Tasker (${t.setupState})"
-        is com.gemmaworkflow.domain.model.TriggerConfig.Battery -> "Battery ${t.condition.name.lowercase()} ${t.levelThreshold}%"
+        is TriggerConfig.ShareSheet -> "Share Sheet (${t.setupState})"
+        is TriggerConfig.Battery -> "Battery ${t.condition.name.lowercase()} ${t.levelThreshold}%"
         is com.gemmaworkflow.domain.model.TriggerConfig.Charger -> "Charger (${t.connectionType.name})"
         is com.gemmaworkflow.domain.model.TriggerConfig.WiFi -> if (t.ssid.isNullOrBlank()) "WiFi" else "WiFi (${t.ssid})"
         is com.gemmaworkflow.domain.model.TriggerConfig.Bluetooth -> if (t.deviceAddress.isNullOrBlank()) "Bluetooth" else "Bluetooth (${t.deviceAddress})"

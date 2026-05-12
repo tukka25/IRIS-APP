@@ -18,8 +18,7 @@ data class TriggerInfo(
     val type: String,
     val label: String,
     val description: String,
-    val setupState: SetupState = SetupState.Ready,
-    val requiresTasker: Boolean = false
+    val setupState: SetupState = SetupState.Ready
 )
 
 object TriggerCatalog {
@@ -47,13 +46,6 @@ object TriggerCatalog {
             label = "Share sheet",
             description = "Run when content is shared to GemmaWorkflow.",
             setupState = SetupState.NeedsSetup
-        ),
-        TriggerInfo(
-            type = "tasker_setup_required",
-            label = "Tasker automation",
-            description = "Requires Tasker app to create the automation profile.",
-            setupState = SetupState.NeedsSetup,
-            requiresTasker = true
         ),
         TriggerInfo(
             type = "battery",
@@ -102,6 +94,23 @@ object TriggerCatalog {
     fun find(type: String): TriggerInfo? = all.find { it.type == type }
 
     val supportedTypes: Set<String> = all.map { it.type }.toSet()
+
+    /**
+     * Compact, token-efficient trigger list for SLM prompts.
+     * Format: "type: description"
+     * The SLM picks from these when producing trigger_hint.
+     */
+    fun toCompactPrompt(): String = buildString {
+        appendLine("Available trigger types (pick one for trigger_hint):")
+        all.forEach { trigger ->
+            val setup = when (trigger.setupState) {
+                SetupState.Ready -> ""
+                SetupState.NeedsSetup -> " [needs setup]"
+                SetupState.Unsupported -> " [unsupported]"
+            }
+            appendLine("  ${trigger.type}: ${trigger.description}$setup")
+        }
+    }
 }
 
 /**

@@ -1,5 +1,8 @@
 package com.gemmaworkflow.domain.parser
 
+import com.gemmaworkflow.domain.model.BatteryCondition
+import com.gemmaworkflow.domain.model.ChargerType
+import com.gemmaworkflow.domain.model.GeofenceTransition
 import com.gemmaworkflow.domain.model.PlannedWorkflow
 import com.gemmaworkflow.domain.model.TriggerConfig
 import com.gemmaworkflow.domain.model.WorkflowStep
@@ -80,7 +83,47 @@ object WorkflowJsonParser {
                 tagId = obj["tag_id"]?.jsonPrimitive?.content
             )
             "share_sheet" -> TriggerConfig.ShareSheet(setupState = setupState)
-            "tasker_setup_required" -> TriggerConfig.TaskerRequired(setupState = setupState)
+            "battery" -> {
+                val threshold = obj["level_threshold"]?.jsonPrimitive?.content?.toIntOrNull() ?: 20
+                val condition = when (obj["battery_condition"]?.jsonPrimitive?.content) {
+                    "above" -> BatteryCondition.ABOVE
+                    else -> BatteryCondition.BELOW
+                }
+                TriggerConfig.Battery(levelThreshold = threshold, condition = condition)
+            }
+            "charger" -> {
+                val chargerType = when (obj["charger_type"]?.jsonPrimitive?.content) {
+                    "usb" -> ChargerType.USB
+                    "ac" -> ChargerType.AC
+                    "wireless" -> ChargerType.WIRELESS
+                    else -> ChargerType.ANY
+                }
+                TriggerConfig.Charger(chargerType)
+            }
+            "wifi" -> TriggerConfig.WiFi(
+                ssid = obj["ssid"]?.jsonPrimitive?.content
+            )
+            "bluetooth" -> TriggerConfig.Bluetooth(
+                deviceAddress = obj["device_address"]?.jsonPrimitive?.content
+            )
+            "airplane_mode" -> TriggerConfig.AirplaneMode(
+                enabled = obj["enabled"]?.jsonPrimitive?.content?.toBooleanStrictOrNull() ?: true
+            )
+            "dnd" -> TriggerConfig.DoNotDisturb(
+                interruptionFilter = obj["interruption_filter"]?.jsonPrimitive?.content?.toIntOrNull()
+            )
+            "geofence" -> {
+                TriggerConfig.Geofence(
+                    latitude = obj["latitude"]?.jsonPrimitive?.content?.toDoubleOrNull() ?: 0.0,
+                    longitude = obj["longitude"]?.jsonPrimitive?.content?.toDoubleOrNull() ?: 0.0,
+                    radiusMeters = obj["radius_meters"]?.jsonPrimitive?.content?.toFloatOrNull() ?: 100f,
+                    transitionType = when (obj["transition_type"]?.jsonPrimitive?.content) {
+                        "exit" -> GeofenceTransition.EXIT
+                        "dwell" -> GeofenceTransition.DWELL
+                        else -> GeofenceTransition.ENTER
+                    }
+                )
+            }
             else -> TriggerConfig.Manual
         }
     }
