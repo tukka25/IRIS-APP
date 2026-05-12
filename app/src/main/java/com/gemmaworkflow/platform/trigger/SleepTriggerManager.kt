@@ -127,7 +127,7 @@ object SleepTriggerManager {
             when (intent.action) {
                 Intent.ACTION_POWER_CONNECTED -> {
                     lastChargerConnected = true
-                    Log.d(TAG, "Charger connected")
+                    Log.d(TAG, "Charger connected event detected")
                 }
                 Intent.ACTION_POWER_DISCONNECTED -> {
                     val wasConnected = lastChargerConnected == true
