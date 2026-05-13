@@ -4,7 +4,6 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.BroadcastReceiver
 import android.content.Context
-import android.content.ContextCompat
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
@@ -101,8 +100,8 @@ object WiFiTriggerManager {
             var bssid: String? = null
             var isConnected = false
 
-            val hasLocationPermission = ContextCompat.checkSelfPermission(
-                ctx, Manifest.permission.ACCESS_FINE_LOCATION
+            val hasLocationPermission = ctx.checkSelfPermission(
+                Manifest.permission.ACCESS_FINE_LOCATION
             ) == PackageManager.PERMISSION_GRANTED
 
             if (hasLocationPermission) {

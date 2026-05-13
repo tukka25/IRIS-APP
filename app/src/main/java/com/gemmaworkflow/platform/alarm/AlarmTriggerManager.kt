@@ -1,5 +1,6 @@
 package com.gemmaworkflow.platform.alarm
 
+import android.app.Activity
 import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
@@ -78,7 +79,19 @@ object AlarmTriggerManager {
             snoozeIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val info = android.app.AlarmManager.AlarmClockInfo(triggerTimeMillis, dismissPending)
+        // showIntent - opens the alarm app UI when user taps the system alarm clock icon
+        // Must be an Activity PendingIntent, not a BroadcastReceiver (which would fire workflows on tap)
+        val showIntent = Intent(context, com.gemmaworkflow.ui.MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra("alarm_id", alarmId)
+            putExtra("from_alarm", true)
+        }
+        val showPending = PendingIntent.getActivity(
+            context, alarmId.hashCode() + 3,
+            showIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val info = android.app.AlarmManager.AlarmClockInfo(triggerTimeMillis, showPending)
 
         try {
             alarmManager.setAlarmClock(info, firePending)
@@ -151,7 +164,8 @@ object AlarmTriggerManager {
             val alarmWorkflows = workflows.filter { it.trigger is TriggerConfig.AlarmStopped }
 
             val fired = alarmWorkflows.filter { wf ->
-                val t = wf.trigger as TriggerConfig.AlarmStopped
+                // Match by workflowName if provided, otherwise match all AlarmStopped workflows
+                // (alarmId is in the format: "{workflowName}_alarm" or "{workflowName}_snoozed")
                 workflowName == null || wf.name == workflowName
             }
 

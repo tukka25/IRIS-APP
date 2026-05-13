@@ -5,7 +5,6 @@ import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice
 import android.content.BroadcastReceiver
 import android.content.Context
-import android.content.ContextCompat
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager

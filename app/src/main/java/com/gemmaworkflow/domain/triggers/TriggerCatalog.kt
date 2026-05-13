@@ -88,6 +88,48 @@ object TriggerCatalog {
             label = "Arrive / Leave",
             description = "Run when the device enters, exits, or dwells at a location.",
             setupState = SetupState.NeedsSetup
+        ),
+        TriggerInfo(
+            type = "alarm_stopped",
+            label = "Alarm stopped",
+            description = "Run when a GemmaWorkflow alarm is dismissed or stopped.",
+            setupState = SetupState.Ready
+        ),
+        TriggerInfo(
+            type = "app_opened",
+            label = "App opened",
+            description = "Run when a specific app is opened.",
+            setupState = SetupState.NeedsSetup
+        ),
+        TriggerInfo(
+            type = "app_closed",
+            label = "App closed",
+            description = "Run when a specific app is closed.",
+            setupState = SetupState.NeedsSetup
+        ),
+        TriggerInfo(
+            type = "sms_received",
+            label = "SMS received",
+            description = "Run when an SMS matching criteria is received.",
+            setupState = SetupState.NeedsSetup
+        ),
+        TriggerInfo(
+            type = "messaging_notification",
+            label = "Messaging notification",
+            description = "Run when a messaging app notification arrives.",
+            setupState = SetupState.NeedsSetup
+        ),
+        TriggerInfo(
+            type = "email_received",
+            label = "Email received",
+            description = "Run when a new email arrives.",
+            setupState = SetupState.NeedsSetup
+        ),
+        TriggerInfo(
+            type = "sleep_proxy",
+            label = "Sleep schedule",
+            description = "Run on a sleep/wind-down schedule.",
+            setupState = SetupState.NeedsSetup
         )
     )
 

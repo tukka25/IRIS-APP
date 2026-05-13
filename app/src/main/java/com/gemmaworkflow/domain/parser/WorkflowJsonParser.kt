@@ -120,6 +120,7 @@ object WorkflowJsonParser {
                     transitionType = when (obj["transition_type"]?.jsonPrimitive?.content) {
                         "exit" -> GeofenceTransition.EXIT
                         "dwell" -> GeofenceTransition.DWELL
+                        "enter_exit" -> GeofenceTransition.ENTER_EXIT
                         else -> GeofenceTransition.ENTER
                     }
                 )
