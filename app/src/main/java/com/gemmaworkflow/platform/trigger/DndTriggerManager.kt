@@ -97,8 +97,13 @@ object DndTriggerManager {
 
             val notificationManager = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             val currentFilter = notificationManager.currentInterruptionFilter
+            val dndActive = currentFilter != NotificationManager.INTERRUPTION_FILTER_ALL
 
             Log.d(TAG, "DND filter changed: $currentFilter")
+
+            if (dndActive) {
+                SleepTriggerManager.onDndActivated(ctx, currentFilter)
+            }
 
             val toFire = synchronized(activeWorkflows) {
                 activeWorkflows.filter { (_, trigger) ->

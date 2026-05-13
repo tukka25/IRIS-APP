@@ -4,7 +4,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.content.SharedPreferences
 import android.os.Build
 import android.util.Log
 import com.gemmaworkflow.data.repository.WorkflowRepository
@@ -23,8 +22,6 @@ import kotlinx.coroutines.launch
 object AirplaneModeTriggerManager {
 
     private const val TAG = "AirplaneModeTriggerManager"
-    private const val PREFS_NAME = "airplane_trigger_prefs"
-
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     // Active airplane mode workflows: workflow name -> trigger config
@@ -94,7 +91,8 @@ object AirplaneModeTriggerManager {
 
             val toFire = synchronized(activeWorkflows) {
                 activeWorkflows.filter { (_, trigger) ->
-                    trigger.enabled == null || trigger.enabled == enabled
+                    // TriggerConfig.AirplaneMode.enabled is non-nullable; exact match is required.
+                    trigger.enabled == enabled
             }.toList() }
 
             for ((workflowName, _) in toFire) {

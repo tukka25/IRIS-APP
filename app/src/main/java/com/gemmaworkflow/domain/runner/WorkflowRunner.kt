@@ -25,6 +25,7 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.isString
 import kotlinx.serialization.json.jsonPrimitive
 
 /**
@@ -88,13 +89,12 @@ class WorkflowRunner(
         for (entry in params.entries) {
             val key = entry.key
             val value = entry.value
-            val text = if (value is kotlinx.serialization.json.JsonPrimitive) {
-                value.contentOrNull ?: value.toString()
+            val resolvedValue = if (value is JsonPrimitive && value.isString) {
+                JsonPrimitive(resolveOutputRefs(value.content))
             } else {
-                value.toString()
+                value
             }
-            val resolvedText = resolveOutputRefs(text)
-            resolvedEntries.add(key to JsonPrimitive(resolvedText))
+            resolvedEntries.add(key to resolvedValue)
         }
         return JsonObject(resolvedEntries.toMap())
     }
@@ -288,7 +288,7 @@ class WorkflowRunner(
                 return executePackageLaunch(step, spec, execution, onDebug)
             }
             is ExecutionSpec.InternalTool -> {
-                return executeInternalTool(step, spec, execution, onDebug)
+                return executeInternalTool(resolvedStep, spec, execution, onDebug)
             }
             is ExecutionSpec.AndroidIntent -> Unit
             is ExecutionSpec.CustomTab,
@@ -372,7 +372,12 @@ class WorkflowRunner(
         execution: ExecutionSpec.InternalTool,
         onDebug: (label: String, message: String) -> Unit
     ): ExecutionResult {
-        val input = step.params.mapValues { entry -> entry.value.jsonPrimitive.contentOrNull ?: entry.value.toString() }
+        val input = step.params.mapValues { (_, value) ->
+            when (value) {
+                is JsonPrimitive -> value.contentOrNull ?: value.toString()
+                else -> value.toString()
+            }
+        }
         onDebug("Tool call", "${execution.toolName} params=$input")
         val result = ToolRegistry.execute(execution.toolName, input)
 

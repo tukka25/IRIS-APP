@@ -84,9 +84,11 @@ object SleepTriggerManager {
     fun onDndActivated(context: Context, dndInterruptionFilter: Int?) {
         val now = Calendar.getInstance()
         val currentMinutes = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE)
+        val dndActive = isDndActive(dndInterruptionFilter)
 
         val toFire = synchronized(activeSleepWorkflows) {
             activeSleepWorkflows.filter { (_, trigger) ->
+                (!trigger.requireDndActive || dndActive) &&
                 matchesSleepConditions(trigger, currentMinutes, isCharging(context))
             }.toList()
         }
@@ -124,17 +126,17 @@ object SleepTriggerManager {
         override fun onReceive(ctx: Context, intent: Intent) {
             when (intent.action) {
                 Intent.ACTION_POWER_CONNECTED -> {
-                    val wasDisconnected = lastChargerConnected == false
                     lastChargerConnected = true
-                    if (wasDisconnected) {
+                    Log.d(TAG, "Charger connected event detected")
+                }
+                Intent.ACTION_POWER_DISCONNECTED -> {
+                    val wasConnected = lastChargerConnected == true
+                    lastChargerConnected = false
+                    if (wasConnected) {
                         Log.d(TAG, "Charger disconnected event detected (just unplugged)")
                         // Fire sleep workflows that requireChargerDisconnected=true
                         fireIfJustDisconnected(ctx)
                     }
-                }
-                Intent.ACTION_POWER_DISCONNECTED -> {
-                    lastChargerConnected = false
-                    Log.d(TAG, "Charger disconnected")
                 }
             }
         }
@@ -210,5 +212,10 @@ object SleepTriggerManager {
         val status = batteryStatus?.getIntExtra(android.os.BatteryManager.EXTRA_STATUS, -1) ?: -1
         return status == android.os.BatteryManager.BATTERY_STATUS_CHARGING ||
                status == android.os.BatteryManager.BATTERY_STATUS_FULL
+    }
+
+    private fun isDndActive(interruptionFilter: Int?): Boolean {
+        return interruptionFilter != null &&
+            interruptionFilter != android.app.NotificationManager.INTERRUPTION_FILTER_ALL
     }
 }

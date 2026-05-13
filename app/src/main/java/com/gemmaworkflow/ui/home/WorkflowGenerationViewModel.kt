@@ -285,19 +285,23 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
                     null  // handled — no TriggerRegistry.register call
                 }
                 is com.gemmaworkflow.domain.model.TriggerConfig.Bluetooth -> {
-                    BluetoothTriggerManager.registerWorkflow(getApplication(), workflow.name, workflow.trigger)
+                    val bluetoothTrigger = workflow.trigger as com.gemmaworkflow.domain.model.TriggerConfig.Bluetooth
+                    BluetoothTriggerManager.registerWorkflow(getApplication(), workflow.name, bluetoothTrigger)
                     null  // handled — no TriggerRegistry.register call
                 }
                 is com.gemmaworkflow.domain.model.TriggerConfig.AirplaneMode -> {
-                    AirplaneModeTriggerManager.registerWorkflow(getApplication(), workflow.name, workflow.trigger)
+                    val airplaneTrigger = workflow.trigger as com.gemmaworkflow.domain.model.TriggerConfig.AirplaneMode
+                    AirplaneModeTriggerManager.registerWorkflow(getApplication(), workflow.name, airplaneTrigger)
                     null  // handled — no TriggerRegistry.register call
                 }
                 is com.gemmaworkflow.domain.model.TriggerConfig.DoNotDisturb -> {
-                    DndTriggerManager.registerWorkflow(getApplication(), workflow.name, workflow.trigger)
+                    val dndTrigger = workflow.trigger as com.gemmaworkflow.domain.model.TriggerConfig.DoNotDisturb
+                    DndTriggerManager.registerWorkflow(getApplication(), workflow.name, dndTrigger)
                     null  // handled — no TriggerRegistry.register call
                 }
                 is com.gemmaworkflow.domain.model.TriggerConfig.Geofence -> {
-                    com.gemmaworkflow.platform.location.GeofenceManager.registerWorkflow(getApplication(), workflow.name, workflow.trigger)
+                    val geofenceTrigger = workflow.trigger as com.gemmaworkflow.domain.model.TriggerConfig.Geofence
+                    com.gemmaworkflow.platform.location.GeofenceManager.registerWorkflow(getApplication(), workflow.name, geofenceTrigger)
                     null  // handled — no TriggerRegistry.register call
                 }
                 is com.gemmaworkflow.domain.model.TriggerConfig.AlarmStopped -> null  // handled by AlarmTriggerManager

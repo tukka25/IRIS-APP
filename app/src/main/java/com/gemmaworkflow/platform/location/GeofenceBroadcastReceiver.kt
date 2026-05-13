@@ -41,10 +41,8 @@ class GeofenceBroadcastReceiver : BroadcastReceiver() {
             val workflowName = geofence.requestId
             Log.i(TAG, "Geofence transition $transitionType for workflow: $workflowName")
 
-            // Load the workflow and fire it
             val repository = WorkflowRepository(context)
-            val workflows = repository.loadAll()
-            val workflow = workflows.find { it.name == workflowName }
+            val workflow = repository.get(workflowName)
 
             if (workflow != null && workflow.trigger is TriggerConfig.Geofence) {
                 TriggerRegistry.fire(context, workflow)

@@ -236,40 +236,6 @@
             </intent-filter>
         </receiver>
 
-        <!-- Our: trigger receivers -->
-        <receiver
-            android:name=".platform.trigger.AirplaneModeTriggerReceiver"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="android.intent.action.AIRPLANE_MODE" />
-            </intent-filter>
-        </receiver>
-
-        <receiver
-            android:name=".platform.trigger.DndTriggerReceiver"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="android.app.action.NOTIFICATION_INTERRUPTION_FILTER_CHANGED" />
-            </intent-filter>
-        </receiver>
-
-        <receiver
-            android:name=".platform.trigger.WiFiTriggerReceiver"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="android.net.conn.CONNECTIVITY_CHANGE" />
-            </intent-filter>
-        </receiver>
-
-        <receiver
-            android:name=".platform.trigger.BluetoothTriggerReceiver"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="android.bluetooth.device.action.ACL_CONNECTED" />
-                <action android:name="android.bluetooth.device.action.ACL_DISCONNECTED" />
-            </intent-filter>
-        </receiver>
-
         <!-- Their: widget -->
         <receiver
             android:name=".widget.WorkflowWidgetReceiver"

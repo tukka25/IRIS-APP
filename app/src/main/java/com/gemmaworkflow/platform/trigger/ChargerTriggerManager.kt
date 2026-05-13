@@ -109,12 +109,9 @@ private fun fireWorkflow(context: Context, workflowName: String) {
                     ChargerType.WIRELESS -> plugged == BatteryManager.BATTERY_PLUGGED_WIRELESS
                 }
 
-                if (!validType) continue
-
-                val shouldFire = when (trigger.connectionType) {
-                    ChargerType.ANY -> connected
-                    else -> connected
-                }
+                // On disconnect broadcasts, EXTRA_PLUGGED may not identify the prior charger type.
+                // Fire by default so unplug workflows are not missed.
+                val shouldFire = if (connected) validType else true
 
                 if (shouldFire) {
                     Log.i(TAG, "Charger trigger fired: $workflowName (${if (connected) "connected" else "disconnected"}, type=$plugged)")

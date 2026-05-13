@@ -143,7 +143,7 @@ object WorkflowValidator {
         is TriggerConfig.WiFi -> "wifi"
         is TriggerConfig.Bluetooth -> "bluetooth"
         is TriggerConfig.AirplaneMode -> "airplane_mode"
-        is TriggerConfig.DoNotDisturb -> "do_not_disturb"
+        is TriggerConfig.DoNotDisturb -> "dnd"
         is TriggerConfig.AlarmStopped -> "alarm_stopped"
         is TriggerConfig.AppOpened -> "app_opened"
         is TriggerConfig.AppClosed -> "app_closed"
