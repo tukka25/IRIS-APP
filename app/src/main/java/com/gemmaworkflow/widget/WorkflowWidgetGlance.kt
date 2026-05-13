@@ -94,8 +94,22 @@ private fun buildSnapshot(context: Context, workflowName: String): WidgetSnapsho
         }
         is TriggerConfig.Nfc -> context.getString(R.string.widget_trigger_nfc)
         is TriggerConfig.ShareSheet -> context.getString(R.string.widget_trigger_share_sheet)
-        is TriggerConfig.TaskerRequired -> context.getString(R.string.widget_trigger_tasker)
         is TriggerConfig.Manual, null -> context.getString(R.string.widget_trigger_manual)
+        is TriggerConfig.AlarmStopped -> context.getString(R.string.widget_trigger_alarm_stopped)
+        is TriggerConfig.AppOpened,
+        is TriggerConfig.AppClosed -> context.getString(R.string.widget_trigger_app)
+        is TriggerConfig.SmsReceived,
+        is TriggerConfig.NotificationListenerConfig,
+        is TriggerConfig.EmailReceived -> context.getString(R.string.widget_trigger_notification)
+        is TriggerConfig.SleepProxy -> context.getString(R.string.widget_trigger_sleep)
+        is TriggerConfig.Geofence -> context.getString(R.string.widget_trigger_geofence)
+        is TriggerConfig.Battery,
+        is TriggerConfig.Charger,
+        is TriggerConfig.WiFi,
+        is TriggerConfig.Bluetooth,
+        is TriggerConfig.AirplaneMode,
+        is TriggerConfig.DoNotDisturb -> context.getString(R.string.widget_trigger_system)
+        else -> context.getString(R.string.widget_trigger_manual)
     }
 
     val actionLabels = workflow?.actions

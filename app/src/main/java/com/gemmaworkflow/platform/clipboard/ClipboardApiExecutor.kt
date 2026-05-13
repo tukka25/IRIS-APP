@@ -92,17 +92,30 @@ class ClipboardApiExecutor(private val context: Context) {
         return try {
             val uri = Uri.parse(uriText)
 
-            // For content:// URIs (photos, files, etc.), take persistable read permission
-            // so the clipboard recipient can access the data after paste.
+            // For content:// URIs (photos, files, etc.), verify we can access it before
+            // adding to clipboard. Check both existence and read permission.
             if ("content" == uri.scheme) {
-                try {
-                    context.contentResolver.takePersistableUriPermission(
-                        uri,
-                        Intent.FLAG_GRANT_READ_URI_PERMISSION
-                    )
-                } catch (_: SecurityException) {
-                    // Permission not persistable or not held — system grants transient
-                    // read access to clipboard recipients automatically.
+                val canRead = try {
+                    context.contentResolver.openInputStream(uri)?.close(); true
+                } catch (_: Exception) {
+                    false
+                }
+                if (!canRead) {
+                    // Try taking persistable read permission as a fallback
+                    try {
+                        context.contentResolver.takePersistableUriPermission(
+                            uri,
+                            Intent.FLAG_GRANT_READ_URI_PERMISSION
+                        )
+                    } catch (_: SecurityException) {
+                        // Couldn't get permission — report clearly instead of silent failure
+                        Log.e(TAG, "No read permission for URI: $uri")
+                        return ExecutionResult(
+                            stepId = stepId,
+                            success = false,
+                            message = "No read permission for URI. Grant file access or use a different URI scheme."
+                        )
+                    }
                 }
             }
 

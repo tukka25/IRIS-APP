@@ -17,6 +17,18 @@ data class ConfirmationRequest(
 )
 
 /**
+ * Carries the information needed to render a permission-request dialog for a pending step.
+ * [stepId] identifies the action; [stepLabel] is the human-readable name;
+ * [permissions] is the list of Android runtime permissions needed (e.g.
+ * [android.Manifest.permission.READ_CONTACTS]).
+ */
+data class PermissionRequest(
+    val stepId: String,
+    val stepLabel: String,
+    val permissions: List<String>
+)
+
+/**
  * Carries the information needed to render a confirmation dialog when an NFC tag
  * is scanned and the user needs to confirm before running the workflow.
  */
@@ -76,6 +88,8 @@ data class WorkflowGenerationUiState(
     val selectedWorkflowName: String? = null,
     /** Set when a step requires user confirmation; cleared after confirm or dismiss. */
     val pendingConfirmation: ConfirmationRequest? = null,
+    /** Set when a step requires runtime permissions; cleared after grant or dismiss. */
+    val pendingPermission: PermissionRequest? = null,
     /** Index of the next step to run when resuming after confirmation. */
     val resumeStepIndex: Int = 0,
     /** Non-null when the user has tapped a saved workflow to see its detail. */
@@ -110,7 +124,16 @@ data class WorkflowGenerationUiState(
     /** The name of the workflow selected for NFC writing. */
     val nfcWriteWorkflowId: String? = null,
     /** Pending NFC scan awaiting user confirmation to run. */
-    val nfcScanConfirmation: NfcScanConfirmation? = null
+    val nfcScanConfirmation: NfcScanConfirmation? = null,
+
+    // ── Manual editor state ─────────────────────────────────────────────
+    /** Non-null when the manual workflow editor should be shown. */
+    val editingWorkflow: PlannedWorkflow? = null,
+    /** True when the editor is for a new workflow (not editing existing). */
+    val isNewWorkflow: Boolean = false,
+
+    // ── Navigation tabs ────────────────────────────────────────────────
+    val selectedTab: Int = 0  // 0 = Generate, 1 = Workflows, 2 = Editor
 ) {
     val canGenerate: Boolean get() = isModelReady && !isBusy && prompt.isNotBlank()
     val hasWorkflow: Boolean get() = workflowPreview != null

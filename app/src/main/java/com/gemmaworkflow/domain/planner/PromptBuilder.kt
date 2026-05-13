@@ -151,7 +151,7 @@ $toolSchemas
         appendLine("After resolving all entities, produce this JSON:")
         appendLine("""{
   "goal": "concise goal statement",
-  "trigger_hint": "manual" | "time" | "nfc" | "share_sheet" | "tasker_setup_required",
+  "trigger_hint": "manual" | "time" | "nfc" | "share_sheet" | "wifi" | "bluetooth" | "battery" | "dnd" | "geofence" | "alarm_stopped" | "app_opened" | "app_closed" | "sms_received" | "sleep_proxy",
   "schedule_hints": { "hour": 9, "minute": 0, "repeat_days": [] } or null,
   "applications": [
     {
@@ -253,7 +253,7 @@ Output schema (strict):
   "name": "short workflow name",
   "summary": "one sentence describing what this does",
   "trigger": {
-    "type": "manual" | "time" | "nfc" | "share_sheet" | "tasker_setup_required",
+    "type": "manual" | "time" | "nfc" | "share_sheet",
     "setup_state": "ready" | "needs_setup",
     "schedule": { "hour": 9, "minute": 0, "repeat_days": [] } or null
   },

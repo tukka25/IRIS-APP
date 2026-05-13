@@ -7,6 +7,7 @@ import com.google.ai.edge.litertlm.SamplerConfig
 import com.gemmaworkflow.domain.catalog.ActionSpecRegistry
 import com.gemmaworkflow.domain.parser.WorkflowJsonParser
 import com.gemmaworkflow.domain.safety.WorkflowValidator
+import com.gemmaworkflow.domain.triggers.TriggerCatalog
 import com.gemmaworkflow.platform.capability.PackageCapabilityScanner
 import com.gemmaworkflow.platform.tools.reto.CapabilityBinder
 import com.gemmaworkflow.platform.tools.reto.CoverageValidator
@@ -132,6 +133,7 @@ class RetoWorkflowPlanner(
         installedApps: String,
         compactFacts: String
     ): String {
+        val triggerList = TriggerCatalog.toCompactPrompt()
         val prompt = buildString {
             appendLine("You are a request analyzer for GemmaWorkflow.")
             appendLine()
@@ -142,11 +144,13 @@ class RetoWorkflowPlanner(
             appendLine("Resolved facts from device:")
             appendLine(compactFacts)
             appendLine()
+            appendLine(triggerList)
+            appendLine()
             appendLine("Analyze the request. You do NOT need to call any tools — all facts are already resolved above.")
-            appendLine("Return JSON only:")
+            appendLine("Return JSON only (trigger_hint must match one of the types listed above):")
             appendLine("""{
   "goal": "concise goal statement",
-  "trigger_hint": "manual" | "time" | "nfc" | "share_sheet" | "tasker_setup_required",
+  "trigger_hint": "manual" | "time" | "battery" | "charger" | "wifi" | "bluetooth" | "airplane_mode" | "dnd" | "geofence" | "nfc" | "share_sheet",
   "schedule_hints": { "hour": 9, "minute": 0, "repeat_days": [] } or null,
   "applications": [{ "requested_name": "...", "selected_app_label": "...", "package_name": "...", "confidence": "high" }],
   "candidate_app_categories": [...],
@@ -294,7 +298,7 @@ class RetoWorkflowPlanner(
   "name": "short workflow name",
   "summary": "one sentence",
   "trigger": {
-    "type": "manual" | "time" | "nfc" | "share_sheet" | "tasker_setup_required",
+    "type": "manual" | "time" | "nfc" | "share_sheet",
     "setup_state": "ready" | "needs_setup",
     "schedule": { "hour": 9, "minute": 0, "repeat_days": [] } or null
   },

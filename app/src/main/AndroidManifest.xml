@@ -3,11 +3,16 @@
     <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
     <uses-permission android:name="android.permission.READ_CONTACTS" />
     <uses-permission android:name="android.permission.READ_SMS" />
+    <uses-permission android:name="android.permission.RECEIVE_SMS" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.INTERNET" />
 
-    <!-- Media access for domain entity search (playlists, songs, files) -->
+    <!-- Media access for domain entity search (playlists, songs, files) and share actions. -->
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <!-- Fallback for Android 12 and below; Android 13+ uses READ_MEDIA_* instead. -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <!-- Required for AlarmManager.setExactAndAllowWhileIdle().  On Android 12+ the
          system gates this behind Settings; the app redirects via
          ACTION_REQUEST_SCHEDULE_EXACT_ALARM when canScheduleExactAlarms() returns false. -->
@@ -16,6 +21,8 @@
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <!-- Required to reschedule time-triggered workflows after a device reboot. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Required for Do Not Disturb interruption filter change broadcasts. -->
+    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
     <!-- Required for reading/writing calendar events silently. -->
     <uses-permission android:name="android.permission.READ_CALENDAR" />
     <uses-permission android:name="android.permission.WRITE_CALENDAR" />
@@ -24,6 +31,19 @@
     <uses-permission android:name="android.permission.NFC" />
     <!-- NFC hardware feature — not required; app works without NFC but can't write tags. -->
     <uses-feature android:name="android.hardware.nfc" android:required="false" />
+
+    <!-- Bluetooth: required for Bluetooth-connected trigger (Android 12+). -->
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
+    <!-- WiFi: required for WiFi state change detection. -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- WiFi SSID requires location permission on Android 10+. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Geofence background location: required for Arrive/Leave triggers on Android 10+. -->
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
 
     <!-- Package visibility for the declarative ActionSpec registry. -->
     <queries>
@@ -176,6 +196,46 @@
             </intent-filter>
         </receiver>
 
+        <!-- Fires when the device enters/exits/dwells in a geofence (Arrive/Leave trigger). -->
+        <receiver
+            android:name=".platform.location.GeofenceBroadcastReceiver"
+            android:exported="false" />
+
+<!-- Receives SMS-based trigger broadcasts. -->
+        <receiver
+            android:name=".platform.sms.SmsTriggerReceiver"
+            android:exported="true"
+            android:permission="android.permission.BROADCAST_SMS">
+            <intent-filter>
+                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+            </intent-filter>
+        </receiver>
+
+<!-- Listens for notifications used by SMS/notification-based triggers. -->
+        <service
+            android:name=".platform.sms.SmsNotificationListener"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+<!-- Accessibility-based app monitoring trigger service. -->
+        <service
+            android:name=".platform.trigger.AppMonitorAccessibilityService"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
+
         <!-- Receives time trigger confirm/run intents from the notification action buttons. -->
         <activity
             android:name=".ui.trigger.TimeTriggerConfirmationActivity"
@@ -212,7 +272,7 @@
             </intent-filter>
         </receiver>
 
-        <!-- Home-screen widget: shows execution history for a selected workflow. -->
+        <!-- Their: widget -->
         <receiver
             android:name=".widget.WorkflowWidgetReceiver"
             android:exported="true"

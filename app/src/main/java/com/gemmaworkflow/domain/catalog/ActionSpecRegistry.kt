@@ -1,5 +1,6 @@
 package com.gemmaworkflow.domain.catalog
 
+import android.Manifest
 import android.app.SearchManager
 import android.content.Intent
 import android.provider.AlarmClock
@@ -26,6 +27,7 @@ data class ActionSpec(
     val availability: AvailabilitySpec = AvailabilitySpec.IntentResolvable,
     val triggerCompatible: Set<String>,
     val requiresConfirmation: Boolean = false,
+    val requiredPermissions: List<String> = emptyList(),
     val logicalActions: Set<LogicalAction> = emptySet(),
     val source: ActionSource = ActionSource.Standard,
     val appLabels: Set<String> = emptySet(),
@@ -355,6 +357,7 @@ object ActionSpecRegistry {
             ),
             triggerCompatible = setOf("manual", "time", "nfc"),
             requiresConfirmation = true,
+            requiredPermissions = emptyList(),
             logicalActions = setOf(LogicalAction.SendMessage),
             appKeywords = setOf("sms", "message", "messages", "text"),
             fallbackActionIds = listOf("share.share_text"),
@@ -389,6 +392,7 @@ object ActionSpecRegistry {
             ),
             triggerCompatible = setOf("manual", "time", "nfc"),
             requiresConfirmation = true,
+            requiredPermissions = emptyList(),
             logicalActions = setOf(LogicalAction.SendMessage),
             source = ActionSource.AppSpecific,
             appLabels = setOf("WhatsApp"),

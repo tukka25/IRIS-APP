@@ -5,13 +5,16 @@ import com.gemmaworkflow.data.repository.WorkflowRepository
 import com.gemmaworkflow.domain.model.PlannedWorkflow
 import com.gemmaworkflow.domain.model.TriggerConfig
 import com.gemmaworkflow.domain.model.WorkflowStep
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /**
  * Seeds demo workflows into storage on first launch.
  * Ensures the app has something to show even before the AI generates anything.
+ *
+ * Step chaining: use "$step[N].output" in a param value to inject the raw output
+ * of step N into the current step's parameters before execution.
+ * Example: a clipboard step with text="$step[0].output" copies step 0's result.
  */
 object DemoWorkflowSeeder {
 
@@ -29,9 +32,15 @@ object DemoWorkflowSeeder {
     }
 
     private fun buildDemoWorkflows(): List<PlannedWorkflow> = listOf(
+
+        // ─── Coffee & Note ───────────────────────────────────────────────────────
+        // Step 1 opens Maps and returns "Opened Google Maps" as output.
+        // Step 2 copies that output to the clipboard.
+        // Once a real search tool is added (one that returns actual results),
+        // step 1 can be swapped for it and step 2 will automatically use the real data.
         PlannedWorkflow(
             name = "Coffee & Note",
-            summary = "Finds the nearest coffee shop on Maps, then shares a note.",
+            summary = "Opens Maps and copies the result to clipboard. Demonstrates step chaining.",
             trigger = TriggerConfig.Manual,
             actions = listOf(
                 WorkflowStep(
@@ -40,15 +49,19 @@ object DemoWorkflowSeeder {
                     requiresConfirmation = false
                 ),
                 WorkflowStep(
-                    id = "share.share_text",
-                    params = buildJsonObject { put("text", "Coffee stop — found a shop nearby.") },
-                    requiresConfirmation = true
+                    id = "clipboard.copy_text",
+                    params = buildJsonObject { put("text", "${'$'}step[0].output") },
+                    requiresConfirmation = false
                 )
             )
         ),
+
+        // ─── Morning Routine ────────────────────────────────────────────────────
+        // Alarm fires, calendar event is created, then the event details are
+        // copied to clipboard using the chain.
         PlannedWorkflow(
             name = "Morning Routine",
-            summary = "Sets a morning alarm and creates a calendar event for a workout.",
+            summary = "Sets an alarm, creates a calendar event, then copies the event to clipboard.",
             trigger = TriggerConfig.Manual,
             actions = listOf(
                 WorkflowStep(
@@ -71,26 +84,53 @@ object DemoWorkflowSeeder {
                     requiresConfirmation = true
                 ),
                 WorkflowStep(
-                    id = "sms.compose",
-                    params = buildJsonObject { put("message", "Headed to the gym!") },
-                    requiresConfirmation = true
+                    id = "clipboard.copy_text",
+                    params = buildJsonObject { put("text", "${'$'}step[1].output") },
+                    requiresConfirmation = false
                 )
             )
         ),
+
+        // ─── Share & Browse ─────────────────────────────────────────────────────
+        // The URL param uses step 0's output — so when share.share_text is given
+        // a text that contains "$step[0].output", it resolves to the clipboard text,
+        // which is then used as the URL to open.
+        // This demonstrates chaining where step 0 feeds into step 1.
         PlannedWorkflow(
             name = "Share & Browse",
-            summary = "Shares an image and opens a URL in the browser.",
+            summary = "Copies text to clipboard, then opens it as a URL. Demonstrates chained params.",
             trigger = TriggerConfig.Manual,
             actions = listOf(
                 WorkflowStep(
-                    id = "share.share_image",
-                    params = buildJsonObject { put("uri", "content://media/external/images/media/1") },
+                    id = "clipboard.copy_text",
+                    params = buildJsonObject {
+                        put("text", "https://example.com?ref=gemma-workflow")
+                    },
                     requiresConfirmation = true
                 ),
                 WorkflowStep(
                     id = "browser.open_url",
-                    params = buildJsonObject { put("url", "https://example.com") },
+                    params = buildJsonObject { put("url", "${'$'}step[0].output") },
                     requiresConfirmation = false
+                )
+            )
+        ),
+
+// ─── Quick Alarm ───────────────────────────────────────────────────────
+// Simple single-step timer for quick testing.
+ PlannedWorkflow(
+            name = "Quick Alarm",
+            summary = "Sets a 30-second countdown timer for testing. Fast confirmation.",
+            trigger = TriggerConfig.Manual,
+            actions = listOf(
+                WorkflowStep(
+                    id = "alarm.set_timer",
+                    params = buildJsonObject {
+                        // Duration in seconds for alarm.set_timer action.
+                        put("seconds", 30)
+                        put("message", "Quick test alarm")
+                    },
+                    requiresConfirmation = true
                 )
             )
         )
