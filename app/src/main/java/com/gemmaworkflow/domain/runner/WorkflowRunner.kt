@@ -25,7 +25,6 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.isString
 import kotlinx.serialization.json.jsonPrimitive
 
 /**
@@ -89,7 +88,7 @@ class WorkflowRunner(
         for (entry in params.entries) {
             val key = entry.key
             val value = entry.value
-            val resolvedValue = if (value is JsonPrimitive && value.isString) {
+            val resolvedValue = if (value is JsonPrimitive && value.contentOrNull != null) {
                 JsonPrimitive(resolveOutputRefs(value.content))
             } else {
                 value

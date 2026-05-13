@@ -170,6 +170,18 @@ object TriggerRegistry {
                         )
                     }
                     showConfirmationNotification(context, workflowName, t.step.id, t.stepIndex)
+                } else if (t is PermissionRequired) {
+                    // Another step needs permission — re-store and notify.
+                    Log.w(TAG, "Workflow '${workflowName}' needs permissions on resume: ${t.permissions.joinToString()}")
+                    synchronized(pendingExecutions) {
+                        pendingExecutions[workflowName] = PendingExecution(
+                            workflowName = workflowName,
+                            runner = pending.runner,
+                            workflow = pending.workflow,
+                            startIndex = t.stepIndex
+                        )
+                    }
+                    showPermissionNotification(context, workflowName, t.permissions)
                 } else {
                     Log.e(TAG, "Workflow '$workflowName' crashed during resume", t)
                 }
