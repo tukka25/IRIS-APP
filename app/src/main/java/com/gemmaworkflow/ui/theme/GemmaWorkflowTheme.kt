@@ -4,72 +4,111 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
-import androidx.compose.material3.lightColorScheme
+import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-// ── Apple HIG color palette ───────────────────────────────────────────────────
+// ── Lumen Dark Palette ─────────────────────────────────────────────────────────
 
-val AppleBlue    = Color(0xFF007AFF)
-val AppleGreen   = Color(0xFF34C759)
-val AppleRed     = Color(0xFFFF3B30)
-val AppleOrange  = Color(0xFFFF9500)
+// Backgrounds
+val BackgroundDark    = Color(0xFF06080d)
+val SurfaceDark       = Color(0xFF0a1424)
+val SurfaceVariantDark= Color(0xFF100b22)
 
-val SystemBackground          = Color(0xFFF2F2F7)
-val SecondarySystemBackground = Color(0xFFE5E5EA)
-val PrimaryLabel              = Color(0xFF000000)
-val SecondaryLabel            = Color(0xFF636366)
-val TertiaryLabel             = Color(0xFFAEAEB2)
-val Separator                 = Color(0xFFC6C6C8)
+// Accents
+val CyanAccent        = Color(0xFF5EF2FF)
+val VioletAccent      = Color(0xFFB57BFF)
+val CyanVioletStart   = Color(0xFF5EF2FF)
+val CyanVioletEnd     = Color(0xFFB57BFF)
 
-// ── Color scheme ──────────────────────────────────────────────────────────────
+// Semantic
+val GreenSuccess      = Color(0xFF7CF0A8)
+val AmberWarning      = Color(0xFFFFC15E)
 
-private val AppColors = lightColorScheme(
-    primary              = AppleBlue,
-    onPrimary            = Color.White,
-    primaryContainer     = Color(0xFFE5F1FF),
-    onPrimaryContainer   = AppleBlue,
-    secondary            = AppleGreen,
-    onSecondary          = Color.White,
-    secondaryContainer   = Color(0xFFD4F5DF),
-    onSecondaryContainer = Color(0xFF1A6B35),
-    background           = SystemBackground,
-    onBackground         = PrimaryLabel,
-    surface              = Color.White,
-    onSurface            = PrimaryLabel,
-    surfaceVariant       = SecondarySystemBackground,
-    onSurfaceVariant     = SecondaryLabel,
-    outline              = Separator,
-    outlineVariant       = Color(0xFFE0E0E0),
-    error                = AppleRed,
+// Text
+val TextPrimary       = Color(0xFFffffff)
+val TextSecondary     = Color(0xFF999999)
+val TextTertiary      = Color(0xFF666666)
+
+// Borders / glass
+val GlassBorder       = Color(0x1A8A9ADC)   // rgba(140,170,220,0.08) — matches HTML mockup
+val GlassSurface      = Color(0x0DFFFFFF)   // rgba(255,255,255,0.03)
+
+// Surface elevation tints
+val SurfaceTintCyan   = Color(0x1A5EF2FF)   // ~10% cyan overlay
+val SurfaceTintViolet  = Color(0x1AB57BFF)   // ~10% violet overlay
+
+// ── Gradient brushes ───────────────────────────────────────────────────────────
+
+/** Cyan → Violet horizontal gradient, matching the hex-edge gradient in the mockup. */
+val CyanVioletGradient = Brush.horizontalGradient(
+    listOf(CyanVioletStart, CyanVioletEnd)
+)
+
+/** Cyan → Violet diagonal gradient, for fills and buttons. */
+val CyanVioletGradientDiagonal = Brush.linearGradient(
+    listOf(CyanVioletStart, CyanVioletEnd)
+)
+
+/** Radial glow centered on cyan, for background halos. */
+val CyanGlowRadial = Brush.radialGradient(
+    colors = listOf(
+        Color(0xFF9CFBFF).copy(alpha = 0.9f),
+        Color(0xFF5EF2FF).copy(alpha = 0.4f),
+        Color(0xFFB57BFF).copy(alpha = 0f)
+    ),
+    radius = 0.5f
+)
+
+// ── Color scheme ────────────────────────────────────────────────────────────────
+
+private val DarkColors = darkColorScheme(
+    primary              = CyanAccent,
+    onPrimary            = Color(0xFF000000),
+    primaryContainer     = SurfaceVariantDark,
+    onPrimaryContainer   = CyanAccent,
+    secondary            = VioletAccent,
+    onSecondary          = Color(0xFF000000),
+    secondaryContainer   = SurfaceVariantDark,
+    onSecondaryContainer = VioletAccent,
+    tertiary             = GreenSuccess,
+    onTertiary           = Color(0xFF000000),
+    background           = BackgroundDark,
+    onBackground         = TextPrimary,
+    surface              = SurfaceDark,
+    onSurface            = TextPrimary,
+    surfaceVariant       = SurfaceVariantDark,
+    onSurfaceVariant     = TextSecondary,
+    outline              = GlassBorder,
+    outlineVariant       = Color(0x0DFFFFFF),
+    error                = Color(0xFFFF6B6B),
     onError              = Color.White,
-    errorContainer       = Color(0xFFFFECEA),
-    onErrorContainer     = AppleRed,
-    tertiary             = AppleOrange,
-    onTertiary           = Color.White,
+    errorContainer       = Color(0xFF2a1215),
+    onErrorContainer     = Color(0xFFFF8A80),
 )
 
-// ── Typography (iOS scale) ────────────────────────────────────────────────────
+// ── Typography (iOS scale, white on dark) ─────────────────────────────────────
 
-private val AppTypography = Typography(
-    displayLarge  = TextStyle(fontSize = 34.sp, fontWeight = FontWeight.Bold),
-    headlineMedium= TextStyle(fontSize = 28.sp, fontWeight = FontWeight.Bold),
-    headlineSmall = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.Bold),
-    titleLarge    = TextStyle(fontSize = 20.sp, fontWeight = FontWeight(600)),
-    titleMedium   = TextStyle(fontSize = 17.sp, fontWeight = FontWeight(600)),
-    titleSmall    = TextStyle(fontSize = 15.sp, fontWeight = FontWeight(600)),
-    bodyLarge     = TextStyle(fontSize = 17.sp, fontWeight = FontWeight.Normal),
-    bodyMedium    = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.Normal),
-    bodySmall     = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Normal),
-    labelMedium   = TextStyle(fontSize = 12.sp, fontWeight = FontWeight(600), letterSpacing = 0.5.sp),
-    labelSmall    = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Normal),
+private val DarkTypography = Typography(
+    displayLarge  = TextStyle(fontSize = 34.sp, fontWeight = FontWeight.Bold,   color = TextPrimary),
+    headlineMedium= TextStyle(fontSize = 28.sp, fontWeight = FontWeight.Bold,   color = TextPrimary),
+    headlineSmall = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.Bold,   color = TextPrimary),
+    titleLarge    = TextStyle(fontSize = 20.sp, fontWeight = FontWeight(600),   color = TextPrimary),
+    titleMedium   = TextStyle(fontSize = 17.sp, fontWeight = FontWeight(600),   color = TextPrimary),
+    titleSmall    = TextStyle(fontSize = 15.sp, fontWeight = FontWeight(600),   color = TextPrimary),
+    bodyLarge     = TextStyle(fontSize = 17.sp, fontWeight = FontWeight.Normal, color = TextPrimary),
+    bodyMedium    = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.Normal, color = TextPrimary),
+    bodySmall     = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Normal, color = TextSecondary),
+    labelMedium   = TextStyle(fontSize = 12.sp, fontWeight = FontWeight(600),   color = TextTertiary, letterSpacing = 0.5.sp),
+    labelSmall    = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Normal, color = TextTertiary),
 )
 
-// ── Shapes ────────────────────────────────────────────────────────────────────
+// ── Shapes (Apple HIG radii — preserved from original) ─────────────────────────
 
 private val AppShapes = Shapes(
     small      = RoundedCornerShape(8.dp),
@@ -83,8 +122,8 @@ private val AppShapes = Shapes(
 @Composable
 fun GemmaWorkflowTheme(content: @Composable () -> Unit) {
     MaterialTheme(
-        colorScheme = AppColors,
-        typography  = AppTypography,
+        colorScheme = DarkColors,
+        typography  = DarkTypography,
         shapes      = AppShapes,
         content     = content
     )
