@@ -200,6 +200,36 @@
             android:name=".platform.location.GeofenceBroadcastReceiver"
             android:exported="false" />
 
+        <!-- Receives SMS-based trigger broadcasts. -->
+        <receiver
+            android:name=".platform.sms.SmsTriggerReceiver"
+            android:exported="false" />
+
+        <!-- Listens for notifications used by SMS/notification-based triggers. -->
+        <service
+            android:name=".platform.notification.SmsNotificationListener"
+            android:exported="false"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+        <!-- Accessibility-based app monitoring trigger service. -->
+        <service
+            android:name=".platform.accessibility.AppMonitorAccessibilityService"
+            android:exported="false"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
+
         <!-- Receives time trigger confirm/run intents from the notification action buttons. -->
         <activity
             android:name=".ui.trigger.TimeTriggerConfirmationActivity"
