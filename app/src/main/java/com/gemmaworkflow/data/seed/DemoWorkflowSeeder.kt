@@ -116,19 +116,18 @@ object DemoWorkflowSeeder {
             )
         ),
 
-        // ─── Quick Alarm ───────────────────────────────────────────────────────
-        // Simple single-step alarm for quick testing.
-        PlannedWorkflow(
+// ─── Quick Alarm ───────────────────────────────────────────────────────
+// Simple single-step timer for quick testing.
+ PlannedWorkflow(
             name = "Quick Alarm",
-            summary = "Sets a 30-second timer alarm for testing. Fast confirmation.",
+            summary = "Sets a 30-second countdown timer for testing. Fast confirmation.",
             trigger = TriggerConfig.Manual,
             actions = listOf(
                 WorkflowStep(
-                    id = "alarm.set_alarm",
+                    id = "alarm.set_timer",
                     params = buildJsonObject {
-                        // Minutes from now (workflow runner fires immediately, so this
-                        // schedules an alarm for the current time + 30 minutes).
-                        put("minutes", 30)
+                        // Duration in seconds for alarm.set_timer action.
+                        put("seconds", 30)
                         put("message", "Quick test alarm")
                     },
                     requiresConfirmation = true

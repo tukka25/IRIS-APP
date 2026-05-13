@@ -89,18 +89,34 @@ object AlarmTriggerManager {
         }
     }
 
-    fun cancelAlarm(context: Context, alarmId: String) {
+    fun cancelAlarm(context: Context, alarmId: String, workflowName: String? = null) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
-        listOf(0, 1, 2).forEach { offset ->
-            val intent = Intent(context, AlarmFireReceiver::class.java).apply {
-                putExtra("alarm_id", alarmId)
-            }
-            val pending = PendingIntent.getBroadcast(
-                context, alarmId.hashCode() + offset,
-                intent, PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
-            )
-            pending?.let { alarmManager.cancel(it) }
+        // offset 0: fire receiver
+        Intent(context, AlarmFireReceiver::class.java).apply {
+            putExtra("alarm_id", alarmId)
+            workflowName?.let { putExtra("workflow_name", it) }
+        }.let { intent ->
+            PendingIntent.getBroadcast(context, alarmId.hashCode() + 0, intent, PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+            )?.let { alarmManager.cancel(it) }
+        }
+
+        // offset 1: dismiss receiver
+        Intent(context, AlarmDismissReceiver::class.java).apply {
+            putExtra("alarm_id", alarmId)
+            workflowName?.let { putExtra("workflow_name", it) }
+        }.let { intent ->
+            PendingIntent.getBroadcast(context, alarmId.hashCode() + 1, intent, PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+            )?.let { alarmManager.cancel(it) }
+        }
+
+        // offset 2: snooze receiver
+        Intent(context, AlarmSnoozeReceiver::class.java).apply {
+            putExtra("alarm_id", alarmId)
+            workflowName?.let { putExtra("workflow_name", it) }
+        }.let { intent ->
+            PendingIntent.getBroadcast(context, alarmId.hashCode() + 2, intent, PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+            )?.let { alarmManager.cancel(it) }
         }
 
         activeAlarms.remove(alarmId)

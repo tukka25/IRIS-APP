@@ -1,11 +1,14 @@
 package com.gemmaworkflow.platform.trigger
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice
 import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.ContextCompat
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
 import com.gemmaworkflow.data.repository.WorkflowRepository
@@ -102,8 +105,18 @@ object BluetoothTriggerManager {
                 null
             }
 
-            val deviceAddress = device?.address
-            val deviceName = device?.name ?: "Unknown"
+            val deviceAddress: String? = try {
+                device?.address
+            } catch (e: SecurityException) {
+                Log.w(TAG, "Bluetooth device address denied: ${e.message}")
+                null
+            }
+            val deviceName: String = try {
+                device?.name ?: "Unknown"
+            } catch (e: SecurityException) {
+                Log.w(TAG, "Bluetooth device name denied: ${e.message}")
+                "Unknown"
+            }
 
             val connected = when (intent.action) {
                 BluetoothDevice.ACTION_ACL_CONNECTED -> true

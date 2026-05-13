@@ -1,10 +1,13 @@
 package com.gemmaworkflow.platform.trigger
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.ContextCompat
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.net.NetworkCapabilities
 import android.net.NetworkInfo
 import android.net.wifi.WifiManager
@@ -93,10 +96,27 @@ object WiFiTriggerManager {
             if (intent.action != "android.net.conn.CONNECTIVITY_CHANGE") return
 
             val wifiManager = ctx.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
-            val wifiInfo = wifiManager.connectionInfo
-            val ssid = wifiInfo?.ssid?.replace("\"", "") ?: ""
-            val bssid = wifiInfo?.bssid ?: ""
-            val isConnected = wifiInfo != null && wifiInfo.networkId != -1
+
+            var ssid = ""
+            var bssid: String? = null
+            var isConnected = false
+
+            val hasLocationPermission = ContextCompat.checkSelfPermission(
+                ctx, Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+
+            if (hasLocationPermission) {
+                try {
+                    val wifiInfo = wifiManager.connectionInfo
+                    ssid = wifiInfo?.ssid?.replace("\"", "") ?: ""
+                    bssid = wifiInfo?.bssid
+                    isConnected = wifiInfo != null && wifiInfo.networkId != -1
+                } catch (e: SecurityException) {
+                    Log.w(TAG, "WiFi SSID/BSSID access denied: ${e.message}")
+                }
+            } else {
+                Log.w(TAG, "WiFi SSID/BSSID requires ACCESS_FINE_LOCATION permission")
+            }
 
             Log.d(TAG, "WiFi state: connected=$isConnected ssid='$ssid' bssid='$bssid'")
 
