@@ -615,6 +615,298 @@ object ActionSpecRegistry {
                 }
             )
         ),
+
+        // ── P1.1: Media Controls ────────────────────────────────────────────
+        ActionSpec(
+            id = "media.play_pause",
+            label = "Play/Pause media",
+            description = "Toggles play/pause on the active media session (music, video, podcast). No permissions required.",
+            params = emptyList(),
+            execution = ExecutionSpec.BuiltIn,
+            availability = AvailabilitySpec.Always,
+            triggerCompatible = setOf("manual", "time", "nfc"),
+            requiresConfirmation = false,
+            requiredPermissions = emptyList(),
+            logicalActions = setOf(LogicalAction.PlayMedia)
+        ),
+        ActionSpec(
+            id = "media.next_track",
+            label = "Next track",
+            description = "Skips to the next track in the current media session. No permissions required.",
+            params = emptyList(),
+            execution = ExecutionSpec.BuiltIn,
+            availability = AvailabilitySpec.Always,
+            triggerCompatible = setOf("manual", "time", "nfc"),
+            requiresConfirmation = false,
+            requiredPermissions = emptyList(),
+            logicalActions = setOf(LogicalAction.PlayMedia)
+        ),
+        ActionSpec(
+            id = "media.previous_track",
+            label = "Previous track",
+            description = "Skips to the previous track in the current media session. No permissions required.",
+            params = emptyList(),
+            execution = ExecutionSpec.BuiltIn,
+            availability = AvailabilitySpec.Always,
+            triggerCompatible = setOf("manual", "time", "nfc"),
+            requiresConfirmation = false,
+            requiredPermissions = emptyList(),
+            logicalActions = setOf(LogicalAction.PlayMedia)
+        ),
+
+        // ── P1.2: Volume Controls ───────────────────────────────────────────
+        ActionSpec(
+            id = "volume.set",
+            label = "Set volume",
+            description = "Silently sets the volume level for a given audio stream (ring/media/alarm/notification). Requires MODIFY_AUDIO_SETTINGS which is granted automatically on all Android builds.",
+            params = listOf(
+                ParamSpec("level", ParamType.Int, description = "Volume level 0–100"),
+                ParamSpec("stream", ParamType.String, required = false, description = "Audio stream: ring/media/alarm/notification", enumValues = listOf("ring", "media", "alarm", "notification")),
+                ParamSpec("mute", ParamType.Boolean, required = false, description = "Mute the stream")
+            ),
+            execution = ExecutionSpec.BuiltIn,
+            availability = AvailabilitySpec.Always,
+            triggerCompatible = setOf("manual", "time", "nfc"),
+            requiresConfirmation = false,
+            requiredPermissions = listOf("android.permission.MODIFY_AUDIO_SETTINGS"),
+            logicalActions = setOf()
+        ),
+
+        // ── P1.3: Ringer Mode ───────────────────────────────────────────────
+        ActionSpec(
+            id = "ringer_mode.set",
+            label = "Set ringer mode",
+            description = "Silently sets the global ringer mode (normal/silent/vibrate) or Do Not Disturb (dnd_all/dnd_priority/dnd_none). MODIFY_AUDIO_SETTINGS is automatically granted.",
+            params = listOf(
+                ParamSpec("mode", ParamType.String, description = "Mode: normal, silent, vibrate, dnd_all, dnd_priority, dnd_none", enumValues = listOf("normal", "silent", "vibrate", "dnd_all", "dnd_priority", "dnd_none"))
+            ),
+            execution = ExecutionSpec.BuiltIn,
+            availability = AvailabilitySpec.Always,
+            triggerCompatible = setOf("manual", "time", "nfc"),
+            requiresConfirmation = false,
+            requiredPermissions = listOf("android.permission.MODIFY_AUDIO_SETTINGS"),
+            logicalActions = setOf()
+        ),
+
+        // ── P2: UI / Notification / Display ─────────────────────────────────
+        ActionSpec(
+            id = "toast.show",
+            label = "Show toast",
+            description = "Displays a transient on-screen text message. No permissions required.",
+            params = listOf(
+                ParamSpec("message", ParamType.String, description = "Toast message text"),
+                ParamSpec("duration", ParamType.String, required = false, description = "Duration: short or long", enumValues = listOf("short", "long"))
+            ),
+            execution = ExecutionSpec.BuiltIn,
+            availability = AvailabilitySpec.Always,
+            triggerCompatible = setOf("manual", "time", "nfc"),
+            requiresConfirmation = false,
+            requiredPermissions = emptyList(),
+            logicalActions = setOf()
+        ),
+        ActionSpec(
+            id = "notification.send",
+            label = "Send notification",
+            description = "Sends a custom notification with title and body text. On Android 13+ requires POST_NOTIFICATIONS runtime permission.",
+            params = listOf(
+                ParamSpec("title", ParamType.String, description = "Notification title"),
+                ParamSpec("body", ParamType.String, description = "Notification body text"),
+                ParamSpec("channel", ParamType.String, required = false, description = "Channel ID", enumValues = listOf("notification_default")),
+                ParamSpec("priority", ParamType.String, required = false, description = "Priority: low/normal/high", enumValues = listOf("low", "normal", "high"))
+            ),
+            execution = ExecutionSpec.BuiltIn,
+            availability = AvailabilitySpec.Always,
+            triggerCompatible = setOf("manual", "time", "nfc"),
+            requiresConfirmation = false,
+            requiredPermissions = listOf("android.permission.POST_NOTIFICATIONS"),
+            logicalActions = setOf()
+        ),
+        ActionSpec(
+            id = "brightness.set",
+            label = "Set screen brightness",
+            description = "Sets the screen brightness level (0–100) or enables auto-brightness. Requires WRITE_SETTINGS permission which must be granted by the user via Settings.",
+            params = listOf(
+                ParamSpec("level", ParamType.Int, required = false, description = "Brightness 0–100"),
+                ParamSpec("auto", ParamType.Boolean, required = false, description = "Enable auto-brightness")
+            ),
+            execution = ExecutionSpec.BuiltIn,
+            availability = AvailabilitySpec.Always,
+            triggerCompatible = setOf("manual", "time", "nfc"),
+            requiresConfirmation = false,
+            requiredPermissions = listOf("android.permission.WRITE_SETTINGS"),
+            logicalActions = setOf()
+        ),
+        ActionSpec(
+            id = "http_request",
+            label = "Send HTTP request",
+            description = "Sends an HTTP GET/POST/PUT/DELETE/PATCH request to a URL. INTERNET permission already declared. Requires confirmation due to arbitrary network calls.",
+            params = listOf(
+                ParamSpec("url", ParamType.Url, description = "Full URL"),
+                ParamSpec("method", ParamType.String, required = false, description = "HTTP method", enumValues = listOf("GET", "POST", "PUT", "DELETE", "PATCH")),
+                ParamSpec("headers", ParamType.String, required = false, description = "JSON object of headers"),
+                ParamSpec("body", ParamType.String, required = false, description = "Request body"),
+                ParamSpec("content_type", ParamType.String, required = false, description = "Content-Type header")
+            ),
+            execution = ExecutionSpec.BuiltIn,
+            availability = AvailabilitySpec.Always,
+            triggerCompatible = setOf("manual", "time", "nfc"),
+            requiresConfirmation = true,
+            requiredPermissions = emptyList(),
+            logicalActions = setOf()
+        ),
+        ActionSpec(
+            id = "launch_app",
+            label = "Launch app",
+            description = "Launches any installed app by package name. Requires QUERY_ALL_PACKAGES on Android 11+.",
+            params = listOf(
+                ParamSpec("package_name", ParamType.String, description = "Installed app package name"),
+                ParamSpec("class_name", ParamType.String, required = false, description = "Specific Activity within the app")
+            ),
+            execution = ExecutionSpec.BuiltIn,
+            availability = AvailabilitySpec.Always,
+            triggerCompatible = setOf("manual", "time", "nfc"),
+            requiresConfirmation = false,
+            requiredPermissions = listOf("android.permission.QUERY_ALL_PACKAGES"),
+            logicalActions = setOf(LogicalAction.OpenApp)
+        ),
+
+        // ── P3: Bluetooth / WiFi / Display / Intent ───────────────────────
+        ActionSpec(
+            id = "bluetooth.toggle",
+            label = "Toggle Bluetooth",
+            description = "Toggles Bluetooth on or off. On Android 12+ opens a system dialog. Falls back to opening Bluetooth Settings.",
+            params = listOf(
+                ParamSpec("state", ParamType.String, description = "on or off", enumValues = listOf("on", "off", "toggle"))
+            ),
+            execution = ExecutionSpec.BuiltIn,
+            availability = AvailabilitySpec.Always,
+            triggerCompatible = setOf("manual", "time", "nfc"),
+            requiresConfirmation = false,
+            requiredPermissions = listOf("android.permission.BLUETOOTH_CONNECT"),
+            logicalActions = setOf()
+        ),
+        ActionSpec(
+            id = "wifi.toggle",
+            label = "Toggle Wi-Fi",
+            description = "Toggles Wi-Fi on or off. Silently works on Android 9 and below. Opens system Settings on Android 10+.",
+            params = listOf(
+                ParamSpec("state", ParamType.String, description = "on or off", enumValues = listOf("on", "off", "toggle"))
+            ),
+            execution = ExecutionSpec.BuiltIn,
+            availability = AvailabilitySpec.Always,
+            triggerCompatible = setOf("manual", "time", "nfc"),
+            requiresConfirmation = false,
+            requiredPermissions = listOf("android.permission.ACCESS_WIFI_STATE", "android.permission.CHANGE_WIFI_STATE"),
+            logicalActions = setOf()
+        ),
+        ActionSpec(
+            id = "rotation.lock",
+            label = "Lock screen rotation",
+            description = "Locks screen rotation to portrait, landscape, or restores auto-rotate. Requires WRITE_SETTINGS permission which must be granted via Settings first.",
+            params = listOf(
+                ParamSpec("mode", ParamType.String, description = "Rotation mode", enumValues = listOf("portrait", "landscape", "auto"))
+            ),
+            execution = ExecutionSpec.BuiltIn,
+            availability = AvailabilitySpec.Always,
+            triggerCompatible = setOf("manual", "time", "nfc"),
+            requiresConfirmation = false,
+            requiredPermissions = listOf("android.permission.WRITE_SETTINGS"),
+            logicalActions = setOf()
+        ),
+        ActionSpec(
+            id = "intent.send",
+            label = "Send intent",
+            description = "Sends a raw Android Intent (broadcast, activity start, or service start). SECURITY-SENSITIVE — requires confirmation.",
+            params = listOf(
+                ParamSpec("action", ParamType.String, description = "Intent action string"),
+                ParamSpec("data", ParamType.String, required = false, description = "Data URI"),
+                ParamSpec("type", ParamType.String, required = false, description = "MIME type"),
+                ParamSpec("extras", ParamType.String, required = false, description = "JSON object of extras"),
+                ParamSpec("target", ParamType.String, required = false, description = "broadcast/activity/service", enumValues = listOf("broadcast", "activity", "service"))
+            ),
+            execution = ExecutionSpec.BuiltIn,
+            availability = AvailabilitySpec.Always,
+            triggerCompatible = setOf("manual"),
+            requiresConfirmation = true,
+            requiredPermissions = emptyList(),
+            logicalActions = setOf()
+        ),
+
+        // ── P4: System / Root ───────────────────────────────────────────────
+        ActionSpec(
+            id = "hotspot.toggle",
+            label = "Toggle mobile hotspot",
+            description = "Toggles the mobile hotspot (Wi-Fi AP) on or off. Only works silently on devices with system or root access. Otherwise opens Settings.",
+            params = listOf(
+                ParamSpec("state", ParamType.String, description = "on or off", enumValues = listOf("on", "off"))
+            ),
+            execution = ExecutionSpec.BuiltIn,
+            availability = AvailabilitySpec.Always,
+            triggerCompatible = setOf("manual"),
+            requiresConfirmation = false,
+            requiredPermissions = listOf("android.permission.WRITE_SETTINGS"),
+            logicalActions = setOf()
+        ),
+        ActionSpec(
+            id = "cellular.toggle",
+            label = "Toggle mobile data",
+            description = "Toggles mobile data on or off. Only works silently on devices with system or root access. Otherwise opens Settings.",
+            params = listOf(
+                ParamSpec("state", ParamType.String, description = "on or off", enumValues = listOf("on", "off"))
+            ),
+            execution = ExecutionSpec.BuiltIn,
+            availability = AvailabilitySpec.Always,
+            triggerCompatible = setOf("manual"),
+            requiresConfirmation = false,
+            requiredPermissions = listOf("android.permission.WRITE_SECURE_SETTINGS"),
+            logicalActions = setOf()
+        ),
+        ActionSpec(
+            id = "command.exec",
+            label = "Execute shell command",
+            description = "Executes an arbitrary shell command in user space. SECURITY-SENSITIVE — arbitrary command execution is dangerous. Requires confirmation every time.",
+            params = listOf(
+                ParamSpec("command", ParamType.String, description = "Shell command to execute"),
+                ParamSpec("timeout_ms", ParamType.Int, required = false, description = "Timeout in milliseconds (default 5000, max 30000)")
+            ),
+            execution = ExecutionSpec.BuiltIn,
+            availability = AvailabilitySpec.Always,
+            triggerCompatible = setOf("manual"),
+            requiresConfirmation = true,
+            requiredPermissions = emptyList(),
+            logicalActions = setOf()
+        ),
+        ActionSpec(
+            id = "sync.toggle",
+            label = "Toggle account sync",
+            description = "Enables or disables automatic sync for a Google account and authority (e.g. calendar sync).",
+            params = listOf(
+                ParamSpec("account_type", ParamType.String, description = "Account type, e.g. com.google"),
+                ParamSpec("authority", ParamType.String, description = "Sync authority, e.g. com.google.android.gms.calendar"),
+                ParamSpec("enable", ParamType.Boolean, description = "Enable or disable sync")
+            ),
+            execution = ExecutionSpec.BuiltIn,
+            availability = AvailabilitySpec.Always,
+            triggerCompatible = setOf("manual"),
+            requiresConfirmation = false,
+            requiredPermissions = listOf("android.permission.WRITE_SYNC_SETTINGS"),
+            logicalActions = setOf()
+        ),
+        ActionSpec(
+            id = "airplane_mode.toggle",
+            label = "Toggle airplane mode",
+            description = "Toggles Airplane Mode on or off. Only works silently on devices with system or root access. Otherwise opens Settings.",
+            params = listOf(
+                ParamSpec("state", ParamType.String, description = "on or off", enumValues = listOf("on", "off"))
+            ),
+            execution = ExecutionSpec.BuiltIn,
+            availability = AvailabilitySpec.Always,
+            triggerCompatible = setOf("manual"),
+            requiresConfirmation = false,
+            requiredPermissions = listOf("android.permission.WRITE_SECURE_SETTINGS"),
+            logicalActions = setOf()
+        ),
+
         ActionSpec(
             id = "media.play_from_search",
             label = "Play media from search",

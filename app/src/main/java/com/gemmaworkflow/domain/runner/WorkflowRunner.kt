@@ -20,6 +20,23 @@ import com.gemmaworkflow.platform.calendar.CalendarApiExecutor
 import com.gemmaworkflow.platform.capability.ChromeCustomTabOpener
 import com.gemmaworkflow.platform.clipboard.ClipboardApiExecutor
 import com.gemmaworkflow.platform.tools.ToolRegistry
+import com.gemmaworkflow.platform.media.MediaControlApiExecutor
+import com.gemmaworkflow.platform.volume.VolumeApiExecutor
+import com.gemmaworkflow.platform.volume.RingerModeApiExecutor
+import com.gemmaworkflow.platform.ui.ToastApiExecutor
+import com.gemmaworkflow.platform.notification.NotificationApiExecutor
+import com.gemmaworkflow.platform.display.BrightnessApiExecutor
+import com.gemmaworkflow.platform.http.HttpRequestApiExecutor
+import com.gemmaworkflow.platform.app.LaunchAppApiExecutor
+import com.gemmaworkflow.platform.bluetooth.BluetoothApiExecutor
+import com.gemmaworkflow.platform.wifi.WifiApiExecutor
+import com.gemmaworkflow.platform.display.RotationApiExecutor
+import com.gemmaworkflow.platform.intent.GenericIntentApiExecutor
+import com.gemmaworkflow.platform.hotspot.HotspotApiExecutor
+import com.gemmaworkflow.platform.cellular.CellularApiExecutor
+import com.gemmaworkflow.platform.command.CommandApiExecutor
+import com.gemmaworkflow.platform.sync.SyncApiExecutor
+import com.gemmaworkflow.platform.airplane.AirplaneModeApiExecutor
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -70,7 +87,25 @@ class WorkflowRunner(
     private val calendarApiExecutor: CalendarApiExecutor = CalendarApiExecutor(context),
     private val alarmApiExecutor: AlarmApiExecutor = AlarmApiExecutor(context),
     private val clipboardApiExecutor: ClipboardApiExecutor = ClipboardApiExecutor(context),
-    private val chromeCustomTabOpener: ChromeCustomTabOpener = ChromeCustomTabOpener(context)
+    private val chromeCustomTabOpener: ChromeCustomTabOpener = ChromeCustomTabOpener(context),
+    // ── BuiltIn Executors ──────────────────────────────────────────────────────
+    private val mediaControlApiExecutor: MediaControlApiExecutor = MediaControlApiExecutor(context),
+    private val volumeApiExecutor: VolumeApiExecutor = VolumeApiExecutor(context),
+    private val ringerModeApiExecutor: RingerModeApiExecutor = RingerModeApiExecutor(context),
+    private val toastApiExecutor: ToastApiExecutor = ToastApiExecutor(context),
+    private val notificationApiExecutor: NotificationApiExecutor = NotificationApiExecutor(context),
+    private val brightnessApiExecutor: BrightnessApiExecutor = BrightnessApiExecutor(context),
+    private val httpRequestApiExecutor: HttpRequestApiExecutor = HttpRequestApiExecutor(),
+    private val launchAppApiExecutor: LaunchAppApiExecutor = LaunchAppApiExecutor(context),
+    private val bluetoothApiExecutor: BluetoothApiExecutor = BluetoothApiExecutor(context),
+    private val wifiApiExecutor: WifiApiExecutor = WifiApiExecutor(context),
+    private val rotationApiExecutor: RotationApiExecutor = RotationApiExecutor(context),
+    private val genericIntentApiExecutor: GenericIntentApiExecutor = GenericIntentApiExecutor(context),
+    private val hotspotApiExecutor: HotspotApiExecutor = HotspotApiExecutor(context),
+    private val cellularApiExecutor: CellularApiExecutor = CellularApiExecutor(context),
+    private val commandApiExecutor: CommandApiExecutor = CommandApiExecutor(context),
+    private val syncApiExecutor: SyncApiExecutor = SyncApiExecutor(context),
+    private val airplaneModeApiExecutor: AirplaneModeApiExecutor = AirplaneModeApiExecutor(context)
 ) {
     private var pendingStepInfo: PendingStepInfo? = null
     private var pendingStepIndex: Int = -1
@@ -265,9 +300,173 @@ class WorkflowRunner(
         if (step.id == "share.share_image") {
             onDebug("Tool call", "${step.id} params=$resolvedParams")
             Log.d(TAG, "Tool call ${step.id} params=$resolvedParams")
-            val result = clipboardApiExecutor.executeShareImage(resolvedParams)
+val result = clipboardApiExecutor.executeShareImage(resolvedParams)
             onDebug("ClipboardApiExecutor", "result=${result.success} message=${result.message}")
             Log.d(TAG, "ClipboardApiExecutor result=${result.success} message=${result.message}")
+            return result
+        }
+
+        // ── P1.1: Media Controls ────────────────────────────────────────────
+        if (step.id == "media.play_pause") {
+            onDebug("Tool call", "${step.id}")
+            Log.d(TAG, "Tool call ${step.id}")
+            val result = mediaControlApiExecutor.executePlayPause(resolvedParams)
+            onDebug("MediaControlApiExecutor", "result=${result.success} message=${result.message}")
+            Log.d(TAG, "MediaControlApiExecutor result=${result.success} message=${result.message}")
+            return result
+        }
+        if (step.id == "media.next_track") {
+            onDebug("Tool call", "${step.id}")
+            Log.d(TAG, "Tool call ${step.id}")
+            val result = mediaControlApiExecutor.executeNext(resolvedParams)
+            onDebug("MediaControlApiExecutor", "result=${result.success} message=${result.message}")
+            Log.d(TAG, "MediaControlApiExecutor result=${result.success} message=${result.message}")
+            return result
+        }
+        if (step.id == "media.previous_track") {
+            onDebug("Tool call", "${step.id}")
+            Log.d(TAG, "Tool call ${step.id}")
+            val result = mediaControlApiExecutor.executePrevious(resolvedParams)
+            onDebug("MediaControlApiExecutor", "result=${result.success} message=${result.message}")
+            Log.d(TAG, "MediaControlApiExecutor result=${result.success} message=${result.message}")
+            return result
+        }
+
+        // ── P1.2: Volume Controls ───────────────────────────────────────────
+        if (step.id == "volume.set") {
+            onDebug("Tool call", "${step.id} params=$resolvedParams")
+            Log.d(TAG, "Tool call ${step.id} params=$resolvedParams")
+            val result = volumeApiExecutor.execute(resolvedParams)
+            onDebug("VolumeApiExecutor", "result=${result.success} message=${result.message}")
+            Log.d(TAG, "VolumeApiExecutor result=${result.success} message=${result.message}")
+            return result
+        }
+
+        // ── P1.3: Ringer Mode ─────────────────────────────────────────────
+        if (step.id == "ringer_mode.set") {
+            onDebug("Tool call", "${step.id} params=$resolvedParams")
+            Log.d(TAG, "Tool call ${step.id} params=$resolvedParams")
+            val result = ringerModeApiExecutor.execute(resolvedParams)
+            onDebug("RingerModeApiExecutor", "result=${result.success} message=${result.message}")
+            Log.d(TAG, "RingerModeApiExecutor result=${result.success} message=${result.message}")
+            return result
+        }
+
+        // ── P2: UI / Notification / Display ─────────────────────────────────
+        if (step.id == "toast.show") {
+            onDebug("Tool call", "${step.id} params=$resolvedParams")
+            Log.d(TAG, "Tool call ${step.id} params=$resolvedParams")
+            val result = toastApiExecutor.execute(resolvedParams)
+            onDebug("ToastApiExecutor", "result=${result.success} message=${result.message}")
+            Log.d(TAG, "ToastApiExecutor result=${result.success} message=${result.message}")
+            return result
+        }
+        if (step.id == "notification.send") {
+            onDebug("Tool call", "${step.id} params=$resolvedParams")
+            Log.d(TAG, "Tool call ${step.id} params=$resolvedParams")
+            val result = notificationApiExecutor.execute(resolvedParams)
+            onDebug("NotificationApiExecutor", "result=${result.success} message=${result.message}")
+            Log.d(TAG, "NotificationApiExecutor result=${result.success} message=${result.message}")
+            return result
+        }
+        if (step.id == "brightness.set") {
+            onDebug("Tool call", "${step.id} params=$resolvedParams")
+            Log.d(TAG, "Tool call ${step.id} params=$resolvedParams")
+            val result = brightnessApiExecutor.execute(resolvedParams)
+            onDebug("BrightnessApiExecutor", "result=${result.success} message=${result.message}")
+            Log.d(TAG, "BrightnessApiExecutor result=${result.success} message=${result.message}")
+            return result
+        }
+        if (step.id == "http_request") {
+            onDebug("Tool call", "${step.id} params=$resolvedParams")
+            Log.d(TAG, "Tool call ${step.id} params=$resolvedParams")
+            val result = httpRequestApiExecutor.execute(resolvedParams)
+            onDebug("HttpRequestApiExecutor", "result=${result.success} message=${result.message}")
+            Log.d(TAG, "HttpRequestApiExecutor result=${result.success} message=${result.message}")
+            return result
+        }
+        if (step.id == "launch_app") {
+            onDebug("Tool call", "${step.id} params=$resolvedParams")
+            Log.d(TAG, "Tool call ${step.id} params=$resolvedParams")
+            val result = launchAppApiExecutor.execute(resolvedParams)
+            onDebug("LaunchAppApiExecutor", "result=${result.success} message=${result.message}")
+            Log.d(TAG, "LaunchAppApiExecutor result=${result.success} message=${result.message}")
+            return result
+        }
+
+        // ── P3: Bluetooth / WiFi / Display / Intent ────────────────────────
+        if (step.id == "bluetooth.toggle") {
+            onDebug("Tool call", "${step.id} params=$resolvedParams")
+            Log.d(TAG, "Tool call ${step.id} params=$resolvedParams")
+            val result = bluetoothApiExecutor.execute(resolvedParams)
+            onDebug("BluetoothApiExecutor", "result=${result.success} message=${result.message}")
+            Log.d(TAG, "BluetoothApiExecutor result=${result.success} message=${result.message}")
+            return result
+        }
+        if (step.id == "wifi.toggle") {
+            onDebug("Tool call", "${step.id} params=$resolvedParams")
+            Log.d(TAG, "Tool call ${step.id} params=$resolvedParams")
+            val result = wifiApiExecutor.execute(resolvedParams)
+            onDebug("WifiApiExecutor", "result=${result.success} message=${result.message}")
+            Log.d(TAG, "WifiApiExecutor result=${result.success} message=${result.message}")
+            return result
+        }
+        if (step.id == "rotation.lock") {
+            onDebug("Tool call", "${step.id} params=$resolvedParams")
+            Log.d(TAG, "Tool call ${step.id} params=$resolvedParams")
+            val result = rotationApiExecutor.execute(resolvedParams)
+            onDebug("RotationApiExecutor", "result=${result.success} message=${result.message}")
+            Log.d(TAG, "RotationApiExecutor result=${result.success} message=${result.message}")
+            return result
+        }
+        if (step.id == "intent.send") {
+            onDebug("Tool call", "${step.id} params=$resolvedParams")
+            Log.d(TAG, "Tool call ${step.id} params=$resolvedParams")
+            val result = genericIntentApiExecutor.execute(resolvedParams)
+            onDebug("GenericIntentApiExecutor", "result=${result.success} message=${result.message}")
+            Log.d(TAG, "GenericIntentApiExecutor result=${result.success} message=${result.message}")
+            return result
+        }
+
+        // ── P4: System / Root ──────────────────────────────────────────────
+        if (step.id == "hotspot.toggle") {
+            onDebug("Tool call", "${step.id} params=$resolvedParams")
+            Log.d(TAG, "Tool call ${step.id} params=$resolvedParams")
+            val result = hotspotApiExecutor.execute(resolvedParams)
+            onDebug("HotspotApiExecutor", "result=${result.success} message=${result.message}")
+            Log.d(TAG, "HotspotApiExecutor result=${result.success} message=${result.message}")
+            return result
+        }
+        if (step.id == "cellular.toggle") {
+            onDebug("Tool call", "${step.id} params=$resolvedParams")
+            Log.d(TAG, "Tool call ${step.id} params=$resolvedParams")
+            val result = cellularApiExecutor.execute(resolvedParams)
+            onDebug("CellularApiExecutor", "result=${result.success} message=${result.message}")
+            Log.d(TAG, "CellularApiExecutor result=${result.success} message=${result.message}")
+            return result
+        }
+        if (step.id == "command.exec") {
+            onDebug("Tool call", "${step.id} params=$resolvedParams")
+            Log.d(TAG, "Tool call ${step.id} params=$resolvedParams")
+            val result = commandApiExecutor.execute(resolvedParams)
+            onDebug("CommandApiExecutor", "result=${result.success} message=${result.message}")
+            Log.d(TAG, "CommandApiExecutor result=${result.success} message=${result.message}")
+            return result
+        }
+        if (step.id == "sync.toggle") {
+            onDebug("Tool call", "${step.id} params=$resolvedParams")
+            Log.d(TAG, "Tool call ${step.id} params=$resolvedParams")
+            val result = syncApiExecutor.execute(resolvedParams)
+            onDebug("SyncApiExecutor", "result=${result.success} message=${result.message}")
+            Log.d(TAG, "SyncApiExecutor result=${result.success} message=${result.message}")
+            return result
+        }
+        if (step.id == "airplane_mode.toggle") {
+            onDebug("Tool call", "${step.id} params=$resolvedParams")
+            Log.d(TAG, "Tool call ${step.id} params=$resolvedParams")
+            val result = airplaneModeApiExecutor.execute(resolvedParams)
+            onDebug("AirplaneModeApiExecutor", "result=${result.success} message=${result.message}")
+            Log.d(TAG, "AirplaneModeApiExecutor result=${result.success} message=${result.message}")
             return result
         }
 

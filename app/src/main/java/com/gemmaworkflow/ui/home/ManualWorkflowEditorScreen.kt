@@ -1060,7 +1060,9 @@ private fun ActionEditDialog(
                         val paramErrors = validationErrors.filter { it.paramName == paramName }
                         OutlinedTextField(
                             value = params[paramName] ?: "",
-                            onValueChange = { params[paramName] = it },
+                            onValueChange = { newValue ->
+                                params = params.toMutableMap().apply { put(paramName, newValue) }
+                            },
                             label = {
                                 Text(
                                     paramName + if (!param.required) " (optional)" else ""
