@@ -51,6 +51,7 @@ fun SceneChip(
     deviceCount: Int,
     glowColor: Color = SceneGlowColors.Default,
     onClick: () -> Unit,
+    isActive: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val shape = RoundedCornerShape(14.dp)
@@ -61,12 +62,23 @@ fun SceneChip(
             .background(
                 Brush.horizontalGradient(
                     colors = listOf(
-                        glowColor.copy(alpha = 0.12f),
-                        glowColor.copy(alpha = 0.04f)
+                        glowColor.copy(alpha = if (isActive) 0.22f else 0.12f),
+                        glowColor.copy(alpha = if (isActive) 0.08f else 0.04f)
                     )
                 )
             )
-            .background(SurfaceDark.copy(alpha = 0.7f))
+            .background(SurfaceDark.copy(alpha = if (isActive) 0.85f else 0.7f))
+            .then(
+                if (isActive) Modifier.background(
+                    glowColor.copy(alpha = 0.08f),
+                    shape
+                ) else Modifier
+            )
+            .clip(shape)
+            .then(
+                if (isActive) Modifier.background(glowColor.copy(alpha = 0.25f), shape)
+                else Modifier
+            )
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
@@ -74,28 +86,28 @@ fun SceneChip(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Glow dot indicator
+            // Glow dot — brighter when active
             Box(
                 modifier = Modifier
-                    .size(8.dp)
+                    .size(if (isActive) 10.dp else 8.dp)
                     .clip(RoundedCornerShape(50))
-                    .background(glowColor)
+                    .background(if (isActive) glowColor else glowColor.copy(alpha = 0.7f))
             )
 
             Column {
                 Text(
                     text = name,
                     style = MaterialTheme.typography.labelMedium.copy(
-                        fontWeight = FontWeight(600),
+                        fontWeight = FontWeight(if (isActive) 700 else 600),
                         fontSize = 13.sp,
-                        color = Color.White
+                        color = if (isActive) Color.White else Color.White.copy(alpha = 0.9f)
                     )
                 )
                 Text(
                     text = "$deviceCount actions",
                     style = MaterialTheme.typography.labelSmall.copy(
                         fontSize = 10.sp,
-                        color = glowColor.copy(alpha = 0.8f)
+                        color = glowColor.copy(alpha = if (isActive) 1f else 0.8f)
                     )
                 )
             }
@@ -105,11 +117,13 @@ fun SceneChip(
 
 /**
  * A scrollable row of scene chips — the strip at the top of the Workflows tab.
+ * @param selectedSceneId The ID of the currently selected scene (null = none selected)
  */
 @Composable
 fun SceneChipStrip(
     scenes: List<SceneChipData>,
     onChipClick: (SceneChipData) -> Unit,
+    selectedSceneId: String? = null,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -121,7 +135,8 @@ fun SceneChipStrip(
                 name = scene.name,
                 deviceCount = scene.actionCount,
                 glowColor = scene.glowColor,
-                onClick = { onChipClick(scene) }
+                onClick = { onChipClick(scene) },
+                isActive = scene.id == selectedSceneId
             )
         }
     }
