@@ -940,15 +940,9 @@ fun ManualWorkflowEditorScreen(
                             if (currentTriggerConfig is TriggerConfig.AppOpened) "App Opened" else "App Closed",
                             style = MaterialTheme.typography.bodyMedium
                         )
-                        OutlinedTextField(
-                            value = appTriggerPatterns.joinToString(", "),
-                            onValueChange = {
-                                appTriggerPatterns = it.split(",").map { s -> s.trim() }.filter { s -> s.isNotEmpty() }
-                            },
-                            label = { Text("App package patterns (comma-separated)") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            placeholder = { Text("e.g. com.instagram.android") }
+                        AppPatternEditor(
+                            patterns = appTriggerPatterns,
+                            onPatternsChange = { appTriggerPatterns = it }
                         )
                         Text("Trigger on:", style = MaterialTheme.typography.bodySmall)
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1722,4 +1716,131 @@ private fun buildTrigger(
         is TriggerConfig.ShareSheet -> TriggerConfig.ShareSheet(shareSheetState)
         else -> TriggerConfig.Manual
     }
+}
+
+@Composable
+private fun AppPatternEditor(
+    patterns: List<String>,
+    onPatternsChange: (List<String>) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    val context = LocalContext.current
+    val allApps = remember { ActionSpecRegistry.getInstalledAppList("installed_apps", context) }
+    val filteredApps = remember(searchQuery) {
+        if (searchQuery.isBlank()) allApps.take(50)
+        else allApps.filter { (label, pkg) ->
+            label.contains(searchQuery, ignoreCase = true) || pkg.contains(searchQuery, ignoreCase = true)
+        }.take(50)
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        // Show selected patterns as chips
+        if (patterns.isNotEmpty()) {
+            androidx.compose.foundation.layout.FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                patterns.forEach { pattern ->
+                    InputChip(
+                        label = { Text(pattern, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        selected = false,
+                        onClick = { onPatternsChange(patterns - pattern) },
+                        trailingIcon = {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = "Remove",
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    )
+                }
+            }
+        }
+
+        // Search + add from installed apps
+        ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                label = { Text("Add app pattern") },
+                placeholder = { Text("Search installed apps...") },
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .menuAnchor(),
+                singleLine = true
+            )
+            if (filteredApps.isNotEmpty()) {
+                ExposedDropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false }
+                ) {
+                    filteredApps.forEach { (label, pkg) ->
+                        DropdownMenuItem(
+                            text = {
+                                Column {
+                                    Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(pkg, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline, maxLines = 1)
+                                }
+                            },
+                            onClick = {
+                                if (!patterns.contains(pkg)) {
+                                    onPatternsChange(patterns + pkg)
+                                }
+                                searchQuery = ""
+                                expanded = false
+                            }
+                        )
+                    }
+                }
+            }
+        }
+
+        // Manual text input for additional patterns
+        var manualInput by remember { mutableStateOf("") }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            OutlinedTextField(
+                value = manualInput,
+                onValueChange = { manualInput = it },
+                label = { Text("Or enter package pattern") },
+                placeholder = { Text("e.g. com.instagram") },
+                modifier = Modifier.weight(1f),
+                singleLine = true
+            )
+            IconButton(
+                onClick = {
+                    val trimmed = manualInput.trim()
+                    if (trimmed.isNotEmpty() && !patterns.contains(trimmed)) {
+                        onPatternsChange(patterns + trimmed)
+                    }
+                    manualInput = ""
+                },
+                enabled = manualInput.isNotBlank()
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "Add pattern")
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun InputChip(
+    label: @Composable () -> Unit,
+    selected: Boolean,
+    onClick: () -> Unit,
+    trailingIcon: @Composable (() -> Unit)? = null
+) {
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = label,
+        trailingIcon = trailingIcon
+    )
 }
