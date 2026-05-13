@@ -37,6 +37,10 @@ import com.gemmaworkflow.platform.cellular.CellularApiExecutor
 import com.gemmaworkflow.platform.command.CommandApiExecutor
 import com.gemmaworkflow.platform.sync.SyncApiExecutor
 import com.gemmaworkflow.platform.airplane.AirplaneModeApiExecutor
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -145,7 +149,7 @@ class WorkflowRunner(
         }
     }
 
-    suspend fun run(
+suspend fun run(
         workflow: PlannedWorkflow,
         startIndex: Int = 0,
         onDebug: (label: String, message: String) -> Unit = { _, _ -> }
@@ -155,13 +159,58 @@ class WorkflowRunner(
         for (i in 0 until startIndex) {
             results.add(ExecutionResult(stepId = workflow.actions[i].id, success = true, message = "Confirmed"))
         }
-        for (i in startIndex until workflow.actions.size) {
+
+        var i = startIndex
+        while (i < workflow.actions.size) {
             val step = workflow.actions[i]
+            val spec = ActionSpecRegistry.find(step.id)
+
+            // Check if this step can run in parallel with the next step(s)
+            if (spec?.parallelExecutionEnabled == true && i + 1 < workflow.actions.size) {
+                // Collect a batch of consecutive parallelizable steps (up to 3)
+                val batch = mutableListOf<Pair<Int, WorkflowStep>>()
+                var j = i
+                while (j < workflow.actions.size && batch.size < 3) {
+                    val s = workflow.actions[j]
+                    val sp = ActionSpecRegistry.find(s.id)
+                    if (sp?.parallelExecutionEnabled == true) {
+                        batch.add(j to s)
+                        j++
+                    } else {
+                        break
+                    }
+                }
+
+                // Execute batch in parallel
+                if (batch.size > 1) {
+                    onDebug("Parallel batch", "steps ${batch.map { it.first }.joinToString(",")} running in parallel")
+                    val batchResults: List<ExecutionResult> = coroutineScope {
+                        batch.map { (idx, stp): Pair<Int, WorkflowStep> ->
+                            async<ExecutionResult> { executeStep(stp, idx, onDebug) }
+                        }.awaitAll<ExecutionResult>()
+                    }
+                    for (br in batchResults) {
+                        results.add(br)
+                        val pos = results.size - 1
+                        stepOutputs[pos] = br.output
+                        onDebug("Tool result", "${br.stepId}: success=${br.success}, output=${br.output.take(80)}")
+                        if (!br.success) {
+                            // Stop pipeline on first failure in parallel batch
+                            return results
+                        }
+                    }
+                    i = batch.last().first + 1
+                    continue
+                }
+            }
+
+            // Sequential execution
             val result = executeStep(step, i, onDebug)
             results.add(result)
             stepOutputs[i] = result.output
             onDebug("Tool result", step.id + ": success=" + result.success + ", output=" + result.output.take(80))
             if (!result.success) break
+            i++
         }
         return results
     }
@@ -231,7 +280,7 @@ class WorkflowRunner(
             throw PermissionRequired(step, stepIndex, missingPermissions)
         }
 
-        // Pause and request user confirmation before executing sensitive steps
+// Pause and request user confirmation before executing sensitive steps
         if (spec.requiresConfirmation || step.requiresConfirmation) {
             if (stepIndex !in confirmedSteps) {
                 pendingStepInfo = PendingStepInfo(step, PendingKind.Confirmation)
@@ -241,7 +290,29 @@ class WorkflowRunner(
             // stepIndex is in confirmedSteps — user already confirmed; execute without pausing
         }
 
-        // Silently execute calendar.create_event via ContentResolver instead of launching an intent
+        // Wrap execution in a per-step timeout if specified on the ActionSpec
+        val timeoutMs = if (spec.timeoutSeconds > 0) spec.timeoutSeconds * 1000L else null
+        val exec: suspend () -> ExecutionResult = {
+            executeStepBody(resolvedStep, resolvedParams, spec, onDebug)
+        }
+        val result = if (timeoutMs != null) {
+            withTimeoutOrNull(timeoutMs) { exec() }
+                ?: ExecutionResult(stepId = step.id, success = false, message = "Step timed out after ${spec.timeoutSeconds}s")
+        } else {
+            exec()
+        }
+        return result
+    }
+
+    private suspend fun executeStepBody(
+        step: WorkflowStep,
+        resolvedParams: JsonObject,
+        spec: ActionSpec,
+        onDebug: (label: String, String) -> Unit
+    ): ExecutionResult {
+        val resolvedStep = step.copy(params = resolvedParams)
+
+        // Silently execute calendar.create_event
         if (step.id == "calendar.create_event") {
             onDebug("Tool call", "${step.id} params=$resolvedParams")
             Log.d(TAG, "Tool call ${step.id} params=$resolvedParams")

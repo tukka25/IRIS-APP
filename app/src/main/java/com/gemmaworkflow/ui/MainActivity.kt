@@ -7,44 +7,69 @@ import android.nfc.NfcAdapter
 import android.nfc.Tag
 import android.os.Build
 import android.os.Bundle
+import android.view.WindowInsetsController
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.border
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -53,12 +78,32 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import com.gemmaworkflow.ui.components.GlassmorphicCard
+import com.gemmaworkflow.ui.components.GradientButton
+import com.gemmaworkflow.ui.components.HexHeroIcon
+import com.gemmaworkflow.ui.components.SceneChip
+import com.gemmaworkflow.ui.components.SceneChipStrip
+import com.gemmaworkflow.ui.components.SceneChipData
+import com.gemmaworkflow.ui.theme.BackgroundDark
+import com.gemmaworkflow.ui.theme.CyanAccent
+import com.gemmaworkflow.ui.theme.GlassBorder
+import com.gemmaworkflow.ui.theme.GlassSurface
+import com.gemmaworkflow.ui.theme.SurfaceDark
+import com.gemmaworkflow.ui.theme.SurfaceVariantDark
+import com.gemmaworkflow.ui.theme.TextPrimary
+import com.gemmaworkflow.ui.theme.TextSecondary
+import com.gemmaworkflow.ui.theme.VioletAccent
 import kotlinx.coroutines.launch
 import com.gemmaworkflow.domain.catalog.ActionSpecRegistry
 import com.gemmaworkflow.domain.model.ExecutionResult
@@ -103,6 +148,15 @@ class MainActivity : ComponentActivity() {
         observeDeepLinkEvents()
         checkNotificationPermission()
         setContent {
+            // Edge-to-edge with dark system bars — must be after setContent
+            WindowCompat.setDecorFitsSystemWindows(window, false)
+            window.decorView.post {
+                window.insetsController?.setSystemBarsAppearance(
+                    0,
+                    WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or
+                    WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS
+                )
+            }
             GemmaWorkflowTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     WorkflowGenerationScreen(viewModel = viewModel)
@@ -376,31 +430,18 @@ private fun WorkflowGenerationScreen(viewModel: WorkflowGenerationViewModel) {
     }
 
     Scaffold(
+        containerColor = BackgroundDark,
         bottomBar = {
-            NavigationBar {
-                NavigationBarItem(
-                    selected = state.selectedTab == 0,
-                    onClick = { viewModel.selectTab(0) },
-                    icon = { Text("\u2699") },
-                    label = { Text("Generate") }
-                )
-                NavigationBarItem(
-                    selected = state.selectedTab == 1,
-                    onClick = { viewModel.selectTab(1) },
-                    icon = { Text("\u2630") },
-                    label = { Text("Workflows") }
-                )
-                NavigationBarItem(
-                    selected = state.selectedTab == 2,
-                    onClick = { viewModel.selectTab(2) },
-                    icon = { Text("\u2713") },
-                    label = { Text("Debug") }
-                )
-            }
+            DarkNavigationBar(
+                selectedTab = state.selectedTab,
+                onTabSelected = { viewModel.selectTab(it) },
+                tabLabels = listOf("Generate", "Workflows", "Debug"),
+                tabIcons = listOf("⚡", "⚙", "🔍")
+            )
         }
     ) { paddingValues ->
         // Use paddingValues to avoid content under nav bar
-        Box(modifier = Modifier.padding(paddingValues).fillMaxSize()) {
+        Box(modifier = Modifier.padding(paddingValues).fillMaxSize().statusBarsPadding()) {
             when (state.selectedTab) {
                 0 -> GenerateTabContent(viewModel, state)
                 1 -> WorkflowsTabContent(
@@ -421,47 +462,122 @@ private fun GenerateTabContent(viewModel: WorkflowGenerationViewModel, state: Wo
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(20.dp),
+            .padding(horizontal = 20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text("GemmaWorkflow", style = MaterialTheme.typography.headlineMedium)
+        // Hero block: animated hexagonal icon
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            // Radial glow halo behind the icon, matching the hex-edge gradient
+            Box(
+                modifier = Modifier
+                    .size(200.dp)
+                    .background(
+                        Brush.radialGradient(
+                            colors = listOf(
+                                CyanAccent.copy(alpha = 0.15f),
+                                VioletAccent.copy(alpha = 0.08f),
+                                Color.Transparent
+                            )
+                        ),
+                        shape = RoundedCornerShape(100.dp)
+                    )
+            )
+            HexHeroIcon(size = 160.dp)
+        }
 
-        ModelStatusCard(state.inferenceState)
+        // Wordmark — gradient tinted to match hero glow
+        Box(contentAlignment = Alignment.Center) {
+            Text(
+                text = "GemmaWorkflow",
+                style = MaterialTheme.typography.headlineMedium.copy(
+                    fontWeight = FontWeight(700),
+                    fontSize = 28.sp,
+                    brush = Brush.horizontalGradient(listOf(CyanAccent, VioletAccent))
+                )
+            )
+        }
 
         if (state.savedWorkflows.isNotEmpty()) {
-            Text("Saved", style = MaterialTheme.typography.labelMedium)
+            Text("Saved", style = MaterialTheme.typography.labelMedium, color = TextSecondary)
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                state.savedWorkflows.take(4).forEach { wf ->
-                    OutlinedButton(
-                        onClick = { viewModel.loadWorkflowDetail(wf.name) },
-                        modifier = Modifier.weight(1f),
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp, vertical = 2.dp)
+                state.savedWorkflows.take(6).forEach { wf ->
+                    var pressed by remember { mutableStateOf(false) }
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(if (pressed) SurfaceDark else GlassSurface)
+                            .border(
+                                width = if (pressed) 1.5.dp else 1.dp,
+                                color = if (pressed) CyanAccent else GlassBorder,
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                            .clickable { pressed = !pressed; viewModel.loadWorkflowDetail(wf.name) }
+                            .padding(horizontal = 14.dp, vertical = 10.dp)
                     ) {
-                        Text(wf.name, maxLines = 1, style = MaterialTheme.typography.bodySmall)
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                wf.name,
+                                maxLines = 1,
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    color = if (pressed) CyanAccent else TextPrimary,
+                                    fontWeight = FontWeight(500)
+                                )
+                            )
+                            Text(
+                                "${wf.actions.size} steps",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    color = if (pressed) CyanAccent.copy(alpha = 0.8f) else CyanAccent,
+                                    fontSize = 10.sp
+                                )
+                            )
+                        }
                     }
                 }
             }
         }
 
+        Text("Model", style = MaterialTheme.typography.labelMedium, color = TextSecondary)
+        ModelStatusCard(
+            state.inferenceState,
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(GlassSurface, MaterialTheme.shapes.medium)
+                .padding(12.dp)
+        )
+
         OutlinedTextField(
             value = state.prompt,
             onValueChange = viewModel::updatePrompt,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(GlassSurface, MaterialTheme.shapes.medium),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = CyanAccent,
+                unfocusedBorderColor = GlassBorder,
+                focusedLabelColor = CyanAccent,
+                unfocusedLabelColor = TextSecondary,
+                cursorColor = CyanAccent,
+                focusedTextColor = TextPrimary,
+                unfocusedTextColor = TextPrimary
+            ),
             minLines = 3,
             label = { Text("What should GemmaWorkflow do?") },
-            supportingText = { Text("e.g. \"When I tap this, open Maps to the nearest coffee shop and share my location\"") }
+            supportingText = { Text("e.g. \"When I tap this, open Maps to the nearest coffee shop\"", color = TextSecondary) }
         )
 
-        Button(
-            enabled = state.canGenerate,
+        GradientButton(
+            text = if (state.isBusy) "Generating\u2026" else "Generate Workflow",
             onClick = viewModel::generate,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(if (state.isBusy) "Generating\u2026" else "Generate Workflow")
-        }
+            enabled = state.canGenerate
+        )
 
         if (state.isBusy) {
             LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
@@ -487,27 +603,22 @@ private fun GenerateTabContent(viewModel: WorkflowGenerationViewModel, state: Wo
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        val icon = when (stage.status) {
-                            StageStatus.Done -> "\u2713"
-                            StageStatus.Running -> "\u25B6"
-                            StageStatus.Pending -> "\u25CB"
+                        val (icon, iconColor) = when (stage.status) {
+                            StageStatus.Done -> Icons.Default.CheckCircle to CyanAccent
+                            StageStatus.Running -> Icons.Default.PlayArrow to VioletAccent
+                            StageStatus.Pending -> Icons.Default.RadioButtonUnchecked to TextSecondary
                         }
-                        val color = when (stage.status) {
-                            StageStatus.Done -> MaterialTheme.colorScheme.primary
-                            StageStatus.Running -> MaterialTheme.colorScheme.tertiary
-                            StageStatus.Pending -> MaterialTheme.colorScheme.outline
-                        }
-                        Text(icon, color = color, style = MaterialTheme.typography.bodyMedium)
+                        Icon(icon, contentDescription = null, tint = iconColor, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(stage.label, color = color, style = MaterialTheme.typography.bodySmall)
+                            Text(stage.label, color = iconColor, style = MaterialTheme.typography.bodySmall)
                             // Token usage bar
                             if (tokenInfo != null && tokenInfo.estimatedTokens > 0) {
                                 val pct = (tokenInfo.estimatedTokens.toFloat() / tokenInfo.contextWindow).coerceAtMost(1f)
                                 val barColor = when {
-                                    pct > 0.8f -> MaterialTheme.colorScheme.error
-                                    pct > 0.5f -> MaterialTheme.colorScheme.tertiary
-                                    else -> MaterialTheme.colorScheme.primary
+                                    pct > 0.8f -> Color(0xFFFF6B6B)
+                                    pct > 0.5f -> VioletAccent
+                                    else -> CyanAccent
                                 }
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     // Mini progress bar
@@ -535,13 +646,11 @@ private fun GenerateTabContent(viewModel: WorkflowGenerationViewModel, state: Wo
         }
 
         if (state.error != null) {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
-            ) {
+            GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
                 Text(
                     text = state.error.orEmpty(),
                     modifier = Modifier.padding(12.dp),
-                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodyMedium)
             }
         }
@@ -552,7 +661,7 @@ private fun GenerateTabContent(viewModel: WorkflowGenerationViewModel, state: Wo
 
             Text("Generated Workflow", style = MaterialTheme.typography.titleMedium)
 
-            Card(modifier = Modifier.fillMaxWidth()) {
+            GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(workflow.name, style = MaterialTheme.typography.titleSmall)
                     if (workflow.summary.isNotBlank()) {
@@ -578,13 +687,11 @@ private fun GenerateTabContent(viewModel: WorkflowGenerationViewModel, state: Wo
             }
 
             if (state.validationErrors.isNotEmpty()) {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
-                ) {
+                GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(12.dp)) {
-                        Text("Validation errors:", style = MaterialTheme.typography.labelMedium)
+                        Text("Validation errors:", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.error)
                         state.validationErrors.forEach { err ->
-                            Text("  \u2022 $err", color = MaterialTheme.colorScheme.onErrorContainer)
+                            Text("  \u2022 $err", style = MaterialTheme.typography.bodySmall)
                         }
                     }
                 }
@@ -608,7 +715,7 @@ private fun GenerateTabContent(viewModel: WorkflowGenerationViewModel, state: Wo
             if (state.rawJson != null) {
                 Text("Raw Model Output", style = MaterialTheme.typography.titleSmall)
                 SelectionContainer {
-                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                    GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
                         Text(
                             text = state.rawJson.orEmpty(),
                             modifier = Modifier.padding(12.dp),
@@ -643,7 +750,7 @@ private fun GenerateTabContent(viewModel: WorkflowGenerationViewModel, state: Wo
             }
             if (debugExpanded) {
                 SelectionContainer {
-                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                    GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
                         Column(
                             modifier = Modifier.padding(12.dp),
                             verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -679,51 +786,160 @@ private fun WorkflowsTabContent(
     onEdit: (PlannedWorkflow) -> Unit,
     onNew: () -> Unit
 ) {
+    // Scene selection state — null means "show all"
+    var selectedSceneId by remember { mutableStateOf<String?>(null) }
+
+    val scenes = remember {
+        listOf(
+            SceneChipData("morning", "Morning", 3, Color(0xFFFFC15E)),
+            SceneChipData("work", "Work", 5, CyanAccent),
+            SceneChipData("dinner", "Dinner", 4, Color(0xFFFF6BD6)),
+            SceneChipData("sleep", "Sleep", 6, Color(0xFFB57BFF))
+        )
+    }
+
+    // Filter workflows when a scene is selected; null = show all
+    val displayedWorkflows = remember(selectedSceneId, workflows) {
+        if (selectedSceneId == null) workflows
+        else workflows.filter { it.scene == selectedSceneId }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(20.dp),
+            .padding(horizontal = 20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        Text(
+            "Workflows",
+            style = MaterialTheme.typography.headlineMedium.copy(
+                fontWeight = FontWeight(700),
+                fontSize = 28.sp,
+                color = TextPrimary
+            ),
+            modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
+        )
+
+        // Scene chip strip
+        SceneChipStrip(
+            scenes = scenes,
+            selectedSceneId = selectedSceneId,
+            onChipClick = { scene ->
+                selectedSceneId = if (selectedSceneId == scene.id) null else scene.id
+            },
+            modifier = Modifier.horizontalScroll(rememberScrollState())
+        )
+
+        Spacer(modifier = Modifier.height(4.dp))
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Saved Workflows", style = MaterialTheme.typography.titleLarge)
-            Button(onClick = onNew) {
-                Text("+ New")
-            }
+            val headerLabel = if (selectedSceneId != null) {
+                val sceneName = scenes.find { it.id == selectedSceneId }?.name ?: ""
+                "$sceneName Workflows"
+            } else "Saved Workflows"
+
+            Text(
+                headerLabel,
+                style = MaterialTheme.typography.titleMedium.copy(
+                    color = TextSecondary,
+                    fontWeight = FontWeight(600)
+                )
+            )
+            GradientButton(text = "+ New", onClick = onNew)
         }
 
-        if (workflows.isEmpty()) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-            ) {
-                Column(
-                    modifier = Modifier.padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text("No workflows yet", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        "Create one with AI or build manually",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.outline
-                    )
+        val isFiltering = selectedSceneId != null
+            val isEmpty = workflows.isEmpty()
+            val isFilteredEmpty = isFiltering && displayedWorkflows.isEmpty() && !isEmpty
+
+            when {
+                isEmpty -> {
+                    // No workflows at all
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(GlassSurface, MaterialTheme.shapes.medium)
+                            .padding(24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                "No workflows yet",
+                                style = MaterialTheme.typography.titleMedium.copy(color = TextPrimary)
+                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text(
+                                    "Create one with AI or build manually",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = TextSecondary
+                                )
+                                val infiniteTransition = rememberInfiniteTransition(label = "arrow")
+                                val offsetX by infiniteTransition.animateFloat(
+                                    initialValue = 0f,
+                                    targetValue = 6f,
+                                    animationSpec = infiniteRepeatable(
+                                        animation = tween(600, easing = LinearEasing),
+                                        repeatMode = RepeatMode.Reverse
+                                    ),
+                                    label = "arrow"
+                                )
+                                Icon(
+                                    Icons.AutoMirrored.Filled.ArrowForward,
+                                    contentDescription = "Create workflow",
+                                    tint = CyanAccent,
+                                    modifier = Modifier
+                                        .offset(x = offsetX.dp)
+                                        .size(18.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+                isFilteredEmpty -> {
+                    // Workflows exist but none match this scene
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(GlassSurface, MaterialTheme.shapes.medium)
+                            .padding(24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            val sceneName = scenes.find { it.id == selectedSceneId }?.name ?: ""
+                            Text(
+                                "No $sceneName workflows",
+                                style = MaterialTheme.typography.titleMedium.copy(color = TextPrimary)
+                            )
+                            TextButton(onClick = { selectedSceneId = null }) {
+                                Text("Show all workflows", color = CyanAccent)
+                            }
+                        }
+                    }
+                }
+                else -> {
+                    displayedWorkflows.forEach { workflow ->
+                        WorkflowListCard(
+                            workflow = workflow,
+                            onSelect = { onSelect(workflow) },
+                            onEdit = { onEdit(workflow) }
+                        )
+                    }
                 }
             }
-        } else {
-            workflows.forEach { workflow ->
-                WorkflowListCard(
-                    workflow = workflow,
-                    onSelect = { onSelect(workflow) },
-                    onEdit = { onEdit(workflow) }
-                )
-            }
-        }
 
         Spacer(modifier = Modifier.height(32.dp))
     }
@@ -751,7 +967,7 @@ private fun DebugTabContent(state: WorkflowGenerationUiState) {
         }
 
         grouped.forEach { (group, messages) ->
-            Card(modifier = Modifier.fillMaxWidth()) {
+            GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(group, style = MaterialTheme.typography.titleSmall)
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
@@ -792,19 +1008,19 @@ private fun DebugTabContent(state: WorkflowGenerationUiState) {
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    val icon = when (stage.status) {
-                        StageStatus.Done -> "\u2713"
-                        StageStatus.Running -> "\u25B6"
-                        StageStatus.Pending -> "\u25CB"
+                    val (icon, iconColor) = when (stage.status) {
+                        StageStatus.Done -> Icons.Default.CheckCircle to CyanAccent
+                        StageStatus.Running -> Icons.Default.PlayArrow to VioletAccent
+                        StageStatus.Pending -> Icons.Default.RadioButtonUnchecked to TextSecondary
                     }
-                    val color = when (stage.status) {
-                        StageStatus.Done -> MaterialTheme.colorScheme.primary
-                        StageStatus.Running -> MaterialTheme.colorScheme.tertiary
-                        StageStatus.Pending -> MaterialTheme.colorScheme.outline
+                    val description = when (stage.status) {
+                        StageStatus.Done -> "Done"
+                        StageStatus.Running -> "Running"
+                        StageStatus.Pending -> "Pending"
                     }
-                    Text(icon, color = color)
+                    Icon(icon, contentDescription = description, tint = iconColor, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(stage.label, color = color, style = MaterialTheme.typography.bodyMedium)
+                    Text(stage.label, color = iconColor, style = MaterialTheme.typography.bodyMedium)
                     if (tokenInfo != null) {
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
@@ -827,7 +1043,10 @@ private fun WorkflowListCard(
     onSelect: () -> Unit,
     onEdit: () -> Unit
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    GlassmorphicCard(
+        modifier = Modifier.fillMaxWidth(),
+        glowColor = null
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -836,25 +1055,34 @@ private fun WorkflowListCard(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(workflow.name, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    workflow.name,
+                    style = MaterialTheme.typography.titleMedium.copy(color = TextPrimary)
+                )
                 if (workflow.summary.isNotBlank()) {
                     Text(
                         workflow.summary,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.outline,
+                        color = TextSecondary,
                         maxLines = 1
                     )
                 }
                 Text(
                     triggerLabel(workflow),
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary
+                    color = CyanAccent
                 )
             }
-            OutlinedButton(onClick = onSelect) {
+            OutlinedButton(
+                onClick = onSelect,
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = CyanAccent)
+            ) {
                 Text("View")
             }
-            OutlinedButton(onClick = onEdit) {
+            OutlinedButton(
+                onClick = onEdit,
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = VioletAccent)
+            ) {
                 Text("Edit")
             }
         }
@@ -862,16 +1090,20 @@ private fun WorkflowListCard(
 }
 
 @Composable
-private fun ModelStatusCard(state: InferenceState) {
+private fun ModelStatusCard(state: InferenceState, modifier: Modifier = Modifier) {
     val (label, color) = when (state) {
-        is InferenceState.Idle -> "Idle" to MaterialTheme.colorScheme.outline
-        is InferenceState.Loading -> "Loading model\u2026" to MaterialTheme.colorScheme.primary
-        is InferenceState.Ready -> "Ready \u2014 ${state.backend} (LiteRT-LM)" to MaterialTheme.colorScheme.primary
-        is InferenceState.MissingModel -> "Model not found" to MaterialTheme.colorScheme.error
-        is InferenceState.GpuUnavailable -> "GPU unavailable: ${state.reason}" to MaterialTheme.colorScheme.error
-        is InferenceState.Error -> "Error: ${state.message}" to MaterialTheme.colorScheme.error
+        is InferenceState.Idle -> "Idle" to TextSecondary
+        is InferenceState.Loading -> "Loading model\u2026" to CyanAccent
+        is InferenceState.Ready -> "Ready \u2014 ${state.backend}" to CyanAccent
+        is InferenceState.MissingModel -> "Model not found" to Color(0xFFFF6B6B)
+        is InferenceState.GpuUnavailable -> "GPU unavailable: ${state.reason}" to Color(0xFFFF6B6B)
+        is InferenceState.Error -> "Error: ${state.message}" to Color(0xFFFF6B6B)
     }
-    Card(colors = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.1f))) {
+    Box(
+        modifier = modifier
+            .clip(MaterialTheme.shapes.medium)
+            .background(color.copy(alpha = 0.1f))
+    ) {
         Text(
             text = label,
             modifier = Modifier.padding(12.dp),
@@ -1109,7 +1341,9 @@ private fun WorkflowDetailScreen(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(20.dp),
+            .padding(20.dp)
+            .statusBarsPadding()
+            .navigationBarsPadding(),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Row(
@@ -1226,7 +1460,9 @@ private fun ShareSheetPicker(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(20.dp),
+            .padding(20.dp)
+            .statusBarsPadding()
+            .navigationBarsPadding(),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Row(
@@ -1294,7 +1530,7 @@ private fun ShareSheetPicker(
                         Text(
                             "${workflow.actions.size} step${if (workflow.actions.size != 1) "s" else ""}",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.outline
+                            color = TextSecondary
                         )
                     }
                 }
@@ -1302,5 +1538,71 @@ private fun ShareSheetPicker(
         }
 
         Spacer(modifier = Modifier.height(32.dp))
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Dark Navigation Bar — Lumen-inspired bottom tab bar
+// ═══════════════════════════════════════════════════════════════
+@Composable
+private fun DarkNavigationBar(
+    selectedTab: Int,
+    onTabSelected: (Int) -> Unit,
+    tabLabels: List<String>,
+    tabIcons: List<String>
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().navigationBarsPadding(),
+        color = SurfaceDark,
+        shadowElevation = 0.dp,
+        tonalElevation = 0.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            SurfaceDark.copy(alpha = 0.95f),
+                            BackgroundDark.copy(alpha = 0.98f)
+                        )
+                    )
+                )
+                .padding(vertical = 8.dp, horizontal = 24.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            tabLabels.forEachIndexed { index, label ->
+                val isSelected = selectedTab == index
+                val icon = tabIcons.getOrElse(index) { "" }
+
+                Column(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(
+                            if (isSelected) CyanAccent.copy(alpha = 0.1f)
+                            else Color.Transparent
+                        )
+                        .clickable { onTabSelected(index) }
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Text(
+                        text = icon,
+                        fontSize = 18.sp,
+                        color = if (isSelected) CyanAccent else TextSecondary.copy(alpha = 0.6f)
+                    )
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 11.sp,
+                            fontWeight = if (isSelected) FontWeight(600) else FontWeight(400)
+                        ),
+                        color = if (isSelected) CyanAccent else TextSecondary.copy(alpha = 0.6f)
+                    )
+                }
+            }
+        }
     }
 }

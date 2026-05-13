@@ -110,7 +110,8 @@ class IntentFactory {
         when (extra.type) {
             ParamType.String,
             ParamType.Url,
-            ParamType.Enum -> intent.putExtra(extra.extraKey, value.jsonPrimitive.content)
+            ParamType.Enum,
+            ParamType.AppPicker -> intent.putExtra(extra.extraKey, value.jsonPrimitive.content)
             ParamType.Uri -> intent.putExtra(extra.extraKey, Uri.parse(value.jsonPrimitive.content))
             ParamType.Int -> value.jsonPrimitive.intOrNull?.let { intent.putExtra(extra.extraKey, it) }
             ParamType.Long,

@@ -11,6 +11,7 @@ data class PlannedWorkflow(
     val summary: String = "",
     val trigger: TriggerConfig = TriggerConfig.Manual,
     val actions: List<WorkflowStep> = emptyList(),
+    val scene: String? = null,
     val missingSetup: List<String> = emptyList(),
     val rawModelOutput: String = ""
 )

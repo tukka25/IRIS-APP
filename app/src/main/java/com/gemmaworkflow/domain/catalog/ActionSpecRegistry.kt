@@ -2,6 +2,7 @@ package com.gemmaworkflow.domain.catalog
 
 import android.Manifest
 import android.app.SearchManager
+import android.content.Context
 import android.content.Intent
 import android.provider.AlarmClock
 import android.provider.CalendarContract
@@ -35,7 +36,11 @@ data class ActionSpec(
     val fallbackActionIds: List<String> = emptyList(),
     val toolBindings: List<ActionToolBinding> = emptyList(),
     val sharedToolGroups: Set<SharedToolGroup> = emptySet(),
-    val examples: List<JsonObject> = emptyList()
+    val examples: List<JsonObject> = emptyList(),
+    val timeoutSeconds: Int = 0,
+    /** When true, this step can run in parallel with the next independent step. */
+    val parallelExecutionEnabled: Boolean = false,
+    val installedAppListProviderId: String? = null
 )
 
 data class ActionToolBinding(
@@ -142,7 +147,8 @@ enum class ParamType(val promptName: String) {
     Boolean("boolean"),
     StringArray("string_array"),
     DateTimeMillis("datetime_millis"),
-    Enum("enum")
+    Enum("enum"),
+    AppPicker("app_picker")
 }
 
 sealed interface ExecutionSpec {
@@ -202,6 +208,31 @@ sealed interface AvailabilitySpec {
 }
 
 object ActionSpecRegistry {
+
+    private val installedAppProviders: Map<String, (Context) -> List<Pair<String, String>>> = mapOf(
+        "installed_apps" to { context: Context ->
+            val pm = context.packageManager
+            val intent = android.content.Intent(android.content.Intent.ACTION_MAIN)
+                .addCategory(android.content.Intent.CATEGORY_LAUNCHER)
+            val flags = if (android.os.Build.VERSION.SDK_INT >= 33) {
+                android.content.pm.PackageManager.MATCH_DEFAULT_ONLY
+            } else {
+                @Suppress("DEPRECATION") android.content.pm.PackageManager.MATCH_DEFAULT_ONLY
+            }
+            @Suppress("DEPRECATION")
+            val activities: List<android.content.pm.ResolveInfo> = pm.queryIntentActivities(intent, flags)
+            activities
+                .map { ri: android.content.pm.ResolveInfo -> Pair(ri.loadLabel(pm).toString(), ri.activityInfo.packageName) }
+                .distinct()
+                .sortedBy { it.first.lowercase() }
+        }
+    )
+
+    /** Returns list of (label, packageName) pairs for the given provider ID. */
+    fun getInstalledAppList(providerId: String, context: Context): List<Pair<String, String>> {
+        val provider: ((Context) -> List<Pair<String, String>>)? = installedAppProviders[providerId]
+        return provider?.invoke(context) ?: emptyList()
+    }
 
     val all: List<ActionSpec> = listOf(
         ActionSpec(
@@ -757,9 +788,9 @@ object ActionSpecRegistry {
         ActionSpec(
             id = "launch_app",
             label = "Launch app",
-            description = "Launches any installed app by package name. Requires QUERY_ALL_PACKAGES on Android 11+.",
+            description = "Launches any installed app by package name. Tap the field to browse installed apps.",
             params = listOf(
-                ParamSpec("package_name", ParamType.String, description = "Installed app package name"),
+                ParamSpec("package_name", ParamType.AppPicker, description = "Tap to select an installed app"),
                 ParamSpec("class_name", ParamType.String, required = false, description = "Specific Activity within the app")
             ),
             execution = ExecutionSpec.BuiltIn,
@@ -767,7 +798,9 @@ object ActionSpecRegistry {
             triggerCompatible = setOf("manual", "time", "nfc"),
             requiresConfirmation = false,
             requiredPermissions = listOf("android.permission.QUERY_ALL_PACKAGES"),
-            logicalActions = setOf(LogicalAction.OpenApp)
+            logicalActions = setOf(LogicalAction.OpenApp),
+            installedAppListProviderId = "installed_apps",
+            timeoutSeconds = 10
         ),
 
         // ── P3: Bluetooth / WiFi / Display / Intent ───────────────────────

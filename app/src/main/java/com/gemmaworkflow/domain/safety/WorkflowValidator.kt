@@ -119,6 +119,7 @@ object WorkflowValidator {
                     "$prefix: param '${param.name}' must be one of ${param.enumValues.joinToString()}"
                 }
             }
+            ParamType.AppPicker -> if (primitive?.contentOrNull != null) null else "$prefix: param '${param.name}' must be a string"
         }
     }
 
