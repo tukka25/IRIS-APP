@@ -36,12 +36,16 @@ import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.AppShortcut
 import androidx.compose.material.icons.filled.BatteryChargingFull
 import androidx.compose.material.icons.filled.Bluetooth
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DoNotDisturb
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Nightlight
 import androidx.compose.material.icons.filled.Nfc
 import androidx.compose.material.icons.filled.Notifications
@@ -57,6 +61,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -112,6 +117,7 @@ import com.gemmaworkflow.ui.theme.BackgroundDark
 import com.gemmaworkflow.ui.theme.CyanAccent
 import com.gemmaworkflow.ui.theme.GlassBorder
 import com.gemmaworkflow.ui.theme.GlassSurface
+import com.gemmaworkflow.platform.sound.YamnetClassifier
 import com.gemmaworkflow.ui.theme.SurfaceDark
 import com.gemmaworkflow.ui.theme.SurfaceVariantDark
 import com.gemmaworkflow.ui.theme.TextPrimary
@@ -166,7 +172,9 @@ private val TRIGGER_CATEGORIES: Map<TriggerCategory, List<TriggerItem>> = mapOf(
         TriggerItem("App Closed", TriggerConfig.AppClosed(emptyList(), false, true), Icons.Default.AppShortcut, TriggerCategory.EVENT),
         TriggerItem("SMS Received", TriggerConfig.SmsReceived(null, null), Icons.Default.Sms, TriggerCategory.EVENT),
         TriggerItem("Notification", TriggerConfig.NotificationListenerConfig(emptyList(), null, null, false), Icons.Default.Notifications, TriggerCategory.EVENT),
-        TriggerItem("Email Received", TriggerConfig.EmailReceived(null, null), Icons.Default.Email, TriggerCategory.EVENT)
+        TriggerItem("Email Received", TriggerConfig.EmailReceived(null, null), Icons.Default.Email, TriggerCategory.EVENT),
+        TriggerItem("Voice", TriggerConfig.Voice, Icons.Default.Mic, TriggerCategory.EVENT),
+        TriggerItem("Sound Event", TriggerConfig.SoundEvent(emptyList()), Icons.Default.GraphicEq, TriggerCategory.EVENT)
     ),
     TriggerCategory.SENSOR to listOf(
         TriggerItem("Geofence", TriggerConfig.Geofence(0.0, 0.0, 100f, GeofenceTransition.ENTER_EXIT), Icons.Default.LocationOn, TriggerCategory.SENSOR),
@@ -332,13 +340,16 @@ fun ManualWorkflowEditorScreen(
     }
     var appTriggerOnOpen by remember {
         mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.AppOpened)?.triggerOnOpen
-            ?: (initialWorkflow?.trigger as? TriggerConfig.AppClosed)?.triggerOnOpen
             ?: true)
     }
     var appTriggerOnClose by remember {
-        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.AppOpened)?.triggerOnClose
-            ?: (initialWorkflow?.trigger as? TriggerConfig.AppClosed)?.triggerOnClose
-            ?: false)
+        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.AppClosed)?.triggerOnClose
+            ?: true)
+    }
+
+    // Sound Event trigger state
+    var soundEventClasses by remember {
+        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.SoundEvent)?.soundClasses ?: emptyList())
     }
 
     // SmsReceived trigger state
@@ -481,7 +492,8 @@ fun ManualWorkflowEditorScreen(
                         sleepRequireChargerDisconnected = sleepRequireChargerDisconnected,
                         sleepRequireDndActive = sleepRequireDndActive,
                         nfcTagId = nfcTagId,
-                        shareSheetState = shareSheetState
+                        shareSheetState = shareSheetState,
+                        soundEventClasses = soundEventClasses
                     )
                     val workflow = PlannedWorkflow(
                         name = name.ifBlank { "Untitled" },
@@ -715,6 +727,20 @@ fun ManualWorkflowEditorScreen(
             ?: TriggerConfig.Manual
 
         when (currentTriggerConfig) {
+            is TriggerConfig.Manual -> {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            "This workflow runs manually from the widget or list.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = TextSecondary
+                        )
+                    }
+                }
+            }
             is TriggerConfig.Time -> {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(
@@ -920,7 +946,7 @@ fun ManualWorkflowEditorScreen(
                         Text(
                             "Fires when a GemmaWorkflow alarm is dismissed or cancelled by the user.",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.outline
+                            color = TextSecondary
                         )
                         OutlinedTextField(
                             value = alarmStoppedType,
@@ -967,7 +993,7 @@ fun ManualWorkflowEditorScreen(
                         Text(
                             "Fires when an SMS matching the patterns is received. Requires notification access.",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.outline
+                            color = TextSecondary
                         )
                         OutlinedTextField(
                             value = smsSenderPattern,
@@ -995,7 +1021,7 @@ fun ManualWorkflowEditorScreen(
                         Text(
                             "Fires on notifications from specific apps. Requires notification access.",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.outline
+color = TextSecondary,
                         )
                         OutlinedTextField(
                             value = notifAppPatterns.joinToString(", "),
@@ -1042,7 +1068,7 @@ fun ManualWorkflowEditorScreen(
                         Text(
                             "Fires on email notifications. Requires notification access.",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.outline
+color = TextSecondary,
                         )
                         OutlinedTextField(
                             value = emailSenderPattern,
@@ -1077,7 +1103,7 @@ fun ManualWorkflowEditorScreen(
                         Text(
                             "Fires when bedtime conditions are met (DND active, charger disconnected).",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.outline
+color = TextSecondary,
                         )
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             OutlinedTextField(
@@ -1135,7 +1161,7 @@ fun ManualWorkflowEditorScreen(
                         Text(
                             "Fires when a specific NFC tag is scanned. Requires NFC enabled.",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.outline
+color = TextSecondary,
                         )
                         OutlinedTextField(
                             value = nfcTagId,
@@ -1154,7 +1180,7 @@ fun ManualWorkflowEditorScreen(
                         Text(
                             "Fires when content is shared to GemmaWorkflow from any app.",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.outline
+color = TextSecondary,
                         )
                         val stateLabel = when (shareSheetState) {
                             SetupState.Ready -> "Ready"
@@ -1165,7 +1191,141 @@ fun ManualWorkflowEditorScreen(
                     }
                 }
             }
-            else -> {}
+            is TriggerConfig.Voice -> {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Voice Intent", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            "Fires when the user speaks a trigger phrase and the Gemini model identifies a matching workflow.",
+                            style = MaterialTheme.typography.bodySmall,
+color = TextSecondary,
+                        )
+                        Text(
+                            "Use the mic button on the main screen to train and trigger voice workflows.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = CyanAccent
+                        )
+                    }
+                }
+            }
+            is TriggerConfig.SoundEvent -> {
+                var expanded by remember { mutableStateOf(false) }
+                var searchQuery by remember { mutableStateOf("") }
+                val allSounds = remember { YamnetClassifier.AUDIOSET_CLASSES.toList() }
+                val filtered = remember(searchQuery) {
+                    if (searchQuery.isBlank()) allSounds
+                    else allSounds.filter { it.contains(searchQuery, ignoreCase = true) }
+                }
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { expanded = !expanded }
+                ) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Sound Event", style = MaterialTheme.typography.bodyMedium)
+                                if (soundEventClasses.isEmpty()) {
+                                    Text(
+                                        "No sound classes configured",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Color(0xFFFFB74D)
+                                    )
+                                } else {
+                                    Text(
+                                        "${soundEventClasses.size} sound${if (soundEventClasses.size != 1) "s" else ""} configured",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = CyanAccent
+                                    )
+                                }
+                            }
+                            Icon(
+                                imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                contentDescription = if (expanded) "Collapse" else "Expand",
+                                tint = TextSecondary,
+                            )
+                        }
+
+                        if (expanded) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            OutlinedTextField(
+                                value = searchQuery,
+                                onValueChange = { searchQuery = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                placeholder = { Text("Search sounds…") },
+                                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                                trailingIcon = {
+                                    if (searchQuery.isNotEmpty()) {
+                                        IconButton(onClick = { searchQuery = "" }) {
+                                            Icon(Icons.Default.Clear, contentDescription = "Clear search")
+                                        }
+                                    }
+                                },
+                                singleLine = true
+                            )
+                            HorizontalDivider()
+                            LazyColumn(
+                                modifier = Modifier.height(200.dp)
+                            ) {
+                                items(filtered.take(50)) { sound ->
+                                    val checked = sound in soundEventClasses
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable {
+                                                soundEventClasses = if (checked) {
+                                                    soundEventClasses - sound
+                                                } else {
+                                                    soundEventClasses + sound
+                                                }
+                                            }
+                                            .padding(vertical = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Checkbox(
+                                            checked = checked,
+                                            onCheckedChange = { selected ->
+                                                soundEventClasses = if (selected) {
+                                                    soundEventClasses + sound
+                                                } else {
+                                                    soundEventClasses - sound
+                                                }
+                                            }
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = sound,
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                    }
+                                }
+                                if (filtered.size > 50) {
+                                    item {
+                                        Text(
+                                            "Showing first 50 results",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = TextSecondary,
+                                            modifier = Modifier.padding(vertical = 8.dp)
+                                        )
+                                    }
+                                }
+                            }
+                            if (soundEventClasses.isNotEmpty()) {
+                                TextButton(
+                                    onClick = { soundEventClasses = emptyList() },
+                                    modifier = Modifier.align(Alignment.End)
+                                ) {
+                                    Text("Clear all")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         HorizontalDivider()
@@ -1261,7 +1421,8 @@ fun ManualWorkflowEditorScreen(
                         sleepRequireChargerDisconnected = sleepRequireChargerDisconnected,
                         sleepRequireDndActive = sleepRequireDndActive,
                         nfcTagId = nfcTagId,
-                        shareSheetState = shareSheetState
+                        shareSheetState = shareSheetState,
+                        soundEventClasses = soundEventClasses
                     )
                     onSave(
                         PlannedWorkflow(
@@ -1329,7 +1490,7 @@ private fun ActionStepCard(
                             step.params.toString(),
                             style = MaterialTheme.typography.bodySmall,
                             fontFamily = FontFamily.Monospace,
-                            color = MaterialTheme.colorScheme.outline
+color = TextSecondary,
                         )
                     }
                 }
@@ -1465,7 +1626,7 @@ private fun ActionEditDialog(
                                                     text = {
                                                         Column {
                                                             Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                                            Text(pkg, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline, maxLines = 1)
+                                                            Text(pkg, style = MaterialTheme.typography.labelSmall, color = TextSecondary, maxLines = 1)
                                                         }
                                                     },
                                                     onClick = {
@@ -1557,6 +1718,8 @@ private fun triggerConfigMatches(a: TriggerConfig, b: TriggerConfig): Boolean {
         a is TriggerConfig.NotificationListenerConfig && b is TriggerConfig.NotificationListenerConfig -> true
         a is TriggerConfig.EmailReceived && b is TriggerConfig.EmailReceived -> true
         a is TriggerConfig.SleepProxy && b is TriggerConfig.SleepProxy -> true
+        a is TriggerConfig.Voice && b is TriggerConfig.Voice -> true
+        a is TriggerConfig.SoundEvent && b is TriggerConfig.SoundEvent -> true
         else -> false
     }
 }
@@ -1651,7 +1814,8 @@ private fun buildTrigger(
     sleepRequireChargerDisconnected: Boolean,
     sleepRequireDndActive: Boolean,
     nfcTagId: String,
-    shareSheetState: SetupState
+    shareSheetState: SetupState,
+    soundEventClasses: List<String>
 ): TriggerConfig {
     return when (triggerType.second) {
         is TriggerConfig.Manual -> TriggerConfig.Manual
@@ -1714,10 +1878,13 @@ private fun buildTrigger(
         )
         is TriggerConfig.Nfc -> TriggerConfig.Nfc(nfcTagId.ifBlank { null })
         is TriggerConfig.ShareSheet -> TriggerConfig.ShareSheet(shareSheetState)
+        is TriggerConfig.Voice -> TriggerConfig.Voice
+        is TriggerConfig.SoundEvent -> TriggerConfig.SoundEvent(soundEventClasses)
         else -> TriggerConfig.Manual
     }
 }
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class, androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 private fun AppPatternEditor(
     patterns: List<String>,
@@ -1782,7 +1949,7 @@ private fun AppPatternEditor(
                             text = {
                                 Column {
                                     Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    Text(pkg, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline, maxLines = 1)
+                                    Text(pkg, style = MaterialTheme.typography.labelSmall, color = TextSecondary, maxLines = 1)
                                 }
                             },
                             onClick = {
