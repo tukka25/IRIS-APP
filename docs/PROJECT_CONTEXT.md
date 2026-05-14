@@ -1,10 +1,10 @@
-# GemmaWorkflow Project Context
+# IrisApp Project Context
 
 Last updated: 2026-05-11
 
 ## Product Summary
 
-GemmaWorkflow is an Android app that turns a user's natural-language request into a runnable phone workflow.
+IrisApp is an Android app that turns a user's natural-language request into a runnable phone workflow.
 
 The user can say something like:
 
@@ -98,7 +98,7 @@ User request
 ```text
 app/src/main/java/com/gemmaworkflow/
 ├── app/
-│   └── GemmaWorkflowApp.kt
+│   └── IrisAppApp.kt
 ├── data/
 │   ├── local/storage/
 │   ├── repository/
@@ -149,7 +149,7 @@ Responsibilities:
 The model file is expected under the app external files model directory, usually:
 
 ```text
-/sdcard/Android/data/com.gemmaworkflow/files/models/gemma-4-E2B-it.litertlm
+/sdcard/Android/data/com.irisapp/files/models/gemma-4-E2B-it.litertlm
 ```
 
 The local repo model path is:
@@ -291,7 +291,7 @@ Exact availability depends on:
 
 Android does not expose a safe universal schema of every installed app's private intents and extras.
 
-So GemmaWorkflow uses a curated, declarative action registry:
+So IrisApp uses a curated, declarative action registry:
 
 ```text
 SLM chooses: action_id + typed params
@@ -657,8 +657,8 @@ adb logcat | grep -Ei "WorkflowGeneration|WorkflowRunner|InferenceManager|Trigge
 Model push path:
 
 ```bash
-adb shell mkdir -p /sdcard/Android/data/com.gemmaworkflow/files/models
-adb push local-models/gemma-4-E2B-it.litertlm /sdcard/Android/data/com.gemmaworkflow/files/models/gemma-4-E2B-it.litertlm
+adb shell mkdir -p /sdcard/Android/data/com.irisapp/files/models
+adb push local-models/gemma-4-E2B-it.litertlm /sdcard/Android/data/com.irisapp/files/models/gemma-4-E2B-it.litertlm
 ```
 
 ## Design/Product Docs

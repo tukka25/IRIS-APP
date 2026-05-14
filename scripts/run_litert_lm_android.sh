@@ -58,6 +58,6 @@ else
     echo "To run via the Android app instead:"
     echo "  1. Build and install: ./gradlew installDebug"
     echo "  2. Push model to app dir:"
-    echo "     $ADB push $MODEL_PATH /sdcard/Android/data/com.gemmaworkflow/files/models/"
+    echo "     $ADB push $MODEL_PATH /sdcard/Android/data/com.irisapp/files/models/"
     echo "  3. Open app and tap 'Load model'"
 fi

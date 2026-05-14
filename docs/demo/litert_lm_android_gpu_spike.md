@@ -26,7 +26,7 @@ Push a model to the device:
 
 ```bash
 adb push gemma3-1b-it.litertlm \
-  /sdcard/Android/data/com.gemmaworkflow/files/models/
+  /sdcard/Android/data/com.irisapp/files/models/
 ```
 
 ## GPU Backend
@@ -57,7 +57,7 @@ The `AndroidManifest.xml` declares both as optional native libraries:
 2. Push a model:
    ```bash
    adb push gemma3-1b-it.litertlm \
-     /sdcard/Android/data/com.gemmaworkflow/files/models/
+     /sdcard/Android/data/com.irisapp/files/models/
    ```
 3. Open the app, tap "Load model", then enter a prompt and tap "Generate".
 

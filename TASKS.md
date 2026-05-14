@@ -1,4 +1,4 @@
-# GemmaWorkflow Hackathon Task Plan
+# IrisApp Hackathon Task Plan
 
 ## Working Assumptions
 
@@ -169,7 +169,7 @@ Deliverable: NFC tag can launch or run a saved workflow.
 - [ ] P1 Test a Tasker profile that fires the plugin.
 - [ ] P2 Spike Tasker profile import or prefilled setup only after plugin firing works.
 
-Deliverable: Tasker can trigger a GemmaWorkflow workflow.
+Deliverable: Tasker can trigger a IrisApp workflow.
 
 ## Milestone 9: LiteRT-LM GPU Inference
 

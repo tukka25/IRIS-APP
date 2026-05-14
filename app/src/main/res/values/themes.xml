@@ -1,6 +1,6 @@
 <resources>
     <!-- Base application theme — dark, edge-to-edge, no action bar -->
-    <style name="Theme.GemmaWorkflow" parent="android:style/Theme.Material.NoActionBar">
+    <style name="Theme.Iris" parent="android:style/Theme.Material.NoActionBar">
         <item name="android:windowActionBar">false</item>
         <item name="android:windowNoTitle">true</item>
         <!-- Edge-to-edge: let content draw behind system bars -->
@@ -12,4 +12,3 @@
         <item name="android:windowBackground">@color/splash_background</item>
     </style>
 </resources>
-

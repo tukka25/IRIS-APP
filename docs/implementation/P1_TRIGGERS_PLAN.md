@@ -59,7 +59,7 @@ GeofenceManager (singleton, object)
   ├── geofencingClient: GeofencingClient
   ├── pendingIntent: PendingIntent  →  GeofenceBroadcastReceiver
   │
-  ├── registerAll(context)          ← called from GemmaWorkflowApp.onCreate
+  ├── registerAll(context)          ← called from IrisAppApp.onCreate
   ├── registerWorkflow(ctx, name, trigger)
   └── unregisterWorkflow(name)
 
@@ -93,7 +93,7 @@ Workflow saved with Geofence trigger
 - **Expiration:** use `Geofence.NEVER_EXPIRE` (-1) by default
 - **Battery:** use `GeofencingClient.addGeofences()` with `setCallback()` to monitor validity
 - **Android 12+ (API 31+):** `ACCESS_BACKGROUND_LOCATION` is required for background geofence monitoring
-- **Register in GemmaWorkflowApp.onCreate:** loads all geofence workflows, calls `addGeofences()`
+- **Register in IrisAppApp.onCreate:** loads all geofence workflows, calls `addGeofences()`
 - **Register per workflow on save:** `GeofencingClient.addGeofences()` is idempotent — safe to call multiple times
 - **Permission guidance:** When `ACCESS_BACKGROUND_LOCATION` is denied on Android 10+, show a dedicated screen explaining why background location is needed and guide the user to Settings → Location → Permission → "Allow all the time"
 
@@ -106,7 +106,7 @@ Workflow saved with Geofence trigger
 | `domain/model/WorkflowModels.kt` | Modify — add `Geofence` + `GeofenceTransition` |
 | `domain/triggers/TriggerCatalog.kt` | Modify — add geofence `TriggerInfo` |
 | `ui/home/WorkflowGenerationViewModel.kt` | Modify — call `GeofenceManager.registerWorkflow` on save |
-| `app/GemmaWorkflowApp.kt` | Modify — call `GeofenceManager.registerAll` on create |
+| `app/IrisAppApp.kt` | Modify — call `GeofenceManager.registerAll` on create |
 | `AndroidManifest.xml` | Modify — add `ACCESS_FINE_LOCATION`, `ACCESS_BACKGROUND_LOCATION`, declare receiver |
 
 ---
@@ -167,7 +167,7 @@ Workflow saved with SmsReceived trigger
   → Also check NotificationListenerService access:
   → if !notificationListenerService.isEnabled():
       return SetupState.NeedsSetup with message directing user to
-        Settings → Notification Access → enable GemmaWorkflow
+        Settings → Notification Access → enable IrisApp
       (required for Android 14+ fallback)
 
   → Both permissions granted: SMS trigger is active
@@ -194,7 +194,7 @@ Workflow saved with SmsReceived trigger
 | `domain/model/WorkflowModels.kt` | Modify — add `SmsReceived` |
 | `domain/triggers/TriggerCatalog.kt` | Modify — add sms `TriggerInfo` |
 | `ui/home/WorkflowGenerationViewModel.kt` | Modify — call `SmsTriggerManager.registerWorkflow` on save |
-| `app/GemmaWorkflowApp.kt` | Modify — call `SmsTriggerManager.registerAll` + register NotificationListenerService on create |
+| `app/IrisAppApp.kt` | Modify — call `SmsTriggerManager.registerAll` + register NotificationListenerService on create |
 | `AndroidManifest.xml` | Modify — add `RECEIVE_SMS`, `READ_SMS`, `READ_PHONE_STATE`, declare receiver and service |
 
 ---
@@ -209,7 +209,7 @@ Workflow saved with SmsReceived trigger
 
 ### Strategy
 
-**For GemmaWorkflow's own scheduled alarms:**
+**For IrisApp's own scheduled alarms:**
 - Track alarm lifecycle internally: `scheduled` → `fired` → `snoozed` or `dismissed`
 - When alarm fires (notification shown), start tracking it
 - User taps "Snooze" on notification → `AlarmSnoozeReceiver` → re-schedules for snooze interval
@@ -236,7 +236,7 @@ data class AlarmStopped(
 @Serializable
 enum class AlarmTriggerType {
     ANY,                    // any alarm (own or system)
-    OWN_ONLY                // only GemmaWorkflow's own alarms
+    OWN_ONLY                // only IrisApp's own alarms
 }
 
 @Serializable
@@ -262,11 +262,11 @@ AlarmTracker (singleton, object)
   └── cancel(workflowName)
 
 AlarmDismissReceiver : BroadcastReceiver
-  → called when user taps "Dismiss" on GemmaWorkflow alarm notification
+  → called when user taps "Dismiss" on IrisApp alarm notification
   → updates AlarmTracker state → fires OWN alarm workflows with alarmType=OWN_ONLY
 
 AlarmSnoozeReceiver : BroadcastReceiver
-  → called when user taps "Snooze" on GemmaWorkflow alarm notification
+  → called when user taps "Snooze" on IrisApp alarm notification
   → re-schedules alarm for snooze interval
   → fires OWN alarm workflows with alarmType=OWN_ONLY
 ```
@@ -277,13 +277,13 @@ AlarmSnoozeReceiver : BroadcastReceiver
 SystemAlarmMonitor (singleton)
   → listens to ACTION_NEXT_ALARM_CLOCK_CHANGED
   → tracks previous AlarmClockInfo
-  → when alarm disappears without GemmaWorkflow firing → user may have dismissed a system alarm
+  → when alarm disappears without IrisApp firing → user may have dismissed a system alarm
   → fires ANY workflows (with appropriate caveats in logs)
 ```
 
 ### Key Implementation Notes
 
-- **Own alarms only are reliable** — the dismiss/snooze PendingIntents are GemmaWorkflow's own
+- **Own alarms only are reliable** — the dismiss/snooze PendingIntents are IrisApp's own
 - **System alarms are best-effort** — `ACTION_NEXT_ALARM_CLOCK_CHANGED` cannot distinguish snooze vs dismiss
 - **Notification action intents** must use `Intent.FLAG_ACTIVITY_NEW_TASK` since they launch from Notification
 - **Do NOT register for snooze/dismiss of third-party alarms** — no such broadcast exists
@@ -299,7 +299,7 @@ SystemAlarmMonitor (singleton)
 | `domain/model/WorkflowModels.kt` | Modify — add `AlarmStopped`, `AlarmTriggerType`, `SnoozeTriggerBehavior` |
 | `domain/triggers/TriggerCatalog.kt` | Modify — add alarm_stopped `TriggerInfo` with caveat in description |
 | `ui/home/WorkflowGenerationViewModel.kt` | Modify — call `AlarmTracker.schedule` on save |
-| `app/GemmaWorkflowApp.kt` | Modify — call `AlarmTracker.init` + register receivers on create |
+| `app/IrisAppApp.kt` | Modify — call `AlarmTracker.init` + register receivers on create |
 | `AndroidManifest.xml` | Modify — add `SCHEDULE_ALARMS` permission, declare receivers |
 
 ---
@@ -311,7 +311,7 @@ SystemAlarmMonitor (singleton)
 All three managers follow the same initialization pattern as P0 managers:
 
 ```kotlin
-// GemmaWorkflowApp.kt
+// IrisAppApp.kt
 override fun onCreate() {
     super.onCreate()
 
@@ -376,7 +376,7 @@ This is already implemented and works for all P0 triggers. It will work for P1 w
 - [ ] Android 12+ background location permission prompts correctly
 
 **SMS:**
-- [ ] Receive SMS with GemmaWorkflow as default SMS app (Android < 14) → workflow fires
+- [ ] Receive SMS with IrisApp as default SMS app (Android < 14) → workflow fires
 - [ ] Sender pattern filter matches correctly
 - [ ] Body pattern filter matches correctly
 - [ ] Multiple matching workflows all fire
@@ -401,7 +401,7 @@ This is already implemented and works for all P0 triggers. It will work for P1 w
 
 **Answer: Yes, NotificationListenerService as fallback.** `NotificationListenerService` works differently — it receives notifications from apps the user grants access to, independent of being the default SMS app. On Android 14+, `SMS_RECEIVED_ACTION` is limited to the default SMS app, but `NotificationListenerService` can still detect SMS app notifications if the user enables Notification Access. The catch: the notification text may be redacted on Android 12+ depending on the SMS app. Strategy: implement both — primary `SMS_RECEIVED_ACTION` (for Android < 14), fallback `NotificationListenerService` (for Android 14+ or as alternative).
 
-~~3. **Alarm snooze interval:** Where does the snooze duration come from — a user-configured setting in GemmaWorkflow, or do we query the system's default snooze length?~~
+~~3. **Alarm snooze interval:** Where does the snooze duration come from — a user-configured setting in IrisApp, or do we query the system's default snooze length?~~
 
 **Answer: User-configured in app settings.** Add a `SnoozeDurationMinutes` setting in `AppSettings` (or `SharedPreferences`), defaulting to 10 minutes. User can change it in workflow settings or global app settings.
 

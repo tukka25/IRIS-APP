@@ -14,6 +14,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "GemmaWorkflow"
+rootProject.name = "IrisApp"
 include(":app")
 

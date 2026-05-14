@@ -149,7 +149,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
 
-fun copyTextToClipboardSilently(context: Context, text: String, label: String = "GemmaWorkflow") {
+fun copyTextToClipboardSilently(context: Context, text: String, label: String = "IrisApp") {
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     val clip = ClipData.newPlainText(label, text)
     clipboard.setPrimaryClip(clip)
@@ -206,7 +206,7 @@ import android.content.Context
 import android.net.Uri
 import android.widget.Toast
 
-fun copyImageUriToClipboardSilently(context: Context, imageUri: Uri, label: String = "GemmaWorkflow") {
+fun copyImageUriToClipboardSilently(context: Context, imageUri: Uri, label: String = "IrisApp") {
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     // FLAG_GRANT_READ_URI_PERMISSION lets the clipboard own a temporary read grant
     val clip = ClipData.newUri(context.contentResolver, label, imageUri)

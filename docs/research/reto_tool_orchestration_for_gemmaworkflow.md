@@ -1,4 +1,4 @@
-# RETO-Inspired Tool Orchestration For GemmaWorkflow
+# RETO-Inspired Tool Orchestration For IrisApp
 
 Date: 2026-05-08
 
@@ -8,7 +8,7 @@ Primary paper: [Robust and Efficient Tool Orchestration via Layered Execution St
 
 ## Goal
 
-Implement a RETO-inspired orchestration layer for GemmaWorkflow so the local LiteRT SLM can use tools more reliably without fine-tuning.
+Implement a RETO-inspired orchestration layer for IrisApp so the local LiteRT SLM can use tools more reliably without fine-tuning.
 
 The current app already has:
 
@@ -55,7 +55,7 @@ RETO has three stages:
 
    When a tool call has bad params, bad schema, empty output, unavailable permission, or execution failure, RETO repairs that specific call under a budget. It does not replan the whole workflow unless local repair fails.
 
-The paper reports major gains for non-tool-tuned SLMs, especially Qwen2.5-7B, and notes that constrained execution plus local repair keeps smaller models functional. This is directly relevant to GemmaWorkflow because the app uses an on-device SLM and has tight context, latency, and reliability constraints.
+The paper reports major gains for non-tool-tuned SLMs, especially Qwen2.5-7B, and notes that constrained execution plus local repair keeps smaller models functional. This is directly relevant to IrisApp because the app uses an on-device SLM and has tight context, latency, and reliability constraints.
 
 ## Adaptation Decision
 
@@ -407,7 +407,7 @@ Important: the SLM should not choose arbitrary tools. It should receive candidat
 Prompt contract:
 
 ```text
-You are a RETO layer planner for GemmaWorkflow.
+You are a RETO layer planner for IrisApp.
 Group tools into coarse execution layers.
 Do not output tool arguments.
 Do not use effectful tools during generation.

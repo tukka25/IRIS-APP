@@ -1,0 +1,183 @@
+package com.irisapp.ui.home
+
+import com.irisapp.domain.model.ExecutionResult
+import com.irisapp.domain.model.PlannedWorkflow
+import com.irisapp.domain.model.SharedContent
+import com.irisapp.platform.inference.InferenceState
+
+/**
+ * Carries the information needed to render a confirmation dialog for a pending step.
+ * [stepId] identifies the action; [stepLabel] is the human-readable name;
+ * [params] are the key/value parameters that will be executed on confirm.
+ */
+data class ConfirmationRequest(
+    val stepId: String,
+    val stepLabel: String,
+    val params: Map<String, String>
+)
+
+/**
+ * Carries the information needed to render a permission-request dialog for a pending step.
+ * [stepId] identifies the action; [stepLabel] is the human-readable name;
+ * [permissions] is the list of Android runtime permissions needed (e.g.
+ * [android.Manifest.permission.READ_CONTACTS]).
+ */
+data class PermissionRequest(
+    val stepId: String,
+    val stepLabel: String,
+    val permissions: List<String>
+)
+
+/**
+ * Carries the information needed to render a confirmation dialog when an NFC tag
+ * is scanned and the user needs to confirm before running the workflow.
+ */
+data class NfcScanConfirmation(
+    val workflowId: String,
+    val workflowName: String
+)
+
+/**
+ * Represents content received via the Android share sheet that is pending
+ * workflow selection by the user.
+ */
+data class PendingShare(
+    val text: String?,
+    val uri: String?,
+    val sourceLabel: String?
+) {
+    val displaySummary: String
+        get() = when {
+            !text.isNullOrBlank() -> text.take(80).let { if (text.length > 80) "$it…" else it }
+            !uri.isNullOrBlank() -> "Shared file: ${uri.substringAfterLast('/')}"
+            else -> "Shared content"
+        }
+}
+
+data class WorkflowRunSummary(
+    val recentHistory: List<Boolean>,
+    val totalRuns: Int,
+    val lastRunMillis: Long
+)
+
+data class RecentRun(
+    val workflowName: String,
+    val success: Boolean,
+    val timestampMillis: Long
+)
+
+data class WorkflowGenerationUiState(
+    val prompt: String = "send message to Maya saying hi, and invite him to meeting on 6 oclock on next friday and then add it to my calendar.",
+    val inferenceState: InferenceState = InferenceState.Idle,
+    val isModelReady: Boolean = false,
+    val isModelLoaded: Boolean = false,
+    val isBusy: Boolean = false,
+    val stage: String = "",
+    val stageTimeline: List<StageProgress> = emptyList(),
+    val stageTokenUsage: List<StageTokenUsage> = emptyList(),
+    val elapsedSeconds: Long = 0,
+    val error: String? = null,
+    val workflowPreview: PlannedWorkflow? = null,
+    val rawJson: String? = null,
+    val validationErrors: List<String> = emptyList(),
+    val saved: Boolean = false,
+    val runResults: List<ExecutionResult> = emptyList(),
+    val debugMessages: List<DebugMessage> = emptyList(),
+    val savedWorkflows: List<PlannedWorkflow> = emptyList(),
+    val workflowSummaries: Map<String, WorkflowRunSummary> = emptyMap(),
+    val recentActivity: List<RecentRun> = emptyList(),
+    val selectedWorkflowName: String? = null,
+    /** Set when a step requires user confirmation; cleared after confirm or dismiss. */
+    val pendingConfirmation: ConfirmationRequest? = null,
+    /** Set when a step requires runtime permissions; cleared after grant or dismiss. */
+    val pendingPermission: PermissionRequest? = null,
+    /** Index of the next step to run when resuming after confirmation. */
+    val resumeStepIndex: Int = 0,
+    /** Non-null when the user has tapped a saved workflow to see its detail. */
+    val selectedWorkflowDetail: PlannedWorkflow? = null,
+    /** The workflow currently being executed (used to resume after confirmation on the detail screen). */
+    val runningWorkflow: PlannedWorkflow? = null,
+    /** Non-null when the user is setting up a time trigger for a saved workflow. */
+    val timeTriggerSetupWorkflow: PlannedWorkflow? = null,
+    /** Shared content from an incoming share intent. */
+    val sharedContent: SharedContent? = null,
+
+    // ── Share sheet state ──────────────────────────────────────────────────
+    /**
+     * Non-null when the user is setting up a share sheet trigger for a saved workflow.
+     */
+    val shareSheetSetupWorkflow: PlannedWorkflow? = null,
+
+    /**
+     * Non-null when content was shared to the app and the user needs to pick a workflow.
+     */
+    val pendingShare: PendingShare? = null,
+    /**
+     * List of saved workflows that support the share sheet trigger.
+     */
+    val shareSheetWorkflows: List<PlannedWorkflow> = emptyList(),
+
+    // ── NFC trigger state ────────────────────────────────────────────────
+    /** True when the NFC tag setup screen should be shown. */
+    val showNfcSetup: Boolean = false,
+    /** Current write-to-tag state. */
+    val nfcWriteState: NfcWriteState = NfcWriteState.Idle,
+    /** The name of the workflow selected for NFC writing. */
+    val nfcWriteWorkflowId: String? = null,
+    /** Pending NFC scan awaiting user confirmation to run. */
+    val nfcScanConfirmation: NfcScanConfirmation? = null,
+
+    // ── Manual editor state ─────────────────────────────────────────────
+    /** Non-null when the manual workflow editor should be shown. */
+    val editingWorkflow: PlannedWorkflow? = null,
+    /** True when the editor is for a new workflow (not editing existing). */
+    val isNewWorkflow: Boolean = false,
+
+    // ── Sound Event trigger setup ───────────────────────────────────
+    /** Non-null when the SoundEvent trigger setup screen should be shown. */
+    val soundEventTriggerSetupWorkflow: PlannedWorkflow? = null,
+
+    // ── Navigation tabs ────────────────────────────────────────────────
+    val selectedTab: Int = 0  // 0 = Generate, 1 = Workflows, 2 = Editor
+) {
+    val canGenerate: Boolean get() = isModelLoaded && isModelReady && !isBusy && prompt.isNotBlank()
+    val hasWorkflow: Boolean get() = workflowPreview != null
+    val isValid: Boolean get() = hasWorkflow && validationErrors.isEmpty()
+}
+
+enum class StageStatus { Pending, Running, Done }
+
+data class StageProgress(
+    val label: String,
+    val status: StageStatus = StageStatus.Pending
+)
+
+/** Token usage for one agent stage. */
+data class StageTokenUsage(
+    val stageLabel: String,
+    val inputChars: Int = 0,
+    val estimatedTokens: Int = 0,
+    val contextWindow: Int = 8192  // Gemma 4 E2B IT default
+)
+
+data class DebugMessage(
+    val label: String,
+    val message: String,
+    val timestampMillis: Long = System.currentTimeMillis()
+)
+
+/** Mirrors the fields needed to render the detail screen for a saved workflow. */
+data class WorkflowDetailState(
+    val name: String,
+    val summary: String,
+    val trigger: com.irisapp.domain.model.TriggerConfig,
+    val steps: List<StepDetail>
+)
+
+data class StepDetail(
+    val id: String,
+    val label: String,
+    val icon: String,
+    val params: String,
+    val requiresConfirmation: Boolean
+)

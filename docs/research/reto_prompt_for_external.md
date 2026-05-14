@@ -1,4 +1,4 @@
-I'm building an Android automation app called GemmaWorkflow that generates
+I'm building an Android automation app called IrisApp that generates
 workflows from natural language (e.g. "send message to Maya saying hi at 6pm
 next Friday and add to calendar"). It runs Gemma 4 E2B IT (2.4GB) on-device
 via LiteRT-LM GPU backend.

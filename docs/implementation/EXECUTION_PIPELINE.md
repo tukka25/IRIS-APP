@@ -36,7 +36,7 @@ Each manager follows a two-phase registration:
 ### Phase 1: App Startup — `registerAll(context)`
 
 ```kotlin
-// GemmaWorkflowApp.onCreate()
+// IrisAppApp.onCreate()
 GeofenceManager.registerAll(this)
 ```
 
@@ -127,11 +127,11 @@ System event (geofence entered, SMS received, etc.)
 
 ### TriggerRegistry
 
-**File:** `com.gemmaworkflow.platform.trigger.TriggerRegistry` (object/singleton)
+**File:** `com.irisapp.platform.trigger.TriggerRegistry` (object/singleton)
 
 | Method | Description |
 |--------|-------------|
-| `init(context)` | One-time init in `GemmaWorkflowApp.onCreate`. Sets `applicationContext`. Must be called before any manager registers. |
+| `init(context)` | One-time init in `IrisAppApp.onCreate`. Sets `applicationContext`. Must be called before any manager registers. |
 | `fire(context, workflowName)` | Load workflow by name, delegate to `fire(context, workflow)` |
 | `fire(context, workflow)` | Launch `WorkflowRunner.run()` in `Dispatchers.Default` coroutine. Catches `ConfirmationRequired` → stores pending + shows notification. |
 | `confirmAndResume(context, workflowName)` | Called from `MainActivity` when user confirms. Re-launches runner from stored step index. |
@@ -139,7 +139,7 @@ System event (geofence entered, SMS received, etc.)
 
 ### WorkflowRunner
 
-**File:** `com.gemmaworkflow.domain.runner.WorkflowRunner`
+**File:** `com.irisapp.domain.runner.WorkflowRunner`
 
 | Method | Description |
 |--------|-------------|
@@ -149,13 +149,13 @@ System event (geofence entered, SMS received, etc.)
 
 ### ConfirmationRequired
 
-**File:** `com.gemmaworkflow.domain.runner.WorkflowRunner`
+**File:** `com.irisapp.domain.runner.WorkflowRunner`
 
 Exception thrown by `executeStep()` when a step requires user confirmation before running. Caught by `TriggerRegistry.fire()` which stores the pending execution and shows a notification.
 
 ### ExecutionResult
 
-**File:** `com.gemmaworkflow.domain.model.WorkflowModels.kt`
+**File:** `com.irisapp.domain.model.WorkflowModels.kt`
 
 ```kotlin
 data class ExecutionResult(
@@ -365,7 +365,7 @@ MainActivity.onNewIntent():
 
 ## 11. Startup Restore
 
-When the app starts, `GemmaWorkflowApp.onCreate()` calls `registerAll()` on each manager. This loads all workflows from `WorkflowRepository` and re-registers their system-level triggers. Without this step, triggers would not survive a device restart.
+When the app starts, `IrisAppApp.onCreate()` calls `registerAll()` on each manager. This loads all workflows from `WorkflowRepository` and re-registers their system-level triggers. Without this step, triggers would not survive a device restart.
 
 ```
 App.onCreate()

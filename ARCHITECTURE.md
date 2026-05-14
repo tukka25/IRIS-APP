@@ -1,8 +1,8 @@
-# GemmaWorkflow Architecture And Technology Plan
+# IrisApp Architecture And Technology Plan
 
 ## Purpose
 
-GemmaWorkflow is a hackathon Android app that turns a natural-language request into a runnable cross-app workflow. The strongest demo path is:
+IrisApp is a hackathon Android app that turns a natural-language request into a runnable cross-app workflow. The strongest demo path is:
 
 ```text
 User prompt -> on-device planner -> validated JSON workflow -> save -> run now or attach trigger
@@ -114,7 +114,7 @@ The app should prove three things:
 ```text
 app/src/main/java/com/gemmaworkflow/
 +-- app/
-|   +-- GemmaWorkflowApp.kt
+|   +-- IrisAppApp.kt
 |   +-- AppContainer.kt
 +-- core/
 |   +-- catalog/
@@ -378,11 +378,11 @@ This path is more controllable than background NFC automation and more demo-frie
 
 ### Tasker
 
-Treat Tasker as assisted automation, not as a guaranteed silent profile creator. The safer architecture is to expose GemmaWorkflow as a Tasker/Locale plugin:
+Treat Tasker as assisted automation, not as a guaranteed silent profile creator. The safer architecture is to expose IrisApp as a Tasker/Locale plugin:
 
 - `TaskerPluginEditActivity` lets Tasker configure which workflow should run.
 - `TaskerPluginFireReceiver` receives Tasker's fire intent and starts the workflow.
-- Tasker owns the profile trigger; GemmaWorkflow owns workflow execution.
+- Tasker owns the profile trigger; IrisApp owns workflow execution.
 
 If profile creation/import is attempted, it should be a separate spike because it depends on Tasker's supported import/configuration behavior.
 
