@@ -3,654 +3,423 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GemmaWorkflow — On-device AI workflow automation for Android</title>
-  <meta name="description" content="Turn plain English into phone automation. GemmaWorkflow runs a 2B on-device language model to plan cross-app workflows — no cloud, no data leaves your device.">
-
-  <!-- Fonts -->
+  <title>Iris — On-device AI for Android</title>
+  <meta name="description" content="Gemma 4 2B runs locally on your Android phone. Turn plain English into cross-app workflows. No cloud, no data leaves your device.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-
-  <!-- Favicon (inline SVG as data URI) -->
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23050505'/><polygon points='16,4 28,10 28,22 16,28 4,22 4,10' fill='none' stroke='%237C6AFF' stroke-width='2'/><circle cx='16' cy='16' r='4' fill='%2300D4AA'/></svg>">
-
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
-  <!-- ═══ NAVIGATION ═══════════════════════════════════════════ -->
+  <!-- Nav -->
   <nav class="nav">
-    <div class="nav__inner">
-      <a href="#" class="nav__logo">
-        <!-- Hex icon -->
-        <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <polygon points="14,2 24,7 24,21 14,26 4,21 4,7" stroke="#7C6AFF" stroke-width="1.5" fill="none"/>
-          <polygon points="14,7 20,10.5 20,17.5 14,21 8,17.5 8,10.5" fill="#7C6AFF" opacity="0.2"/>
-          <circle cx="14" cy="14" r="3" fill="#00D4AA"/>
-        </svg>
-        GemmaWorkflow
-      </a>
-      <ul class="nav__links">
-        <li><a href="#features">Features</a></li>
-        <li><a href="#architecture">Architecture</a></li>
-        <li><a href="#actions">Actions</a></li>
-        <li><a href="#triggers">Triggers</a></li>
-        <li><a href="#get-started">Get Started</a></li>
-      </ul>
-      <a href="https://github.com/tukka25/gemma4good_android" class="nav__cta" target="_blank" rel="noopener">
-        <!-- GitHub icon -->
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-          <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
-        </svg>
-        View on GitHub
-      </a>
+    <a href="#" class="nav__logo">
+      <svg width="22" height="22" viewBox="0 0 28 28" fill="none">
+        <polygon points="14,3 25,8.5 25,19.5 14,25 3,19.5 3,8.5" stroke="#7C6AFF" stroke-width="1.8" fill="none"/>
+        <circle cx="14" cy="14" r="3.5" fill="#7C6AFF"/>
+      </svg>
+      Iris
+    </a>
+    <div class="nav__links">
+      <a href="#features">Features</a>
+      <a href="#benchmarks">Benchmarks</a>
+      <a href="#model">Model</a>
+      <a href="#install">Install</a>
+      <a href="https://github.com/tukka25/gemma4good_android" class="nav__cta" target="_blank" rel="noopener">GitHub</a>
     </div>
   </nav>
 
-  <!-- ═══ HERO ═════════════════════════════════════════════════ -->
-  <section class="hero" style="background: var(--surface);">
-    <div class="container">
-      <div class="hero__eyebrow reveal">
-        <span class="hero__badge"></span>
-        On-device AI · Privacy-first · GPU-accelerated
-      </div>
-
-      <h1 class="hero__headline reveal" style="transition-delay: 0.1s;">
-        Turn plain English<br>into phone automation.
-      </h1>
-
-      <p class="hero__sub reveal" style="transition-delay: 0.2s;">
-        GemmaWorkflow runs a 2B on-device language model to plan cross-app
-        workflows — no cloud, no data leaves your device.
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero__text">
+      <h1 class="hero__headline">Say it. Run it.</h1>
+      <p class="hero__sub">
+        Iris runs Gemma 4 2B entirely on your Android device.
+        Describe what you want in plain English — it builds the workflow, you run it.
       </p>
-
-      <div class="hero__actions reveal" style="transition-delay: 0.3s;">
-        <a href="https://github.com/tukka25/gemma4good_android" class="btn btn-primary" target="_blank" rel="noopener">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
-          </svg>
-          View on GitHub
-        </a>
-        <a href="#get-started" class="btn btn-secondary">
-          Get Started
-          <svg width="14" height="14" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M1 6h10M7 2l4 4-4 4"/>
-          </svg>
-        </a>
-      </div>
-
-      <!-- Phone mockup -->
-      <div class="hero__phone reveal" style="transition-delay: 0.4s;">
-        <svg viewBox="0 0 280 540" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:100%;filter:drop-shadow(0 24px 48px rgba(124,106,255,0.12))">
-          <!-- Phone frame -->
-          <rect width="280" height="540" rx="36" fill="#111113" stroke="#2B2B30" stroke-width="1.5"/>
-          <!-- Screen area -->
-          <rect x="12" y="12" width="256" height="516" rx="28" fill="#0A0A0F"/>
-          <!-- Status bar -->
-          <rect x="12" y="12" width="256" height="36" rx="28" fill="#111113"/>
-          <circle cx="220" cy="30" r="6" fill="#333"/>
-          <circle cx="232" cy="30" r="6" fill="#333"/>
-          <circle cx="244" cy="30" r="6" fill="#333"/>
-          <!-- Notch -->
-          <rect x="100" y="12" width="80" height="24" rx="12" fill="#111113"/>
-          <!-- App header -->
-          <text x="24" y="76" font-family="Inter,sans-serif" font-size="20" font-weight="700" fill="white">GemmaWorkflow</text>
-          <rect x="24" y="84" width="80" height="4" rx="2" fill="#7C6AFF" opacity="0.6"/>
-          <!-- Hex hero icon -->
-          <polygon points="140,105 168,117 168,145 140,157 112,145 112,117" stroke="#7C6AFF" stroke-width="1.5" fill="none"/>
-          <circle cx="140" cy="131" r="10" fill="#00D4AA" opacity="0.8"/>
-          <!-- Prompt field -->
-          <rect x="24" y="172" width="232" height="64" rx="12" fill="#1A1A1D" stroke="#2B2B30" stroke-width="1"/>
-          <text x="40" y="196" font-family="Inter,sans-serif" font-size="13" fill="#8888A0">Send a message to Maya saying hi...</text>
-          <rect x="40" y="208" width="60" height="4" rx="2" fill="#333"/>
-          <!-- Generate button -->
-          <rect x="24" y="252" width="232" height="40" rx="10" fill="#7C6AFF" opacity="0.9"/>
-          <text x="140" y="277" font-family="Inter,sans-serif" font-size="13" font-weight="600" fill="white" text-anchor="middle">Generate Workflow</text>
-          <!-- Model status -->
-          <rect x="24" y="308" width="232" height="36" rx="10" fill="#1A1A1D" stroke="#2B2B30" stroke-width="1"/>
-          <circle cx="44" cy="326" r="5" fill="#00D4AA"/>
-          <text x="58" y="330" font-family="Inter,sans-serif" font-size="11" fill="#8888A0">Model ready · 2B GPU</text>
-          <!-- Saved workflows strip -->
-          <text x="24" y="372" font-family="Inter,sans-serif" font-size="12" font-weight="600" fill="white">Saved Workflows</text>
-          <rect x="24" y="384" width="100" height="52" rx="10" fill="#1A1A1D" stroke="#2B2B30" stroke-width="1"/>
-          <text x="36" y="403" font-family="Inter,sans-serif" font-size="11" fill="white">Morning Routine</text>
-          <text x="36" y="418" font-family="Inter,sans-serif" font-size="10" fill="#8888A0">3 actions · Manual</text>
-          <rect x="132" y="384" width="100" height="52" rx="10" fill="#1A1A1D" stroke="#2B2B30" stroke-width="1"/>
-          <text x="144" y="403" font-family="Inter,sans-serif" font-size="11" fill="white">Expense Log</text>
-          <text x="144" y="418" font-family="Inter,sans-serif" font-size="10" fill="#8888A0">5 actions · NFC</text>
-          <!-- Tab bar -->
-          <rect x="12" y="490" width="256" height="38" rx="0" fill="#0D0D12"/>
-          <rect x="12" y="492" width="256" height="1" fill="#2B2B30"/>
-          <!-- Active tab -->
-          <rect x="36" y="498" width="48" height="22" rx="6" fill="#7C6AFF" opacity="0.15"/>
-          <text x="60" y="513" font-family="Inter,sans-serif" font-size="10" font-weight="600" fill="#7C6AFF" text-anchor="middle">Home</text>
-          <text x="140" y="513" font-family="Inter,sans-serif" font-size="10" fill="#8888A0" text-anchor="middle">Workflows</text>
-          <text x="220" y="513" font-family="Inter,sans-serif" font-size="10" fill="#8888A0" text-anchor="middle">Debug</text>
-        </svg>
-      </div>
-
-      <div class="hero__badges reveal" style="transition-delay: 0.5s;">
-        <span>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="#7C6AFF"><path d="M13 2.05v2.02c3.95.49 7 3.85 7 7.93 0 3.21-1.92 6-4.72 7.28L13 17v5l6-6-1.28-1.28A9.96 9.96 0 0022 12c0-5.18-3.95-9.45-9-9.95zM11 2.05C5.94 2.55 2 6.82 2 12c0 2.9 1.25 5.54 3.29 7.56L4.4 18.6A9.96 9.96 0 004 12c0-5.18 3.95-9.45 9-9.95z"/></svg>
-          Android
-        </span>
-        <span>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7C6AFF" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-          Kotlin
-        </span>
-        <span>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7C6AFF" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 12h10M12 7v10"/></svg>
-          Jetpack Compose
-        </span>
-        <span>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="#00D4AA"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2"/></svg>
-          LiteRT-LM
-        </span>
-        <span>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="#8888A0"><polygon points="12,2 22,8.5 22,15.5 12,22 2,15.5 2,8.5"/></svg>
-          Gemma 4 2B
-        </span>
-      </div>
+      <a href="https://github.com/tukka25/gemma4good_android" class="hero__cta" target="_blank" rel="noopener">
+        View on GitHub
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 6h10M7 2l4 4-4 4"/></svg>
+      </a>
     </div>
-  </section>
-
-  <!-- ═══ PROBLEM ══════════════════════════════════════════════ -->
-  <section id="problem">
-    <div class="container">
-      <div style="text-align:center;">
-        <span class="section-label reveal">The Problem</span>
-        <h2 class="section-title reveal" style="transition-delay:0.1s;">Your apps don't talk to each other.</h2>
-        <p class="section-sub reveal" style="transition-delay:0.2s;">
-          Modern smartphones have dozens of apps, each living in its own silo.
-          Getting them to work together usually means learning complex automation
-          tools or relying on cloud services you don't trust.
-        </p>
-      </div>
-
-      <div class="pain-grid">
-        <div class="pain-card reveal" style="transition-delay:0.25s;">
-          <div class="pain-card__icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-          </div>
-          <h3>Siloed Apps</h3>
-          <p>Calendar, SMS, maps, browser — each works in isolation. No native bridge between them.</p>
+    <div class="hero__visual">
+      <div class="hero__screen">
+        <div class="hero__screen-top">
+          <div class="dot dot--red"></div>
+          <div class="dot dot--yellow"></div>
+          <div class="dot dot--green"></div>
         </div>
-        <div class="pain-card reveal" style="transition-delay:0.35s;">
-          <div class="pain-card__icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+        <div class="hero__screen-body">
+          <div class="hero__screen-label">Saved workflows</div>
+          <div class="workflow-line">
+            <span class="tag">alarm</span>
+            <span class="action">Remind me to call Maya · Friday 6pm</span>
           </div>
-          <h3>Complex Automation</h3>
-          <p>Tasker, MacroDroid, Shortcuts — powerful but require technical knowledge and manual flow design.</p>
-        </div>
-        <div class="pain-card reveal" style="transition-delay:0.45s;">
-          <div class="pain-card__icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M12 8v4M12 16h.01"/></svg>
+          <div class="workflow-line">
+            <span class="tag">nfc</span>
+            <span class="action">Log expense after grocery run</span>
           </div>
-          <h3>Cloud Dependency</h3>
-          <p>Most AI automation sends your data to the cloud. Your prompts, your habits, your workflows — all remote.</p>
-        </div>
-      </div>
-
-      <div style="text-align:center; margin-top:56px;" class="reveal" style="transition-delay:0.55s;">
-        <h3 style="font-size:1.15rem; color:var(--text); margin-bottom:8px;">Enter GemmaWorkflow</h3>
-        <p style="font-size:1rem; max-width:480px; margin:0 auto;">On-device AI understands what you want, builds the workflow for you, and runs it locally — no cloud, no complexity.</p>
-      </div>
-    </div>
-  </section>
-
-  <!-- ═══ HOW IT WORKS ══════════════════════════════════════════ -->
-  <section id="how-it-works" style="background: var(--surface);">
-    <div class="container">
-      <div style="text-align:center;">
-        <span class="section-label reveal">How It Works</span>
-        <h2 class="section-title reveal" style="transition-delay:0.1s;">Four steps from idea to action</h2>
-        <p class="section-sub reveal" style="transition-delay:0.2s;">
-          Describe what you want in plain English. The on-device model plans,
-          validates, and builds a workflow you can run immediately or schedule.
-        </p>
-      </div>
-
-      <div class="flow reveal" style="transition-delay:0.3s;">
-        <!-- Step 1 -->
-        <div class="flow-step">
-          <div class="flow-step__num">1</div>
-          <div class="flow-step__icon">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#7C6AFF" stroke-width="1.8"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+          <div class="workflow-line">
+            <span class="tag">share</span>
+            <span class="action">Save articles to reading list</span>
           </div>
-          <h3>Describe</h3>
-          <p>Type your request in plain English — e.g. "Remind me to call Maya on Friday at 6pm"</p>
-        </div>
-
-        <div class="flow-arrow">→</div>
-
-        <!-- Step 2 -->
-        <div class="flow-step">
-          <div class="flow-step__num">2</div>
-          <div class="flow-step__icon">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#7C6AFF" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+          <div class="workflow-status">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="6" cy="6" r="5"/><path d="M6 3v3l2 2"/></svg>
+            Model ready · 2B GPU · LiteRT-LM
           </div>
-          <h3>AI Plans</h3>
-          <p>Gemma 4 2B runs a 4-stage planner pipeline: analysis → capability → action → JSON</p>
-        </div>
-
-        <div class="flow-arrow">→</div>
-
-        <!-- Step 3 -->
-        <div class="flow-step">
-          <div class="flow-step__num">3</div>
-          <div class="flow-step__icon">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#7C6AFF" stroke-width="1.8"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
-          </div>
-          <h3>Preview</h3>
-          <p>Review the generated workflow — each action, its parameters, and the trigger type</p>
-        </div>
-
-        <div class="flow-arrow">→</div>
-
-        <!-- Step 4 -->
-        <div class="flow-step">
-          <div class="flow-step__num">4</div>
-          <div class="flow-step__icon">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#00D4AA" stroke-width="1.8"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-          </div>
-          <h3>Run or Schedule</h3>
-          <p>Tap "Run Now" immediately, or attach NFC, Time, or Share Sheet triggers</p>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- ═══ ARCHITECTURE ══════════════════════════════════════════ -->
-  <section id="architecture">
-    <div class="container">
-      <div style="text-align:center;">
-        <span class="section-label reveal">Architecture</span>
-        <h2 class="section-title reveal" style="transition-delay:0.1s;">Built for on-device intelligence</h2>
-        <p class="section-sub reveal" style="transition-delay:0.2s;">
-          Every component runs locally on your Android device. No server calls,
-          no cloud dependency, no data leaving your phone.
+  <!-- Code: actual workflow JSON -->
+  <div class="code-section">
+    <div class="code-block">
+      <div class="code-block__header">
+        <div class="dot dot--red"></div>
+        <div class="dot dot--yellow"></div>
+        <div class="dot dot--green"></div>
+        <span class="code-block__name">generated_workflow.json</span>
+      </div>
+      <div class="code-block__body">
+        <pre><span class="code-comment">// generated by Gemma 4 2B on-device — no server involved</span>
+{
+  <span class="code-key">"name"</span>: <span class="code-str">"Morning brief"</span>,
+  <span class="code-key">"trigger"</span>: { <span class="code-key">"type"</span>: <span class="code-str">"time"</span>, <span class="code-key">"hour"</span>: <span class="code-num">7</span>, <span class="code-key">"minute"</span>: <span class="code-num">30</span> },
+  <span class="code-key">"steps"</span>: [
+    { <span class="code-key">"action"</span>: <span class="code-str">"calendar.create_event"</span>, <span class="code-key">"params"</span>: { <span class="code-key">"title"</span>: <span class="code-str">"Review overnight messages"</span> }},
+    { <span class="code-key">"action"</span>: <span class="code-str">"clipboard.copy_text"</span>,   <span class="code-key">"params"</span>: { <span class="code-key">"text"</span>: <span class="code-str">"Check messages, email, calendar"</span> }}
+  ],
+  <span class="code-key">"silent"</span>: <span class="code-num">true</span>
+}</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- Feature 1: Voice triggers -->
+  <div id="features" class="features">
+    <div class="feature">
+      <div class="feature__text">
+        <div class="feature__eyebrow">Trigger system</div>
+        <h2 class="feature__headline">Tap, schedule, or speak to run it.</h2>
+        <p class="feature__body">
+          Each workflow can run manually, on a schedule, or be attached to
+          a trigger — NFC tag, time, or share sheet. Unsupported triggers
+          are marked clearly, never silently skipped.
         </p>
-      </div>
-
-      <div class="arch-diagram reveal" style="transition-delay:0.3s;">
-<pre>
-┌─────────────────────────────────────────────────────────────────┐
-│                         Your Android Phone                      │
-│                                                                  │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │  UI Layer (Jetpack Compose)                              │   │
-│  │  Home · Workflow List · Editor · Widget (Glance)          │   │
-│  └────────────────────────────┬─────────────────────────────┘   │
-│                               │                                   │
-│  ┌────────────────────────────▼─────────────────────────────┐   │
-│  │  Domain Layer                                           │   │
-│  │  PromptBuilder · RequestAnalysis · ActionPlan           │   │
-│  │  WorkflowJsonParser · WorkflowValidator                  │   │
-│  │  WorkflowRunner · IntentFactory                          │   │
-│  └────────────────────────────┬─────────────────────────────┘   │
-│                               │                                   │
-│  ┌────────────────────────────▼─────────────────────────────┐   │
-│  │  Inference Layer — LiteRT-LM Engine                      │   │
-│  │  Gemma 4 2B · GPU Backend · Conversation Context        │   │
-│  └────────────────────────────┬─────────────────────────────┘   │
-│                               │                                   │
-│  ┌────────────────────────────▼─────────────────────────────┐   │
-│  │  Platform Layer                                         │   │
-│  │  AlarmManager · ContentResolver · IntentDispatch        │   │
-│  │  NFC · Share Sheet · BootReceiver · Glance Widget        │   │
-│  └──────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────┘</pre>
-      </div>
-
-      <div class="callout-grid">
-        <div class="callout reveal" style="transition-delay:0.4s;">
-          <div class="callout__icon">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#00D4AA" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
-          </div>
-          <h3>On-device AI</h3>
-          <p>Gemma 4 2B runs entirely on your phone via LiteRT-LM. No cloud, no data leaves your device.</p>
+        <div class="feature__list">
+          <div class="feature__list-item">Run Now — one tap from the workflow screen</div>
+          <div class="feature__list-item">Time — rescheduled after every device reboot</div>
+          <div class="feature__list-item">NFC — write once, run forever</div>
+          <div class="feature__list-item">Share Sheet — any app can trigger a workflow</div>
         </div>
-        <div class="callout reveal" style="transition-delay:0.5s;">
-          <div class="callout__icon">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#00D4AA" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      </div>
+      <div class="feature__preview">
+        <div class="feature__preview-label">Trigger setup</div>
+        <div class="preview-card">
+          <div class="preview-card__icon">⏰</div>
+          <div class="preview-card__text">
+            <div class="preview-card__title">Time trigger</div>
+            <div class="preview-card__sub">7:30 AM · weekdays</div>
           </div>
-          <h3>Privacy-first</h3>
-          <p>All inference is local. Your prompts, workflows, and habits never leave your phone.</p>
         </div>
-        <div class="callout reveal" style="transition-delay:0.6s;">
-          <div class="callout__icon">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#00D4AA" stroke-width="1.8"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 12h.01M10 12h.01M14 12h.01M18 12h.01"/></svg>
+        <div class="preview-card">
+          <div class="preview-card__icon">📱</div>
+          <div class="preview-card__text">
+            <div class="preview-card__title">NFC tag</div>
+            <div class="preview-card__sub">gemmaworkflow://workflow/3</div>
           </div>
-          <h3>GPU-accelerated</h3>
-          <p>Runs on your phone's GPU via LiteRT-LM — fast enough for real-time planning on mobile.</p>
+        </div>
+        <div class="preview-card">
+          <div class="preview-card__icon">📤</div>
+          <div class="preview-card__text">
+            <div class="preview-card__title">Share Sheet</div>
+            <div class="preview-card__sub">Active · matched on text content</div>
+          </div>
         </div>
       </div>
     </div>
-  </section>
+  </div>
 
-  <!-- ═══ FEATURES ══════════════════════════════════════════════ -->
-  <section id="features" style="background: var(--surface);">
-    <div class="container">
-      <div style="text-align:center;">
-        <span class="section-label reveal">Features</span>
-        <h2 class="section-title reveal" style="transition-delay:0.1s;">Everything you need, nothing you don't</h2>
-        <p class="section-sub reveal" style="transition-delay:0.2s;">
-          Built for real-world use — from simple reminders to complex cross-app automation.
+  <!-- Feature 2: Sound + Voice -->
+  <div class="features">
+    <div class="feature feature--flip">
+      <div class="feature__text">
+        <div class="feature__eyebrow">Multimodal triggers</div>
+        <h2 class="feature__headline">Sound and voice as triggers.</h2>
+        <p class="feature__body">
+          Yamnet classifier listens for environmental sounds in the background.
+          Voice intent triggers activate on your wake word.
+          The app wakes only when it needs to.
         </p>
+        <div class="feature__list">
+          <div class="feature__list-item">Yamnet sound classification — dog bark, alarm, crash</div>
+          <div class="feature__list-item">Wake-word voice activation via VoiceTriggerHandler</div>
+          <div class="feature__list-item">Background service with minimal battery impact</div>
+        </div>
       </div>
-
-      <div class="features-grid">
-        <div class="feature-card reveal" style="transition-delay:0.2s;">
-          <div class="feature-card__icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7C6AFF" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+      <div class="feature__preview">
+        <div class="feature__preview-label">Sound event trigger</div>
+        <div class="preview-card">
+          <div class="preview-card__icon">🔔</div>
+          <div class="preview-card__text">
+            <div class="preview-card__title">Sound: alarm_detected</div>
+            <div class="preview-card__sub">Trigger → Morning brief workflow</div>
           </div>
-          <h3>On-device AI</h3>
-          <p>Gemma 4 2B via LiteRT-LM, running on your phone's GPU — no cloud calls ever.</p>
         </div>
-        <div class="feature-card reveal" style="transition-delay:0.25s;">
-          <div class="feature-card__icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7C6AFF" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+        <div class="preview-card">
+          <div class="preview-card__icon">🎤</div>
+          <div class="preview-card__text">
+            <div class="preview-card__title">Voice: wake_word</div>
+            <div class="preview-card__sub">"Hey Gemma" → listen for intent</div>
           </div>
-          <h3>Plain Language</h3>
-          <p>No code, no flowcharts, no scripting. Just describe what you want in natural English.</p>
-        </div>
-        <div class="feature-card reveal" style="transition-delay:0.3s;">
-          <div class="feature-card__icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7C6AFF" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
-          </div>
-          <h3>Cross-app Actions</h3>
-          <p>Browser, Maps, SMS, Calendar, Clipboard, Alarm, WiFi, Bluetooth, and more.</p>
-        </div>
-        <div class="feature-card reveal" style="transition-delay:0.35s;">
-          <div class="feature-card__icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7C6AFF" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-          </div>
-          <h3>Multiple Triggers</h3>
-          <p>Run Now, Time-scheduled, NFC tag, or Share Sheet. Attach any trigger to any workflow.</p>
-        </div>
-        <div class="feature-card reveal" style="transition-delay:0.4s;">
-          <div class="feature-card__icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7C6AFF" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
-          </div>
-          <h3>Glance Widget</h3>
-          <p>Home-screen AppWidget with Jetpack Glance — run your top workflows without opening the app.</p>
-        </div>
-        <div class="feature-card reveal" style="transition-delay:0.45s;">
-          <div class="feature-card__icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7C6AFF" stroke-width="2"><path d="M12 2a3 3 0 00-3 3v7a3 3 0 006 0V5a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8"/></svg>
-          </div>
-          <h3>Sound Detection</h3>
-          <p>Yamnet classifier runs in the background — trigger workflows from environmental sounds.</p>
-        </div>
-        <div class="feature-card reveal" style="transition-delay:0.5s;">
-          <div class="feature-card__icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7C6AFF" stroke-width="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4"/></svg>
-          </div>
-          <h3>Voice Input</h3>
-          <p>Wake-word and voice intent trigger system — speak your workflow into existence.</p>
-        </div>
-        <div class="feature-card reveal" style="transition-delay:0.55s;">
-          <div class="feature-card__icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7C6AFF" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-          </div>
-          <h3>Dark Theme</h3>
-          <p>Premium glassmorphic UI with a calm, dark palette — designed to feel at home on any Android.</p>
         </div>
       </div>
     </div>
-  </section>
+  </div>
 
-  <!-- ═══ ACTION CATALOG ═════════════════════════════════════════ -->
-  <section id="actions">
-    <div class="container">
-      <div style="text-align:center;">
-        <span class="section-label reveal">Action Catalog</span>
-        <h2 class="section-title reveal" style="transition-delay:0.1s;">20+ actions, all on-device</h2>
-        <p class="section-sub reveal" style="transition-delay:0.2s;">
-          Every action is validated against an allowlist before execution. No arbitrary intent invention.
+  <!-- Feature 3: Widget + Actions -->
+  <div class="features">
+    <div class="feature">
+      <div class="feature__text">
+        <div class="feature__eyebrow">Widget + Actions</div>
+        <h2 class="feature__headline">Home screen widget. Cross-app actions.</h2>
+        <p class="feature__body">
+          Glance widget shows your top workflows on the home screen —
+          no need to open the app. The action catalog covers browser,
+          maps, SMS, alarm, clipboard, calendar, WiFi, Bluetooth, and more.
+          All validated against an allowlist before execution.
+        </p>
+        <div class="feature__list">
+          <div class="feature__list-item">AppWidget with Jetpack Glance — live, interactive</div>
+          <div class="feature__list-item">Chrome Custom Tabs for in-app browser experience</div>
+          <div class="feature__list-item">ContentResolver for calendar, clipboard, SMS</div>
+          <div class="feature__list-item">ActionSpecRegistry — 20+ validated actions</div>
+        </div>
+      </div>
+      <div class="feature__preview">
+        <div class="feature__preview-label">Home screen widget</div>
+        <div class="preview-card">
+          <div class="preview-card__icon">🌗</div>
+          <div class="preview-card__text">
+            <div class="preview-card__title">Morning brief</div>
+            <div class="preview-card__sub">Run now · 3 steps · Active</div>
+          </div>
+        </div>
+        <div class="preview-card">
+          <div class="preview-card__icon">📍</div>
+          <div class="preview-card__text">
+            <div class="preview-card__title">Navigate to Maya's</div>
+            <div class="preview-card__sub">Maps + SMS · NFC trigger</div>
+          </div>
+        </div>
+        <div class="preview-card">
+          <div class="preview-card__icon">🔕</div>
+          <div class="preview-card__text">
+            <div class="preview-card__title">Night mode</div>
+            <div class="preview-card__sub">Run now · 4 steps · Silent</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Model stats section -->
+  <div id="model" class="model-section">
+    <div class="model-section__inner">
+      <div>
+        <div class="model-section__eyebrow">On-device model</div>
+        <h2 class="model-section__headline">Gemma 4 2B. Your phone, your GPU.</h2>
+        <p class="model-section__body">
+          LiteRT-LM loads the Gemma 4 2B model and runs inference entirely
+          on-device using the GPU backend. The planner pipeline — request
+          analysis, capability grounding, action planning, JSON output —
+          all executes locally. No tokens, no latency spikes, no cloud dependency.
+        </p>
+      </div>
+      <div class="model-stats">
+        <div class="stat">
+          <div class="stat__value">2B</div>
+          <div class="stat__label">Parameters</div>
+        </div>
+        <div class="stat">
+          <div class="stat__value">GPU</div>
+          <div class="stat__label">On-device inference</div>
+        </div>
+        <div class="stat">
+          <div class="stat__value">0</div>
+          <div class="stat__label">Cloud calls</div>
+        </div>
+        <div class="stat">
+          <div class="stat__value">20+</div>
+          <div class="stat__label">Validated actions</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Leaderboard -->
+  <div id="benchmarks" class="leaderboard">
+    <div class="leaderboard__inner">
+      <div class="leaderboard__header">
+        <div class="leaderboard__eyebrow">Benchmarks</div>
+        <h2 class="leaderboard__headline">How the 2B class stacks up.</h2>
+        <p class="leaderboard__sub">
+          Numbers from official model cards. Same benchmark, same conditions — compare directly.
+          Gemma 4 E2B highlighted.
         </p>
       </div>
 
-      <div class="catalog-table-wrap reveal" style="transition-delay:0.3s;">
-        <table class="catalog-table">
+      <!-- Shared benchmarks -->
+      <div class="leaderboard__table-label">Head-to-head — same benchmarks, same conditions</div>
+      <div class="leaderboard__table-wrap">
+        <table class="leaderboard__table">
           <thead>
             <tr>
-              <th>Action ID</th>
-              <th>Description</th>
-              <th>Silent</th>
+              <th>Benchmark</th>
+              <th>Qwen 2.5-3B</th>
+              <th>Mistral-3B</th>
+              <th>Phi-4-mini</th>
+              <th class="col--highlight">Gemma 4 E2B</th>
             </tr>
           </thead>
           <tbody>
             <tr>
-              <td><span class="action-id">browser.open_url</span></td>
-              <td>Open URL in Chrome Custom Tab</td>
-              <td><span class="silent-badge">No</span></td>
+              <td>MMLU</td>
+              <td>65.0%</td>
+              <td>60.8%</td>
+              <td>67.3%</td>
+              <td class="col--highlight">67.4%</td>
             </tr>
             <tr>
-              <td><span class="action-id">maps.open_place</span></td>
-              <td>Open a place or address in Google Maps</td>
-              <td><span class="silent-badge">No</span></td>
+              <td>MMLU-Pro</td>
+              <td>44.7%</td>
+              <td>35.3%</td>
+              <td>52.8%</td>
+              <td class="col--highlight">60.0%</td>
             </tr>
             <tr>
-              <td><span class="action-id">sms.compose</span></td>
-              <td>Open SMS composer with pre-filled recipient and text</td>
-              <td><span class="silent-badge">No</span></td>
-            </tr>
-            <tr>
-              <td><span class="action-id">alarm.set_alarm</span></td>
-              <td>Set a silent alarm via AlarmManager</td>
-              <td><span class="silent-badge">Yes</span></td>
-            </tr>
-            <tr>
-              <td><span class="action-id">clipboard.copy_text</span></td>
-              <td>Copy text to clipboard silently</td>
-              <td><span class="silent-badge">Yes</span></td>
-            </tr>
-            <tr>
-              <td><span class="action-id">calendar.create_event</span></td>
-              <td>Create a calendar event via CalendarProvider</td>
-              <td><span class="silent-badge">Yes</span></td>
-            </tr>
-            <tr>
-              <td><span class="action-id">wifi.toggle</span></td>
-              <td>Toggle WiFi on or off</td>
-              <td><span class="silent-badge">Yes</span></td>
-            </tr>
-            <tr>
-              <td><span class="action-id">bluetooth.toggle</span></td>
-              <td>Toggle Bluetooth on or off</td>
-              <td><span class="silent-badge">Yes</span></td>
-            </tr>
-            <tr>
-              <td><span class="action-id">volume.set_ringer</span></td>
-              <td>Set ringer mode: normal, silent, or vibrate</td>
-              <td><span class="silent-badge">Yes</span></td>
-            </tr>
-            <tr>
-              <td><span class="action-id">airplane.toggle</span></td>
-              <td>Toggle airplane mode on or off</td>
-              <td><span class="silent-badge">Yes</span></td>
-            </tr>
-            <tr>
-              <td><span class="action-id">display.rotation.lock</span></td>
-              <td>Lock or unlock screen rotation</td>
-              <td><span class="silent-badge">Yes</span></td>
-            </tr>
-            <tr>
-              <td><span class="action-id">display.brightness.set</span></td>
-              <td>Set screen brightness level</td>
-              <td><span class="silent-badge">Yes</span></td>
-            </tr>
-            <tr>
-              <td><span class="action-id">media.play_pause</span></td>
-              <td>Play or pause current media</td>
-              <td><span class="silent-badge">Yes</span></td>
-            </tr>
-            <tr>
-              <td><span class="action-id">nfc.deep_link</span></td>
-              <td>Open a workflow via NFC tag scan</td>
-              <td><span class="silent-badge">No</span></td>
-            </tr>
-            <tr>
-              <td><span class="action-id">sync.trigger</span></td>
-              <td>Trigger a data sync operation</td>
-              <td><span class="silent-badge">Yes</span></td>
-            </tr>
-            <tr>
-              <td><span class="action-id">hotspot.toggle</span></td>
-              <td>Toggle mobile hotspot on or off</td>
-              <td><span class="silent-badge">Yes</span></td>
-            </tr>
-            <tr>
-              <td><span class="action-id">cellular.toggle</span></td>
-              <td>Toggle mobile data on or off</td>
-              <td><span class="silent-badge">Yes</span></td>
-            </tr>
-            <tr>
-              <td><span class="action-id">command.execute</span></td>
-              <td>Execute a shell command via su</td>
-              <td><span class="silent-badge">Yes</span></td>
-            </tr>
-            <tr>
-              <td><span class="action-id">generic.intent</span></td>
-              <td>Dispatch a custom Android Intent</td>
-              <td><span class="silent-badge">Yes</span></td>
+              <td>GPQA Diamond</td>
+              <td>23.4%</td>
+              <td>24.4%</td>
+              <td>25.2%</td>
+              <td class="col--highlight">43.4%</td>
             </tr>
           </tbody>
         </table>
       </div>
-    </div>
-  </section>
+      <p class="leaderboard__footnote">
+        Source: Phi-4-mini model card comparison table (Microsoft, Feb 2025).<br>
+        Gemma 4 numbers from google/gemma-4-E2B-it model card (Google DeepMind, Mar 2026).
+      </p>
 
-  <!-- ═══ TRIGGERS ══════════════════════════════════════════════ -->
-  <section id="triggers" style="background: var(--surface);">
-    <div class="container">
-      <div style="text-align:center;">
-        <span class="section-label reveal">Trigger System</span>
-        <h2 class="section-title reveal" style="transition-delay:0.1s;">Run workflows your way</h2>
-        <p class="section-sub reveal" style="transition-delay:0.2s;">
-          Every workflow can run manually or be attached to a trigger.
-          Unsupported or unfinished triggers save as "Needs Setup" — never silently fail.
-        </p>
+      <!-- Gemma 4 exclusive benchmarks -->
+      <div class="leaderboard__table-label leaderboard__table-label--gemma">Gemma 4 E2B — additional benchmarks</div>
+      <div class="leaderboard__table-wrap">
+        <table class="leaderboard__table">
+          <thead>
+            <tr>
+              <th>Benchmark</th>
+              <th>Score</th>
+              <th>What it measures</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>LiveCodeBench v6</td>
+              <td class="col--highlight">44.0%</td>
+              <td>Code generation across 6 months of unseen problems</td>
+            </tr>
+            <tr>
+              <td>MATH-Vision</td>
+              <td class="col--highlight">52.4%</td>
+              <td>Math problems with visual content (charts, diagrams)</td>
+            </tr>
+            <tr>
+              <td>AIME 2026</td>
+              <td class="col--highlight">37.5%</td>
+              <td>Competition math — no tools, no scratchpad</td>
+            </tr>
+            <tr>
+              <td>Codeforces ELO</td>
+              <td class="col--highlight">633</td>
+              <td>Competitive programming ranking</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
-
-      <div class="trigger-grid">
-        <div class="trigger-card reveal" style="transition-delay:0.25s;">
-          <div class="trigger-card__icon">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#7C6AFF" stroke-width="1.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-          </div>
-          <h3>Run Now</h3>
-          <p>Tap "Run Now" in the workflow detail screen. Works immediately, no setup required.</p>
-        </div>
-        <div class="trigger-card reveal" style="transition-delay:0.35s;">
-          <div class="trigger-card__icon">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#7C6AFF" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          </div>
-          <h3>Time</h3>
-          <p>Schedule a workflow to run at a specific time. Persists across device reboots via AlarmManager.</p>
-        </div>
-        <div class="trigger-card reveal" style="transition-delay:0.45s;">
-          <div class="trigger-card__icon">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#7C6AFF" stroke-width="1.5"><path d="M6.5 6.5l11 11M6.5 17.5L17.5 6.5M9.88 9.88l4.24 4.24M9.88 14.12l4.24-4.24"/></svg>
-          </div>
-          <h3>NFC Tag</h3>
-          <p>Write a workflow to an NFC tag. Scan the tag to run — one tap and it executes.</p>
-        </div>
-        <div class="trigger-card reveal" style="transition-delay:0.55s;">
-          <div class="trigger-card__icon">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#7C6AFF" stroke-width="1.5"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
-          </div>
-          <h3>Share Sheet</h3>
-          <p>Share content from any app to GemmaWorkflow. The AI matches the content to a workflow and runs it.</p>
-        </div>
-      </div>
-
-      <div style="text-align:center; margin-top:48px;" class="reveal" style="transition-delay:0.65s;">
-        <div style="display:inline-flex; align-items:center; gap:8px; padding:12px 20px; background:var(--elevated); border:1px solid var(--border); border-radius:var(--radius); font-size:0.88rem; color:var(--muted);">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00D4AA" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-          Time triggers persist across reboots — BootReceiver reschedules all triggers on startup
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ═══ GET STARTED ══════════════════════════════════════════ -->
-  <section id="get-started">
-    <div class="container">
-      <div style="text-align:center;">
-        <span class="section-label reveal">Get Started</span>
-        <h2 class="section-title reveal" style="transition-delay:0.1s;">Build and run in minutes</h2>
-        <p class="section-sub reveal" style="transition-delay:0.2s;">
-          GemmaWorkflow is a native Android app. No server, no emulator, no complicated setup.
-        </p>
-      </div>
-
-      <div class="steps reveal" style="transition-delay:0.3s;">
-        <div class="step">
-          <div class="step__body">
-            <h3>Clone the repository</h3>
-            <p>Get the latest source code from GitHub.</p>
-            <code>git clone https://github.com/tukka25/gemma4good_android</code>
-          </div>
-        </div>
-        <div class="step">
-          <div class="step__body">
-            <h3>Push the model to your device</h3>
-            <p>One-time step: copy the Gemma 4 2B model to your Android device's app storage.</p>
-            <code>adb push local_models/gemma-4-E2B-it.litertlm /sdcard/Android/data/com.gemmaworkflow/files/models/</code>
-          </div>
-        </div>
-        <div class="step">
-          <div class="step__body">
-            <h3>Build the app</h3>
-            <p>Run the Gradle build. Use <code>.\\gradlew installDebug</code> on Windows (no Java in WSL).</p>
-            <code>.\gradlew installDebug</code>
-          </div>
-        </div>
-        <div class="step">
-          <div class="step__body">
-            <h3>Describe a workflow and run it</h3>
-            <p>Open the app, type a request like "Remind me to call Maya on Friday at 6pm", preview the plan, and run it.</p>
-          </div>
-        </div>
-      </div>
-
-      <div style="text-align:center; margin-top:56px;" class="reveal" style="transition-delay:0.4s;">
-        <a href="https://github.com/tukka25/gemma4good_android" class="btn btn-primary" target="_blank" rel="noopener">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
-          </svg>
-          View Full Documentation on GitHub
-        </a>
-      </div>
-    </div>
-  </section>
-
-  <!-- ═══ FOOTER ════════════════════════════════════════════════ -->
-  <footer class="footer">
-    <div class="container">
-      <div class="footer__inner">
-        <div class="footer__brand">
-          <svg width="24" height="24" viewBox="0 0 28 28" fill="none">
-            <polygon points="14,2 24,7 24,21 14,26 4,21 4,7" stroke="#7C6AFF" stroke-width="1.5" fill="none"/>
-            <circle cx="14" cy="14" r="3" fill="#00D4AA"/>
-          </svg>
-          GemmaWorkflow
-        </div>
-        <ul class="footer__links">
-          <li><a href="https://github.com/tukka25/gemma4good_android" target="_blank" rel="noopener">GitHub</a></li>
-          <li><a href="https://github.com/tukka25/gemma4good_android/issues" target="_blank" rel="noopener">Issues</a></li>
-          <li><a href="https://github.com/tukka25/gemma4good_android/discussions" target="_blank" rel="noopener">Discussions</a></li>
-          <li><a href="https://github.com/tukka25/gemma4good_android/blob/main/README.md" target="_blank" rel="noopener">README</a></li>
-          <li><a href="https://github.com/tukka25/gemma4good_android/blob/main/ARCHITECTURE.md" target="_blank" rel="noopener">Architecture</a></li>
-        </ul>
-      </div>
-      <p class="footer__copy">
-        Built with ❤️ by the GemmaWorkflow team · Apache 2.0 License
+      <p class="leaderboard__footnote">
+        These benchmarks are not reported by other models in the comparison.<br>
+        MMLU: 5-shot. GPQA Diamond: 0-shot CoT. LiveCodeBench: Pass@1-CoT.<br>
+        AIME = American Invitational Mathematics Examination.
       </p>
     </div>
+  </div>
+
+  <!-- Install section -->
+  <div id="install" class="install-section">
+    <div class="install-section__inner">
+      <h2 class="install-section__headline">Build it in a few steps.</h2>
+      <p class="install-section__body">
+        Push the model to your device, run the Gradle build, open the app.
+        Works on Windows, Linux, and macOS.
+      </p>
+      <div class="install-steps">
+        <div class="install-step">
+          <div class="install-step__num">01</div>
+          <div class="install-step__text">
+            <strong>Clone the repo</strong>
+            <code class="install-step__code">git clone https://github.com/tukka25/gemma4good_android</code>
+          </div>
+        </div>
+        <div class="install-step">
+          <div class="install-step__num">02</div>
+          <div class="install-step__text">
+            <strong>Push the model to your device</strong>
+            <code class="install-step__code">adb push local_models/gemma-4-E2B-it.litertlm /sdcard/Android/data/com.gemmaworkflow/files/models/</code>
+          </div>
+        </div>
+        <div class="install-step">
+          <div class="install-step__num">03</div>
+          <div class="install-step__text">
+            <strong>Build and install</strong>
+            <code class="install-step__code">.\gradlew installDebug</code>
+          </div>
+        </div>
+        <div class="install-step">
+          <div class="install-step__num">04</div>
+          <div class="install-step__text">
+            <strong>Open the app and describe a workflow.</strong>
+            No server, no emulator, no complicated setup.
+          </div>
+        </div>
+      </div>
+      <a href="https://github.com/tukka25/gemma4good_android" class="install-cta" target="_blank" rel="noopener">
+        View on GitHub
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 6h10M7 2l4 4-4 4"/></svg>
+      </a>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer__inner">
+      <div class="footer__brand">
+        <svg width="20" height="20" viewBox="0 0 28 28" fill="none">
+          <polygon points="14,3 25,8.5 25,19.5 14,25 3,19.5 3,8.5" stroke="#7C6AFF" stroke-width="1.8" fill="none"/>
+          <circle cx="14" cy="14" r="3.5" fill="#7C6AFF"/>
+        </svg>
+        Iris
+      </div>
+      <div class="footer__links">
+        <a href="https://github.com/tukka25/gemma4good_android" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/tukka25/gemma4good_android/issues" target="_blank" rel="noopener">Issues</a>
+        <a href="https://github.com/tukka25/gemma4good_android/blob/main/ARCHITECTURE.md" target="_blank" rel="noopener">Docs</a>
+      </div>
+    </div>
+    <p class="footer__copy">Apache 2.0 · Iris · Kotlin · Jetpack Compose · LiteRT-LM</p>
   </footer>
 
-  <script src="app.js"></script>
 </body>
 </html>
