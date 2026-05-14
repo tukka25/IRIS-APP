@@ -23,6 +23,12 @@ val SurfaceVariantDark= Color(0xFF100b22)
 // Accents
 val CyanAccent        = Color(0xFF5EF2FF)
 val VioletAccent      = Color(0xFFB57BFF)
+
+// ── Extended Palette (Redesign 2026) ──────────────────────────────────────────
+val ElectricCyan  = Color(0xFF00F2FE)
+val DeepPurple    = Color(0xFF6F00FF)
+val LiquidViolet  = Color(0xFFB200FF)
+val ObsidianDark  = Color(0xFF050509)
 val CyanVioletStart   = Color(0xFF5EF2FF)
 val CyanVioletEnd     = Color(0xFFB57BFF)
 
