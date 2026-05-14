@@ -130,6 +130,18 @@ object TriggerCatalog {
             label = "Sleep schedule",
             description = "Run on a sleep/wind-down schedule.",
             setupState = SetupState.NeedsSetup
+        ),
+        TriggerInfo(
+            type = "voice",
+            label = "Voice intent",
+            description = "Run when the user speaks a voice command into the GemmaWorkflow mic. The spoken words are transcribed and fed to the LLM to generate the workflow to run.",
+            setupState = SetupState.Ready
+        ),
+        TriggerInfo(
+            type = "sound_event",
+            label = "Sound event",
+            description = "Run when a sound matching configured classes (e.g. dog bark, glass breaking, smoke alarm) is detected in the environment by YAMNet audio classification.",
+            setupState = SetupState.NeedsSetup
         )
     )
 

@@ -245,7 +245,7 @@ object ActionSpecRegistry {
             execution = ExecutionSpec.CustomTab(
                 urlTemplate = "{url}"
             ),
-            triggerCompatible = setOf("manual", "time", "nfc"),
+            triggerCompatible = setOf("manual", "time", "nfc", "voice", "sound_event"),
             logicalActions = setOf(LogicalAction.Search, LogicalAction.GetInfo),
             appKeywords = setOf("browser", "chrome", "web", "url", "link"),
             sharedToolGroups = setOf(SharedToolGroup.Validation),
@@ -267,7 +267,7 @@ object ActionSpecRegistry {
                 action = Intent.ACTION_WEB_SEARCH,
                 extras = listOf(ExtraSpec("query", SearchManager.QUERY, ParamType.String))
             ),
-            triggerCompatible = setOf("manual", "time", "nfc"),
+            triggerCompatible = setOf("manual", "time", "nfc", "voice", "sound_event"),
             logicalActions = setOf(LogicalAction.Search, LogicalAction.GetInfo),
             appKeywords = setOf("browser", "chrome", "search", "google", "web"),
             sharedToolGroups = setOf(SharedToolGroup.Validation),
@@ -289,7 +289,7 @@ object ActionSpecRegistry {
                 action = Intent.ACTION_VIEW,
                 dataTemplate = "geo:0,0?q={query}"
             ),
-            triggerCompatible = setOf("manual", "nfc"),
+            triggerCompatible = setOf("manual", "nfc", "voice", "sound_event"),
             logicalActions = setOf(LogicalAction.Navigate, LogicalAction.Search),
             appKeywords = setOf("maps", "navigation", "place", "address", "nearby"),
             fallbackActionIds = listOf("browser.open_url"),
@@ -312,7 +312,7 @@ object ActionSpecRegistry {
                 action = Intent.ACTION_VIEW,
                 dataTemplate = "google.navigation:q={destination}"
             ),
-            triggerCompatible = setOf("manual", "nfc"),
+            triggerCompatible = setOf("manual", "nfc", "voice", "sound_event"),
             logicalActions = setOf(LogicalAction.Navigate),
             appKeywords = setOf("maps", "navigation", "directions", "drive"),
             fallbackActionIds = listOf("maps.open_place", "browser.open_url"),
@@ -333,7 +333,7 @@ object ActionSpecRegistry {
             ),
             execution = ExecutionSpec.BuiltIn,
             availability = AvailabilitySpec.Always,
-            triggerCompatible = setOf("manual", "time", "share_sheet", "nfc"),
+            triggerCompatible = setOf("manual", "time", "share_sheet", "nfc", "voice", "sound_event"),
             requiresConfirmation = true,
             logicalActions = setOf(LogicalAction.Share, LogicalAction.SendMessage),
             appKeywords = setOf("share", "message", "text"),
@@ -354,7 +354,7 @@ object ActionSpecRegistry {
             ),
             execution = ExecutionSpec.BuiltIn,
             availability = AvailabilitySpec.Always,
-            triggerCompatible = setOf("manual", "share_sheet"),
+            triggerCompatible = setOf("manual", "share_sheet", "voice", "sound_event"),
             requiresConfirmation = true,
             logicalActions = setOf(LogicalAction.Share),
             appKeywords = setOf("share", "image", "photo"),
@@ -386,7 +386,7 @@ object ActionSpecRegistry {
                 dataTemplate = "smsto:{phone}",
                 extras = listOf(ExtraSpec("message", "sms_body", ParamType.String))
             ),
-            triggerCompatible = setOf("manual", "time", "nfc"),
+            triggerCompatible = setOf("manual", "time", "nfc", "voice", "sound_event"),
             requiresConfirmation = true,
             requiredPermissions = emptyList(),
             logicalActions = setOf(LogicalAction.SendMessage),
@@ -421,7 +421,7 @@ object ActionSpecRegistry {
                 dataTemplate = "https://wa.me/{phone}?text={text}",
                 packagePolicy = PackagePolicy.Exact("com.whatsapp")
             ),
-            triggerCompatible = setOf("manual", "time", "nfc"),
+            triggerCompatible = setOf("manual", "time", "nfc", "voice", "sound_event"),
             requiresConfirmation = true,
             requiredPermissions = emptyList(),
             logicalActions = setOf(LogicalAction.SendMessage),
@@ -456,7 +456,7 @@ object ActionSpecRegistry {
                 action = Intent.ACTION_DIAL,
                 dataTemplate = "tel:{phone}"
             ),
-            triggerCompatible = setOf("manual", "nfc"),
+            triggerCompatible = setOf("manual", "nfc", "voice", "sound_event"),
             requiresConfirmation = true,
             logicalActions = setOf(LogicalAction.MakeCall),
             appKeywords = setOf("phone", "dial", "call"),
@@ -479,7 +479,7 @@ object ActionSpecRegistry {
             ),
             execution = ExecutionSpec.BuiltIn,
             availability = AvailabilitySpec.Always,
-            triggerCompatible = setOf("manual", "time", "nfc"),
+            triggerCompatible = setOf("manual", "time", "nfc", "voice", "sound_event"),
             requiresConfirmation = true,
             logicalActions = setOf(LogicalAction.SetAlarm),
             appKeywords = setOf("alarm", "clock", "wake"),
@@ -510,7 +510,7 @@ object ActionSpecRegistry {
                     ExtraSpec("message", AlarmClock.EXTRA_MESSAGE, ParamType.String)
                 )
             ),
-            triggerCompatible = setOf("manual", "time", "nfc"),
+            triggerCompatible = setOf("manual", "time", "nfc", "voice", "sound_event"),
             requiresConfirmation = true,
             logicalActions = setOf(LogicalAction.SetAlarm, LogicalAction.SetReminder),
             appKeywords = setOf("timer", "countdown", "clock"),
@@ -534,7 +534,7 @@ object ActionSpecRegistry {
             ),
             execution = ExecutionSpec.BuiltIn,
             availability = AvailabilitySpec.Always,
-            triggerCompatible = setOf("manual", "time", "nfc"),
+            triggerCompatible = setOf("manual", "time", "nfc", "voice", "sound_event"),
             logicalActions = setOf(LogicalAction.Share, LogicalAction.TakeNote),
             appKeywords = setOf("clipboard", "copy", "text"),
             sharedToolGroups = setOf(SharedToolGroup.Validation),
@@ -569,7 +569,7 @@ object ActionSpecRegistry {
             ),
             execution = ExecutionSpec.BuiltIn,
             availability = AvailabilitySpec.Always,
-            triggerCompatible = setOf("manual", "time", "nfc"),
+            triggerCompatible = setOf("manual", "time", "nfc", "voice", "sound_event"),
             requiresConfirmation = false,
             logicalActions = setOf(LogicalAction.CreateEvent, LogicalAction.SetReminder),
             appKeywords = setOf("calendar", "event", "meeting", "schedule"),
@@ -603,7 +603,7 @@ object ActionSpecRegistry {
             ),
             execution = ExecutionSpec.InternalTool("create_local_reminder"),
             availability = AvailabilitySpec.Always,
-            triggerCompatible = setOf("manual", "time", "nfc"),
+            triggerCompatible = setOf("manual", "time", "nfc", "voice", "sound_event"),
             logicalActions = setOf(LogicalAction.SetReminder),
             source = ActionSource.Internal,
             appKeywords = setOf("reminder", "notify", "notification"),
@@ -634,7 +634,7 @@ object ActionSpecRegistry {
             ),
             execution = ExecutionSpec.PackageLaunch("package_name"),
             availability = AvailabilitySpec.Always,
-            triggerCompatible = setOf("manual", "time", "nfc"),
+            triggerCompatible = setOf("manual", "time", "nfc", "voice", "sound_event"),
             logicalActions = setOf(LogicalAction.OpenApp),
             source = ActionSource.Internal,
             appKeywords = setOf("open app", "launch app"),
@@ -655,7 +655,7 @@ object ActionSpecRegistry {
             params = emptyList(),
             execution = ExecutionSpec.BuiltIn,
             availability = AvailabilitySpec.Always,
-            triggerCompatible = setOf("manual", "time", "nfc"),
+            triggerCompatible = setOf("manual", "time", "nfc", "voice", "sound_event"),
             requiresConfirmation = false,
             requiredPermissions = emptyList(),
             logicalActions = setOf(LogicalAction.PlayMedia)
@@ -667,7 +667,7 @@ object ActionSpecRegistry {
             params = emptyList(),
             execution = ExecutionSpec.BuiltIn,
             availability = AvailabilitySpec.Always,
-            triggerCompatible = setOf("manual", "time", "nfc"),
+            triggerCompatible = setOf("manual", "time", "nfc", "voice", "sound_event"),
             requiresConfirmation = false,
             requiredPermissions = emptyList(),
             logicalActions = setOf(LogicalAction.PlayMedia)
@@ -679,7 +679,7 @@ object ActionSpecRegistry {
             params = emptyList(),
             execution = ExecutionSpec.BuiltIn,
             availability = AvailabilitySpec.Always,
-            triggerCompatible = setOf("manual", "time", "nfc"),
+            triggerCompatible = setOf("manual", "time", "nfc", "voice", "sound_event"),
             requiresConfirmation = false,
             requiredPermissions = emptyList(),
             logicalActions = setOf(LogicalAction.PlayMedia)
@@ -697,7 +697,7 @@ object ActionSpecRegistry {
             ),
             execution = ExecutionSpec.BuiltIn,
             availability = AvailabilitySpec.Always,
-            triggerCompatible = setOf("manual", "time", "nfc"),
+            triggerCompatible = setOf("manual", "time", "nfc", "voice", "sound_event"),
             requiresConfirmation = false,
             requiredPermissions = listOf("android.permission.MODIFY_AUDIO_SETTINGS"),
             logicalActions = setOf()
@@ -713,7 +713,7 @@ object ActionSpecRegistry {
             ),
             execution = ExecutionSpec.BuiltIn,
             availability = AvailabilitySpec.Always,
-            triggerCompatible = setOf("manual", "time", "nfc"),
+            triggerCompatible = setOf("manual", "time", "nfc", "voice", "sound_event"),
             requiresConfirmation = false,
             requiredPermissions = listOf("android.permission.MODIFY_AUDIO_SETTINGS"),
             logicalActions = setOf()
@@ -730,7 +730,7 @@ object ActionSpecRegistry {
             ),
             execution = ExecutionSpec.BuiltIn,
             availability = AvailabilitySpec.Always,
-            triggerCompatible = setOf("manual", "time", "nfc"),
+            triggerCompatible = setOf("manual", "time", "nfc", "voice", "sound_event"),
             requiresConfirmation = false,
             requiredPermissions = emptyList(),
             logicalActions = setOf()
@@ -747,7 +747,7 @@ object ActionSpecRegistry {
             ),
             execution = ExecutionSpec.BuiltIn,
             availability = AvailabilitySpec.Always,
-            triggerCompatible = setOf("manual", "time", "nfc"),
+            triggerCompatible = setOf("manual", "time", "nfc", "voice", "sound_event"),
             requiresConfirmation = false,
             requiredPermissions = listOf("android.permission.POST_NOTIFICATIONS"),
             logicalActions = setOf()
@@ -762,7 +762,7 @@ object ActionSpecRegistry {
             ),
             execution = ExecutionSpec.BuiltIn,
             availability = AvailabilitySpec.Always,
-            triggerCompatible = setOf("manual", "time", "nfc"),
+            triggerCompatible = setOf("manual", "time", "nfc", "voice", "sound_event"),
             requiresConfirmation = false,
             requiredPermissions = listOf("android.permission.WRITE_SETTINGS"),
             logicalActions = setOf()
@@ -780,7 +780,7 @@ object ActionSpecRegistry {
             ),
             execution = ExecutionSpec.BuiltIn,
             availability = AvailabilitySpec.Always,
-            triggerCompatible = setOf("manual", "time", "nfc"),
+            triggerCompatible = setOf("manual", "time", "nfc", "voice", "sound_event"),
             requiresConfirmation = true,
             requiredPermissions = emptyList(),
             logicalActions = setOf()
@@ -795,7 +795,7 @@ object ActionSpecRegistry {
             ),
             execution = ExecutionSpec.BuiltIn,
             availability = AvailabilitySpec.Always,
-            triggerCompatible = setOf("manual", "time", "nfc"),
+            triggerCompatible = setOf("manual", "time", "nfc", "voice", "sound_event"),
             requiresConfirmation = false,
             requiredPermissions = listOf("android.permission.QUERY_ALL_PACKAGES"),
             logicalActions = setOf(LogicalAction.OpenApp),
@@ -813,7 +813,7 @@ object ActionSpecRegistry {
             ),
             execution = ExecutionSpec.BuiltIn,
             availability = AvailabilitySpec.Always,
-            triggerCompatible = setOf("manual", "time", "nfc"),
+            triggerCompatible = setOf("manual", "time", "nfc", "voice", "sound_event"),
             requiresConfirmation = false,
             requiredPermissions = listOf("android.permission.BLUETOOTH_CONNECT"),
             logicalActions = setOf()
@@ -827,7 +827,7 @@ object ActionSpecRegistry {
             ),
             execution = ExecutionSpec.BuiltIn,
             availability = AvailabilitySpec.Always,
-            triggerCompatible = setOf("manual", "time", "nfc"),
+            triggerCompatible = setOf("manual", "time", "nfc", "voice", "sound_event"),
             requiresConfirmation = false,
             requiredPermissions = listOf("android.permission.ACCESS_WIFI_STATE", "android.permission.CHANGE_WIFI_STATE"),
             logicalActions = setOf()
@@ -841,7 +841,7 @@ object ActionSpecRegistry {
             ),
             execution = ExecutionSpec.BuiltIn,
             availability = AvailabilitySpec.Always,
-            triggerCompatible = setOf("manual", "time", "nfc"),
+            triggerCompatible = setOf("manual", "time", "nfc", "voice", "sound_event"),
             requiresConfirmation = false,
             requiredPermissions = listOf("android.permission.WRITE_SETTINGS"),
             logicalActions = setOf()
@@ -859,7 +859,7 @@ object ActionSpecRegistry {
             ),
             execution = ExecutionSpec.BuiltIn,
             availability = AvailabilitySpec.Always,
-            triggerCompatible = setOf("manual"),
+            triggerCompatible = setOf("manual", "voice", "sound_event"),
             requiresConfirmation = true,
             requiredPermissions = emptyList(),
             logicalActions = setOf()
@@ -875,7 +875,7 @@ object ActionSpecRegistry {
             ),
             execution = ExecutionSpec.BuiltIn,
             availability = AvailabilitySpec.Always,
-            triggerCompatible = setOf("manual"),
+            triggerCompatible = setOf("manual", "voice", "sound_event"),
             requiresConfirmation = false,
             requiredPermissions = listOf("android.permission.WRITE_SETTINGS"),
             logicalActions = setOf()
@@ -889,7 +889,7 @@ object ActionSpecRegistry {
             ),
             execution = ExecutionSpec.BuiltIn,
             availability = AvailabilitySpec.Always,
-            triggerCompatible = setOf("manual"),
+            triggerCompatible = setOf("manual", "voice", "sound_event"),
             requiresConfirmation = false,
             requiredPermissions = listOf("android.permission.WRITE_SECURE_SETTINGS"),
             logicalActions = setOf()
@@ -904,7 +904,7 @@ object ActionSpecRegistry {
             ),
             execution = ExecutionSpec.BuiltIn,
             availability = AvailabilitySpec.Always,
-            triggerCompatible = setOf("manual"),
+            triggerCompatible = setOf("manual", "voice", "sound_event"),
             requiresConfirmation = true,
             requiredPermissions = emptyList(),
             logicalActions = setOf()
@@ -920,7 +920,7 @@ object ActionSpecRegistry {
             ),
             execution = ExecutionSpec.BuiltIn,
             availability = AvailabilitySpec.Always,
-            triggerCompatible = setOf("manual"),
+            triggerCompatible = setOf("manual", "voice", "sound_event"),
             requiresConfirmation = false,
             requiredPermissions = listOf("android.permission.WRITE_SYNC_SETTINGS"),
             logicalActions = setOf()
@@ -934,7 +934,7 @@ object ActionSpecRegistry {
             ),
             execution = ExecutionSpec.BuiltIn,
             availability = AvailabilitySpec.Always,
-            triggerCompatible = setOf("manual"),
+            triggerCompatible = setOf("manual", "voice", "sound_event"),
             requiresConfirmation = false,
             requiredPermissions = listOf("android.permission.WRITE_SECURE_SETTINGS"),
             logicalActions = setOf()
@@ -961,7 +961,7 @@ object ActionSpecRegistry {
                     ExtraSpec("media_focus", MediaStore.EXTRA_MEDIA_FOCUS, ParamType.Enum)
                 )
             ),
-            triggerCompatible = setOf("manual", "time", "nfc"),
+            triggerCompatible = setOf("manual", "time", "nfc", "voice", "sound_event"),
             requiresConfirmation = true,
             logicalActions = setOf(LogicalAction.PlayMedia, LogicalAction.Search),
             appKeywords = setOf("music", "media", "play", "playlist"),
@@ -988,7 +988,7 @@ object ActionSpecRegistry {
                 extras = listOf(ExtraSpec("query", SearchManager.QUERY, ParamType.String)),
                 packagePolicy = PackagePolicy.Exact("com.spotify.music")
             ),
-            triggerCompatible = setOf("manual", "time", "nfc"),
+            triggerCompatible = setOf("manual", "time", "nfc", "voice", "sound_event"),
             requiresConfirmation = true,
             logicalActions = setOf(LogicalAction.PlayMedia),
             source = ActionSource.AppSpecific,
@@ -1020,7 +1020,7 @@ object ActionSpecRegistry {
                 dataTemplate = "{uri}",
                 flags = listOf(IntentFlag.NewTask, IntentFlag.GrantReadUriPermission)
             ),
-            triggerCompatible = setOf("manual", "nfc"),
+            triggerCompatible = setOf("manual", "nfc", "voice", "sound_event"),
             requiresConfirmation = true,
             logicalActions = setOf(LogicalAction.OpenFile),
             appKeywords = setOf("file", "document", "pdf", "open"),
@@ -1047,7 +1047,7 @@ object ActionSpecRegistry {
                     ExtraSpec("text", "com.google.android.gms.actions.extra.TEXT", ParamType.String)
                 )
             ),
-            triggerCompatible = setOf("manual", "time", "nfc", "share_sheet"),
+            triggerCompatible = setOf("manual", "time", "nfc", "share_sheet", "voice", "sound_event"),
             requiresConfirmation = true,
             logicalActions = setOf(LogicalAction.TakeNote),
             appKeywords = setOf("note", "notes", "keep"),

@@ -132,6 +132,10 @@ data class WorkflowGenerationUiState(
     /** True when the editor is for a new workflow (not editing existing). */
     val isNewWorkflow: Boolean = false,
 
+    // ── Sound Event trigger setup ───────────────────────────────────
+    /** Non-null when the SoundEvent trigger setup screen should be shown. */
+    val soundEventTriggerSetupWorkflow: PlannedWorkflow? = null,
+
     // ── Navigation tabs ────────────────────────────────────────────────
     val selectedTab: Int = 0  // 0 = Generate, 1 = Workflows, 2 = Editor
 ) {

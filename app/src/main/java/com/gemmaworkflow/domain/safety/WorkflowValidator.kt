@@ -153,5 +153,7 @@ object WorkflowValidator {
         is TriggerConfig.EmailReceived -> "email_received"
         is TriggerConfig.SleepProxy -> "sleep_proxy"
         is TriggerConfig.Geofence -> "geofence"
+        is TriggerConfig.Voice -> "voice"
+        is TriggerConfig.SoundEvent -> "sound_event"
     }
 }

@@ -26,6 +26,12 @@
     <!-- Required for reading/writing calendar events silently. -->
     <uses-permission android:name="android.permission.READ_CALENDAR" />
     <uses-permission android:name="android.permission.WRITE_CALENDAR" />
+    <!-- Voice intent trigger + sound event trigger (YAMNet). -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Foreground service for sound event detection (Android 10+). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- Foreground microphone service (Android 14+). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
 
     <!-- NFC: read and write NFC tags to trigger workflows. -->
     <uses-permission android:name="android.permission.NFC" />
@@ -243,6 +249,12 @@
                 android:name="android.accessibilityservice"
                 android:resource="@xml/accessibility_service_config" />
         </service>
+
+        <!-- Sound event trigger: foreground service using YAMNet for continuous audio classification. -->
+        <service
+            android:name=".platform.trigger.sound.SoundEventTriggerService"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
 
         <!-- Receives time trigger confirm/run intents from the notification action buttons. -->
         <activity

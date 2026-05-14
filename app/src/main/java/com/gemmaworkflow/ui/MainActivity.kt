@@ -17,6 +17,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -121,12 +122,14 @@ import com.gemmaworkflow.ui.home.PermissionRequest
 import com.gemmaworkflow.ui.home.StageStatus
 import com.gemmaworkflow.ui.home.TimeTriggerSetupScreen
 import com.gemmaworkflow.ui.home.ShareSheetSetupScreen
+import com.gemmaworkflow.ui.home.SoundEventTriggerSetupScreen
 import com.gemmaworkflow.ui.home.ManualWorkflowEditorScreen
 import com.gemmaworkflow.ui.home.WorkflowGenerationViewModel
 import com.gemmaworkflow.ui.home.WorkflowGenerationUiState
 import com.gemmaworkflow.ui.nfc.NfcSetupScreen
 import com.gemmaworkflow.ui.theme.GemmaWorkflowTheme
 import com.gemmaworkflow.ui.trigger.formatTriggerSummary
+import com.gemmaworkflow.platform.trigger.voice.VoiceTriggerFab
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -351,6 +354,18 @@ class MainActivity : ComponentActivity() {
 private fun WorkflowGenerationScreen(viewModel: WorkflowGenerationViewModel) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
+    // Handle system back button — intercept to dismiss overlays before default finish
+    BackHandler(enabled = true) {
+        when {
+            state.editingWorkflow != null -> viewModel.cancelEditWorkflow()
+            state.selectedWorkflowDetail != null -> viewModel.clearWorkflowDetail()
+            state.timeTriggerSetupWorkflow != null -> viewModel.cancelTimeTriggerSetup()
+            state.shareSheetSetupWorkflow != null -> viewModel.cancelShareSheetSetup()
+            state.soundEventTriggerSetupWorkflow != null -> viewModel.cancelSoundEventTriggerSetup()
+            else -> { /* let Activity finish normally */ }
+        }
+    }
+
     // Show the manual editor if open
     state.editingWorkflow?.let { workflow ->
         ManualWorkflowEditorScreen(
@@ -388,6 +403,7 @@ private fun WorkflowGenerationScreen(viewModel: WorkflowGenerationViewModel) {
                     is TriggerConfig.Time -> viewModel.showTimeTriggerSetup(detail)
                     is TriggerConfig.Manual -> viewModel.showTimeTriggerSetup(detail)
                     is TriggerConfig.ShareSheet -> viewModel.showShareSheetSetup(detail)
+                    is TriggerConfig.SoundEvent -> viewModel.showSoundEventTriggerSetup(detail)
                     else -> { /* other triggers not yet supported */ }
                 }
             },
@@ -416,6 +432,21 @@ private fun WorkflowGenerationScreen(viewModel: WorkflowGenerationViewModel) {
         return
     }
 
+    // Show Sound Event trigger setup screen
+    state.soundEventTriggerSetupWorkflow?.let { workflow ->
+        SoundEventTriggerSetupScreen(
+            savedWorkflowNames = state.savedWorkflows.map { it.name },
+            currentMappings = if (workflow.trigger is TriggerConfig.SoundEvent) {
+                (workflow.trigger as TriggerConfig.SoundEvent).soundClasses.associateWith { workflow.name }
+            } else emptyMap(),
+            onSave = { targetWorkflow, soundClasses ->
+                viewModel.saveSoundEventTrigger(targetWorkflow, soundClasses.toList())
+            },
+            onCancel = viewModel::cancelSoundEventTriggerSetup
+        )
+        return
+    }
+
     // Show share sheet picker when app was launched via ACTION_SEND
     state.sharedContent?.let { sharedContent ->
         ShareSheetPicker(
@@ -431,12 +462,20 @@ private fun WorkflowGenerationScreen(viewModel: WorkflowGenerationViewModel) {
 
     Scaffold(
         containerColor = BackgroundDark,
+        floatingActionButton = {
+            VoiceTriggerFab(
+                onWorkflowGenerated = { workflow, rawJson ->
+                    viewModel.selectWorkflow(workflow)
+                    viewModel.setRawJson(rawJson)
+                }
+            )
+        },
         bottomBar = {
             DarkNavigationBar(
                 selectedTab = state.selectedTab,
                 onTabSelected = { viewModel.selectTab(it) },
-                tabLabels = listOf("Generate", "Workflows", "Debug"),
-                tabIcons = listOf("⚡", "⚙", "🔍")
+                tabLabels = listOf("Generate", "Workflows", "Marketplace", "Debug"),
+                tabIcons = listOf("⚡", "⚙", "🛒", "🔍")
             )
         }
     ) { paddingValues ->
@@ -450,9 +489,40 @@ private fun WorkflowGenerationScreen(viewModel: WorkflowGenerationViewModel) {
                     onEdit = viewModel::openEditWorkflowEditor,
                     onNew = viewModel::openNewWorkflowEditor
                 )
-                2 -> DebugTabContent(state)
+                2 -> MarketplaceComingSoon()
+                3 -> DebugTabContent(state)
             }
         }
+    }
+}
+
+@Composable
+private fun MarketplaceComingSoon() {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = "🛒",
+            style = MaterialTheme.typography.displayLarge
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = "Coming Soon",
+            style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight(700)),
+            color = TextPrimary
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = "The marketplace will let you discover and share workflow templates.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = TextSecondary,
+            modifier = Modifier.padding(horizontal = 32.dp)
+        )
     }
 }
 
