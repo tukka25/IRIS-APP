@@ -1,6 +1,6 @@
-package com.gemmaworkflow.platform.tools
+package com.irisapp.platform.tools
 
-import com.gemmaworkflow.platform.tools.impl.ResolveDatetimeTool
+import com.irisapp.platform.tools.impl.ResolveDatetimeTool
 import org.junit.Assert.assertTrue
 import org.junit.Test
 

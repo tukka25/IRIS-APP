@@ -61,7 +61,8 @@ import com.irisapp.domain.model.PlannedWorkflow
  */
 @Composable
 fun VoiceTriggerFab(
-    onWorkflowGenerated: (PlannedWorkflow, rawJson: String) -> Unit,
+    onWorkflowGenerated: (PlannedWorkflow, rawJson: String, transcript: String) -> Unit,
+    onTranscriptReceived: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -87,6 +88,7 @@ fun VoiceTriggerFab(
         parseResult.fold(
             onSuccess = { text ->
                 transcript = text
+                onTranscriptReceived(text)
                 fabState = VoiceFabState.PROCESSING
                 stageLabel = "Generating workflow…"
 
@@ -159,8 +161,8 @@ fun VoiceTriggerFab(
                 errorMessage = errorMessage,
                 stageLabel = stageLabel,
                 validationErrors = validationErrors,
-                onRun = { workflow, json ->
-                    onWorkflowGenerated(workflow, json)
+                onRun = { workflow, json, text ->
+                    onWorkflowGenerated(workflow, json, text)
                     fabState = VoiceFabState.IDLE
                 },
                 onDismiss = {
@@ -233,7 +235,7 @@ private fun VoicePreviewCard(
     errorMessage: String?,
     stageLabel: String?,
     validationErrors: List<String>,
-    onRun: (PlannedWorkflow, String) -> Unit,
+    onRun: (PlannedWorkflow, String, String) -> Unit,
     onDismiss: () -> Unit
 ) {
     val workflowRawJson = remember(workflow) { workflow?.let { "{}" } ?: "" }
@@ -334,7 +336,7 @@ private fun VoicePreviewCard(
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(
-                        onClick = { onRun(workflow, workflowRawJson) },
+                        onClick = { onRun(workflow, workflowRawJson, transcript ?: "") },
                         enabled = validationErrors.isEmpty()
                     ) {
                         Text("Run")

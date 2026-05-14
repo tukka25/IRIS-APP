@@ -71,12 +71,13 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
     init {
         viewModelScope.launch {
             InferenceManager.inferenceState.collect { state ->
-                _uiState.update { it.copy(inferenceState = state, isModelReady = state is InferenceState.Ready) }
+                val isLoaded = state !is InferenceState.Idle
+                _uiState.update { it.copy(inferenceState = state, isModelReady = state is InferenceState.Ready, isModelLoaded = isLoaded) }
                 appendDebug("Model", state.toString())
             }
         }
-        viewModelScope.launch { InferenceManager.initialize(application) }
-        TriggerRegistry.initialize(application)
+        // Model is NOT auto-loaded — user toggles it via the load switch
+        TriggerRegistry.initialize(getApplication())
         viewModelScope.launch(Dispatchers.IO) {
             DemoWorkflowSeeder.seedIfNeeded(application, workflowRepo)
             val saved = workflowRepo.loadAll()
@@ -87,6 +88,14 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
 
     fun updatePrompt(prompt: String) {
         _uiState.update { it.copy(prompt = prompt) }
+    }
+
+    fun loadModel() {
+        viewModelScope.launch { InferenceManager.initialize(getApplication()) }
+    }
+
+    fun unloadModel() {
+        InferenceManager.close()
     }
 
     /**
@@ -504,6 +513,11 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
     /** Set the raw JSON for the currently selected workflow preview (used by voice trigger). */
     fun setRawJson(rawJson: String) {
         _uiState.update { it.copy(rawJson = rawJson) }
+    }
+
+    /** Set a manual error message (e.g. from voice generation failure). */
+    fun setError(message: String) {
+        _uiState.update { it.copy(error = message, isBusy = false) }
     }
 
     fun loadWorkflowDetail(workflowId: String) {

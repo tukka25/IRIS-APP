@@ -68,6 +68,8 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -165,7 +167,10 @@ class MainActivity : ComponentActivity() {
             }
             IrisTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    WorkflowGenerationScreen(viewModel = viewModel)
+                    WorkflowGenerationScreen(
+                        viewModel = viewModel,
+                        marketplaceViewModel = marketplaceViewModel
+                    )
                 }
             }
         }
@@ -354,7 +359,10 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun WorkflowGenerationScreen(viewModel: WorkflowGenerationViewModel) {
+private fun WorkflowGenerationScreen(
+    viewModel: WorkflowGenerationViewModel,
+    marketplaceViewModel: MarketplaceViewModel
+) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     // Handle system back button — intercept to dismiss overlays before default finish
@@ -465,14 +473,6 @@ private fun WorkflowGenerationScreen(viewModel: WorkflowGenerationViewModel) {
 
     Scaffold(
         containerColor = BackgroundDark,
-        floatingActionButton = {
-            VoiceTriggerFab(
-                onWorkflowGenerated = { workflow, rawJson ->
-                    viewModel.selectWorkflow(workflow)
-                    viewModel.setRawJson(rawJson)
-                }
-            )
-        },
         bottomBar = {
             DarkNavigationBar(
                 selectedTab = state.selectedTab,
@@ -483,7 +483,7 @@ private fun WorkflowGenerationScreen(viewModel: WorkflowGenerationViewModel) {
         }
     ) { paddingValues ->
         // Use paddingValues to avoid content under nav bar
-        Box(modifier = Modifier.padding(paddingValues).fillMaxSize().statusBarsPadding()) {
+        Box(modifier = Modifier.padding(paddingValues).fillMaxSize()) {
             when (state.selectedTab) {
                 0 -> GenerateTabContent(viewModel, state)
                 1 -> WorkflowsTabContent(
@@ -492,10 +492,12 @@ private fun WorkflowGenerationScreen(viewModel: WorkflowGenerationViewModel) {
                     onEdit = viewModel::openEditWorkflowEditor,
                     onNew = viewModel::openNewWorkflowEditor
                 )
-                2 -> MarketplaceScreen(
-                    viewModel = marketplaceViewModel,
-                    onBack = { }
-                )
+                2 -> {
+                    MarketplaceScreen(
+                        viewModel = marketplaceViewModel,
+                        onBack = { }
+                    )
+                }
                 3 -> DebugTabContent(state)
             }
         }
@@ -503,55 +505,27 @@ private fun WorkflowGenerationScreen(viewModel: WorkflowGenerationViewModel) {
 }
 
 @Composable
-private fun MarketplaceComingSoon() {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text(
-            text = "🛒",
-            style = MaterialTheme.typography.displayLarge
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text = "Coming Soon",
-            style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight(700)),
-            color = TextPrimary
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = "The marketplace will let you discover and share workflow templates.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = TextSecondary,
-            modifier = Modifier.padding(horizontal = 32.dp)
-        )
-    }
-}
-
-@Composable
 private fun GenerateTabContent(viewModel: WorkflowGenerationViewModel, state: WorkflowGenerationUiState) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+        Spacer(modifier = Modifier.height(8.dp))
         // Hero block: animated hexagonal icon
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 8.dp),
+                .padding(vertical = 4.dp),
             contentAlignment = Alignment.Center
         ) {
             // Radial glow halo behind the icon, matching the hex-edge gradient
             Box(
                 modifier = Modifier
-                    .size(200.dp)
+                    .size(160.dp)
                     .background(
                         Brush.radialGradient(
                             colors = listOf(
@@ -560,26 +534,68 @@ private fun GenerateTabContent(viewModel: WorkflowGenerationViewModel, state: Wo
                                 Color.Transparent
                             )
                         ),
-                        shape = RoundedCornerShape(100.dp)
+                        shape = RoundedCornerShape(80.dp)
                     )
             )
-            HexHeroIcon(size = 160.dp)
+            HexHeroIcon(size = 120.dp)
         }
 
         // Wordmark — gradient tinted to match hero glow
-        Box(contentAlignment = Alignment.Center) {
+        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             Text(
                 text = "IrisApp",
                 style = MaterialTheme.typography.headlineMedium.copy(
                     fontWeight = FontWeight(700),
-                    fontSize = 28.sp,
+                    fontSize = 24.sp,
                     brush = Brush.horizontalGradient(listOf(CyanAccent, VioletAccent))
                 )
             )
         }
 
+        // Model load / unload switch
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(GlassSurface, MaterialTheme.shapes.medium)
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "Model",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = TextPrimary
+                )
+                Text(
+                    text = when {
+                        state.inferenceState is InferenceState.Loading -> "Loading..."
+                        state.inferenceState is InferenceState.Ready -> "Ready (${(state.inferenceState as InferenceState.Ready).backend})"
+                        state.inferenceState is InferenceState.Idle -> "Off"
+                        state.inferenceState is InferenceState.MissingModel -> "Model not found"
+                        state.inferenceState is InferenceState.GpuUnavailable -> "GPU unavailable"
+                        state.inferenceState is InferenceState.Error -> "Error"
+                        else -> "Unknown"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary
+                )
+            }
+            Switch(
+                checked = state.isModelLoaded,
+                onCheckedChange = { if (it) viewModel.loadModel() else viewModel.unloadModel() },
+                enabled = state.inferenceState !is InferenceState.Loading,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = CyanAccent,
+                    checkedTrackColor = CyanAccent.copy(alpha = 0.4f),
+                    uncheckedThumbColor = TextSecondary,
+                    uncheckedTrackColor = SurfaceDark
+                )
+            )
+        }
+
         if (state.savedWorkflows.isNotEmpty()) {
-            Text("Saved", style = MaterialTheme.typography.labelMedium, color = TextSecondary)
             Row(
                 modifier = Modifier.horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -596,7 +612,7 @@ private fun GenerateTabContent(viewModel: WorkflowGenerationViewModel, state: Wo
                                 shape = RoundedCornerShape(12.dp)
                             )
                             .clickable { pressed = !pressed; viewModel.loadWorkflowDetail(wf.name) }
-                            .padding(horizontal = 14.dp, vertical = 10.dp)
+                            .padding(horizontal = 14.dp, vertical = 8.dp)
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
@@ -620,15 +636,6 @@ private fun GenerateTabContent(viewModel: WorkflowGenerationViewModel, state: Wo
             }
         }
 
-        Text("Model", style = MaterialTheme.typography.labelMedium, color = TextSecondary)
-        ModelStatusCard(
-            state.inferenceState,
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(GlassSurface, MaterialTheme.shapes.medium)
-                .padding(12.dp)
-        )
-
         OutlinedTextField(
             value = state.prompt,
             onValueChange = viewModel::updatePrompt,
@@ -644,9 +651,9 @@ private fun GenerateTabContent(viewModel: WorkflowGenerationViewModel, state: Wo
                 focusedTextColor = TextPrimary,
                 unfocusedTextColor = TextPrimary
             ),
-            minLines = 3,
+            minLines = 2,
             label = { Text("What should IrisApp do?") },
-            supportingText = { Text("e.g. \"When I tap this, open Maps to the nearest coffee shop\"", color = TextSecondary) }
+            supportingText = { Text("e.g. \"When I tap this, open Maps\u2026\"", color = TextSecondary) }
         )
 
         GradientButton(
@@ -811,47 +818,56 @@ private fun GenerateTabContent(viewModel: WorkflowGenerationViewModel, state: Wo
             }
         }
 
-        if (state.debugMessages.isNotEmpty()) {
-            var debugExpanded by remember { mutableStateOf(false) }
-            HorizontalDivider()
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("Debug Trace (${state.debugMessages.size} messages)", style = MaterialTheme.typography.titleMedium)
-                TextButton(onClick = { debugExpanded = !debugExpanded }) {
-                    Text(if (debugExpanded) "Hide" else "Show")
-                }
-            }
-            if (debugExpanded) {
-                SelectionContainer {
-                    GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
-                        Column(
-                            modifier = Modifier.padding(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            state.debugMessages.forEach { message ->
-                                Column {
-                                    Text(
-                                        message.label,
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                    Text(
-                                        message.message,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        fontFamily = FontFamily.Monospace
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+        Spacer(modifier = Modifier.height(80.dp))
         }
 
-        Spacer(modifier = Modifier.height(32.dp))
+        // Voice FAB integration
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(16.dp)
+        ) {
+            VoiceTriggerFab(
+                onWorkflowGenerated = { workflow, rawJson, transcript ->
+                    viewModel.updatePrompt(transcript)
+                    viewModel.selectWorkflow(workflow)
+                    viewModel.setRawJson(rawJson)
+                },
+                onTranscriptReceived = { transcript ->
+                    viewModel.updatePrompt(transcript)
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun MarketplaceComingSoon() {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = "🛒",
+            style = MaterialTheme.typography.displayLarge
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = "Coming Soon",
+            style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight(700)),
+            color = TextPrimary
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = "The marketplace will let you discover and share workflow templates.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = TextSecondary,
+            modifier = Modifier.padding(horizontal = 32.dp)
+        )
     }
 }
 
@@ -887,6 +903,7 @@ private fun WorkflowsTabContent(
             .padding(horizontal = 20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        Spacer(modifier = Modifier.height(16.dp))
         Text(
             "Workflows",
             style = MaterialTheme.typography.headlineMedium.copy(
@@ -1030,6 +1047,7 @@ private fun DebugTabContent(state: WorkflowGenerationUiState) {
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        Spacer(modifier = Modifier.height(16.dp))
         Text("Debug Trace", style = MaterialTheme.typography.headlineMedium)
 
         if (state.debugMessages.isEmpty()) {
@@ -1162,30 +1180,6 @@ private fun WorkflowListCard(
                 Text("Edit")
             }
         }
-    }
-}
-
-@Composable
-private fun ModelStatusCard(state: InferenceState, modifier: Modifier = Modifier) {
-    val (label, color) = when (state) {
-        is InferenceState.Idle -> "Idle" to TextSecondary
-        is InferenceState.Loading -> "Loading model\u2026" to CyanAccent
-        is InferenceState.Ready -> "Ready \u2014 ${state.backend}" to CyanAccent
-        is InferenceState.MissingModel -> "Model not found" to Color(0xFFFF6B6B)
-        is InferenceState.GpuUnavailable -> "GPU unavailable: ${state.reason}" to Color(0xFFFF6B6B)
-        is InferenceState.Error -> "Error: ${state.message}" to Color(0xFFFF6B6B)
-    }
-    Box(
-        modifier = modifier
-            .clip(MaterialTheme.shapes.medium)
-            .background(color.copy(alpha = 0.1f))
-    ) {
-        Text(
-            text = label,
-            modifier = Modifier.padding(12.dp),
-            color = color,
-            style = MaterialTheme.typography.bodyMedium
-        )
     }
 }
 

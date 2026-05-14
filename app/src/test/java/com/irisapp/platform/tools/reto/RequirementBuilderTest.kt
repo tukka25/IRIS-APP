@@ -1,4 +1,4 @@
-package com.gemmaworkflow.platform.tools.reto
+package com.irisapp.platform.tools.reto
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

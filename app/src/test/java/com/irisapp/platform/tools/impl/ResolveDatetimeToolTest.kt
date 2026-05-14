@@ -1,4 +1,4 @@
-package com.gemmaworkflow.platform.tools.impl
+package com.irisapp.platform.tools.impl
 
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertFalse

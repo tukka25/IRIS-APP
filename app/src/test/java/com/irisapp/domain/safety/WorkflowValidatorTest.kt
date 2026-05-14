@@ -1,8 +1,8 @@
-package com.gemmaworkflow.domain.safety
+package com.irisapp.domain.safety
 
-import com.gemmaworkflow.domain.model.PlannedWorkflow
-import com.gemmaworkflow.domain.model.TriggerConfig
-import com.gemmaworkflow.domain.model.WorkflowStep
+import com.irisapp.domain.model.PlannedWorkflow
+import com.irisapp.domain.model.TriggerConfig
+import com.irisapp.domain.model.WorkflowStep
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertTrue

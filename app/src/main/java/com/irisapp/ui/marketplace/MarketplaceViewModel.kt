@@ -65,6 +65,13 @@ class MarketplaceViewModel(application: Application) : AndroidViewModel(applicat
                 )
             }
         }
+        // Safety timeout — clear loading if Firebase silently fails
+        viewModelScope.launch {
+            kotlinx.coroutines.delay(15_000)
+            if (_state.value.isLoading) {
+                _state.value = _state.value.copy(isLoading = false)
+            }
+        }
     }
 
     private fun refreshMyEntries() {
@@ -90,7 +97,7 @@ class MarketplaceViewModel(application: Application) : AndroidViewModel(applicat
     // ── Publish ─────────────────────────────────────────────────────────────
 
     private fun loadMyWorkflows() {
-        val workflows = workflowRepo.getAll()
+        val workflows = workflowRepo.loadAll()
         _state.value = _state.value.copy(publishWorkflows = workflows)
     }
 

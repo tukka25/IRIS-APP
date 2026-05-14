@@ -10,8 +10,7 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.*
 import java.util.UUID
 
 /** Entry stored in the Firebase marketplace. */
@@ -36,7 +35,7 @@ data class MarketplaceEntry(
  */
 class MarketplaceRepository(context: Context) {
 
-    private val database = FirebaseDatabase.getInstance("https://gemma4good-marketplace-default-rtdb.firebaseio.com/")
+    private val database = FirebaseDatabase.getInstance("https://iris-23288-default-rtdb.asia-southeast1.firebasedatabase.app/")
         .getReference("marketplace")
 
     private val prefs = context.getSharedPreferences("marketplace_prefs", Context.MODE_PRIVATE)
@@ -61,12 +60,14 @@ class MarketplaceRepository(context: Context) {
 
     /** Returns a Flow of all marketplace entries, newest first. */
     fun browse(): Flow<List<MarketplaceEntry>> = callbackFlow {
+        // Emit empty list immediately so callers get isLoading=false even if DB is empty
+        trySend(emptyList())
         val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val entries = snapshot.children.mapNotNull { child ->
                     runCatching {
-                        val jsonStr = json.encodeToString(child.value)
-                        json.decodeFromString<MarketplaceEntry>(jsonStr)
+                        val jsonElement = child.value.toJsonElement()
+                        json.decodeFromJsonElement<MarketplaceEntry>(jsonElement)
                     }.getOrNull()
                 }.sortedByDescending { it.createdAt }
                 trySend(entries)
@@ -96,8 +97,41 @@ class MarketplaceRepository(context: Context) {
             tags = tags
         )
         val key = entry.id
-        database.child(key).setValue(entry)
+        val jsonElement = json.encodeToJsonElement(MarketplaceEntry.serializer(), entry)
+        database.child(key).setValue(jsonElement.toFirebaseValue())
         return key
+    }
+
+    // ── Serialization Helpers ────────────────────────────────────────────────
+
+    private fun JsonElement.toFirebaseValue(): Any? {
+        return when (this) {
+            is JsonObject -> this.mapValues { it.value.toFirebaseValue() }
+            is JsonArray -> this.map { it.toFirebaseValue() }
+            is JsonPrimitive -> {
+                if (this.isString) this.content
+                else this.booleanOrNull ?: this.longOrNull ?: this.doubleOrNull ?: this.content
+            }
+            is JsonNull -> null
+        }
+    }
+
+    private fun Any?.toJsonElement(): JsonElement {
+        return when (this) {
+            null -> JsonNull
+            is Map<*, *> -> buildJsonObject {
+                this@toJsonElement.forEach { (k, v) ->
+                    put(k.toString(), v.toJsonElement())
+                }
+            }
+            is List<*> -> buildJsonArray {
+                this@toJsonElement.forEach { add(it.toJsonElement()) }
+            }
+            is Number -> JsonPrimitive(this)
+            is Boolean -> JsonPrimitive(this)
+            is String -> JsonPrimitive(this)
+            else -> JsonPrimitive(this.toString())
+        }
     }
 
     // ── Increment download count ──────────────────────────────────────────────

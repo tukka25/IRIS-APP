@@ -1,4 +1,4 @@
-package com.gemmaworkflow.domain.catalog
+package com.irisapp.domain.catalog
 
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
