@@ -1,26 +1,67 @@
 package com.gemmaworkflow.ui.home
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AirplanemodeActive
+import androidx.compose.material.icons.filled.Alarm
+import androidx.compose.material.icons.filled.AppShortcut
+import androidx.compose.material.icons.filled.BatteryChargingFull
+import androidx.compose.material.icons.filled.Bluetooth
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DoNotDisturb
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Nightlight
+import androidx.compose.material.icons.filled.Nfc
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Power
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Sms
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.TouchApp
+import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -32,28 +73,39 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.gemmaworkflow.domain.catalog.ActionSpec
 import com.gemmaworkflow.domain.catalog.ActionSpecRegistry
 import com.gemmaworkflow.domain.catalog.ExecutionSpec
 import com.gemmaworkflow.domain.catalog.ParamSpec
+import com.gemmaworkflow.domain.catalog.ParamType
 import com.gemmaworkflow.domain.model.BatteryCondition
 import com.gemmaworkflow.domain.model.GeofenceTransition
 import com.gemmaworkflow.domain.model.ChargerType
@@ -61,8 +113,78 @@ import com.gemmaworkflow.domain.model.PlannedWorkflow
 import com.gemmaworkflow.domain.model.SetupState
 import com.gemmaworkflow.domain.model.TriggerConfig
 import com.gemmaworkflow.domain.model.WorkflowStep
+import com.gemmaworkflow.ui.theme.BackgroundDark
+import com.gemmaworkflow.ui.theme.CyanAccent
+import com.gemmaworkflow.ui.theme.GlassBorder
+import com.gemmaworkflow.ui.theme.GlassSurface
+import com.gemmaworkflow.platform.sound.YamnetClassifier
+import com.gemmaworkflow.ui.theme.SurfaceDark
+import com.gemmaworkflow.ui.theme.SurfaceVariantDark
+import com.gemmaworkflow.ui.theme.TextPrimary
+import com.gemmaworkflow.ui.theme.TextSecondary
+import com.gemmaworkflow.ui.theme.VioletAccent
+import com.gemmaworkflow.ui.components.GlassmorphicCard
+import com.gemmaworkflow.ui.components.GradientButton
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+
+// ── Trigger category ───────────────────────────────────────────────────────────
+
+private enum class TriggerCategory(val label: String, val icon: ImageVector, val color: Color) {
+    MANUAL("Manual", Icons.Default.TouchApp, Color(0xFF5EF2FF)),
+    TIME("Time & Schedule", Icons.Default.Schedule, Color(0xFFFFC15E)),
+    POWER("Power & Battery", Icons.Default.BatteryChargingFull, Color(0xFF7CF0A8)),
+    NETWORK("Network", Icons.Default.Wifi, Color(0xFF9EA9FF)),
+    EVENT("Events", Icons.Default.Notifications, Color(0xFFFF6BD6)),
+    SENSOR("Sensors & NFC", Icons.Default.Nfc, Color(0xFFB57BFF)),
+}
+
+// ── Trigger item with icon and category ───────────────────────────────────────
+
+private data class TriggerItem(
+    val label: String,
+    val config: TriggerConfig,
+    val icon: ImageVector,
+    val category: TriggerCategory
+)
+
+private val TRIGGER_CATEGORIES: Map<TriggerCategory, List<TriggerItem>> = mapOf(
+    TriggerCategory.MANUAL to listOf(
+        TriggerItem("Manual", TriggerConfig.Manual, Icons.Default.TouchApp, TriggerCategory.MANUAL)
+    ),
+    TriggerCategory.TIME to listOf(
+        TriggerItem("Time", TriggerConfig.Time(9, 0, emptyList()), Icons.Default.Schedule, TriggerCategory.TIME),
+        TriggerItem("Alarm Stopped", TriggerConfig.AlarmStopped("default"), Icons.Default.Alarm, TriggerCategory.TIME),
+        TriggerItem("Sleep Proxy", TriggerConfig.SleepProxy(22, 0, 7, 0, true, true), Icons.Default.Nightlight, TriggerCategory.TIME)
+    ),
+    TriggerCategory.POWER to listOf(
+        TriggerItem("Battery", TriggerConfig.Battery(20, BatteryCondition.BELOW), Icons.Default.Power, TriggerCategory.POWER),
+        TriggerItem("Charger", TriggerConfig.Charger(ChargerType.ANY), Icons.Default.BatteryChargingFull, TriggerCategory.POWER)
+    ),
+    TriggerCategory.NETWORK to listOf(
+        TriggerItem("WiFi", TriggerConfig.WiFi(null), Icons.Default.Wifi, TriggerCategory.NETWORK),
+        TriggerItem("Bluetooth", TriggerConfig.Bluetooth(null), Icons.Default.Bluetooth, TriggerCategory.NETWORK),
+        TriggerItem("Airplane Mode", TriggerConfig.AirplaneMode(true), Icons.Default.AirplanemodeActive, TriggerCategory.NETWORK),
+        TriggerItem("Do Not Disturb", TriggerConfig.DoNotDisturb(null), Icons.Default.DoNotDisturb, TriggerCategory.NETWORK)
+    ),
+    TriggerCategory.EVENT to listOf(
+        TriggerItem("App Opened", TriggerConfig.AppOpened(emptyList(), true, false), Icons.Default.AppShortcut, TriggerCategory.EVENT),
+        TriggerItem("App Closed", TriggerConfig.AppClosed(emptyList(), false, true), Icons.Default.AppShortcut, TriggerCategory.EVENT),
+        TriggerItem("SMS Received", TriggerConfig.SmsReceived(null, null), Icons.Default.Sms, TriggerCategory.EVENT),
+        TriggerItem("Notification", TriggerConfig.NotificationListenerConfig(emptyList(), null, null, false), Icons.Default.Notifications, TriggerCategory.EVENT),
+        TriggerItem("Email Received", TriggerConfig.EmailReceived(null, null), Icons.Default.Email, TriggerCategory.EVENT),
+        TriggerItem("Voice", TriggerConfig.Voice, Icons.Default.Mic, TriggerCategory.EVENT),
+        TriggerItem("Sound Event", TriggerConfig.SoundEvent(emptyList()), Icons.Default.GraphicEq, TriggerCategory.EVENT)
+    ),
+    TriggerCategory.SENSOR to listOf(
+        TriggerItem("Geofence", TriggerConfig.Geofence(0.0, 0.0, 100f, GeofenceTransition.ENTER_EXIT), Icons.Default.LocationOn, TriggerCategory.SENSOR),
+        TriggerItem("NFC Tag", TriggerConfig.Nfc(null), Icons.Default.Nfc, TriggerCategory.SENSOR),
+        TriggerItem("Share Sheet", TriggerConfig.ShareSheet(SetupState.NeedsSetup), Icons.Default.Share, TriggerCategory.SENSOR)
+    )
+)
+
+// Build a flat index for quick lookup
+private val ALL_TRIGGERS: List<TriggerItem> = TRIGGER_CATEGORIES.values.flatten()
 
 /** Returns true for ExecutionSpec variants that can be executed by the app. */
 private fun ExecutionSpec.isRunnable(): Boolean = this !is ExecutionSpec.PackageLaunch
@@ -115,12 +237,11 @@ fun ManualWorkflowEditorScreen(
     var selectedTriggerIndex by remember {
         mutableIntStateOf(
             initialWorkflow?.let { wf ->
-                TRIGGER_TYPES.indexOfFirst { (_, t) -> triggerConfigMatches(wf.trigger, t) }
+                ALL_TRIGGERS.indexOfFirst { triggerConfigMatches(wf.trigger, it.config) }
                     .coerceAtLeast(0)
             } ?: 0
         )
     }
-    val currentTriggerType = TRIGGER_TYPES[selectedTriggerIndex]
 
     // Time trigger state
     var timeHour by remember {
@@ -219,13 +340,16 @@ fun ManualWorkflowEditorScreen(
     }
     var appTriggerOnOpen by remember {
         mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.AppOpened)?.triggerOnOpen
-            ?: (initialWorkflow?.trigger as? TriggerConfig.AppClosed)?.triggerOnOpen
             ?: true)
     }
     var appTriggerOnClose by remember {
-        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.AppOpened)?.triggerOnClose
-            ?: (initialWorkflow?.trigger as? TriggerConfig.AppClosed)?.triggerOnClose
-            ?: false)
+        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.AppClosed)?.triggerOnClose
+            ?: true)
+    }
+
+    // Sound Event trigger state
+    var soundEventClasses by remember {
+        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.SoundEvent)?.soundClasses ?: emptyList())
     }
 
     // SmsReceived trigger state
@@ -303,13 +427,90 @@ fun ManualWorkflowEditorScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(BackgroundDark)
             .verticalScroll(rememberScrollState())
-            .padding(20.dp),
+            .padding(20.dp)
+            .statusBarsPadding()
+            .navigationBarsPadding(),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // ── Top bar ───────────────────────────────────────────────────────────
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Back",
+                tint = TextPrimary,
+                modifier = Modifier
+                    .size(28.dp)
+                    .clickable { onCancel() }
+            )
+            GradientButton(
+                text = "Save",
+                onClick = {
+                    val trigger = buildTrigger(
+                        triggerType = Pair(
+                            "",
+                            ALL_TRIGGERS.getOrNull(selectedTriggerIndex)?.config ?: TriggerConfig.Manual
+                        ),
+                        timeHour = timeHour,
+                        timeMinute = timeMinute,
+                        repeatMode = repeatMode,
+                        selectedDays = selectedDays,
+                        batteryLevel = batteryLevel,
+                        batteryCondition = batteryCondition,
+                        chargerTypeIndex = chargerTypeIndex,
+                        wifiSsid = wifiSsid,
+                        bluetoothAddress = bluetoothAddress,
+                        airplaneEnabled = airplaneEnabled,
+                        geofenceLatitude = geofenceLatitude,
+                        geofenceLongitude = geofenceLongitude,
+                        geofenceRadiusMeters = geofenceRadiusMeters,
+                        geofenceTransitionType = geofenceTransitionType,
+                        geofenceName = geofenceName,
+                        geofenceDwellDelay = geofenceDwellDelay,
+                        alarmStoppedType = alarmStoppedType,
+                        appTriggerPatterns = appTriggerPatterns,
+                        appTriggerOnOpen = appTriggerOnOpen,
+                        appTriggerOnClose = appTriggerOnClose,
+                        smsSenderPattern = smsSenderPattern,
+                        smsBodyPattern = smsBodyPattern,
+                        notifAppPatterns = notifAppPatterns,
+                        notifSenderPattern = notifSenderPattern,
+                        notifBodyPattern = notifBodyPattern,
+                        notifTriggerOnDismiss = notifTriggerOnDismiss,
+                        emailSenderPattern = emailSenderPattern,
+                        emailSubjectPattern = emailSubjectPattern,
+                        emailAppPackage = emailAppPackage,
+                        sleepStartHour = sleepStartHour,
+                        sleepStartMinute = sleepStartMinute,
+                        sleepEndHour = sleepEndHour,
+                        sleepEndMinute = sleepEndMinute,
+                        sleepRequireChargerDisconnected = sleepRequireChargerDisconnected,
+                        sleepRequireDndActive = sleepRequireDndActive,
+                        nfcTagId = nfcTagId,
+                        shareSheetState = shareSheetState,
+                        soundEventClasses = soundEventClasses
+                    )
+                    val workflow = PlannedWorkflow(
+                        name = name.ifBlank { "Untitled" },
+                        summary = summary,
+                        trigger = trigger,
+                        actions = steps
+                    )
+                    onSave(workflow)
+                },
+                modifier = Modifier.height(36.dp)
+            )
+        }
+
         Text(
             text = if (initialWorkflow != null) "Edit Workflow" else "New Workflow",
-            style = MaterialTheme.typography.headlineSmall
+            style = MaterialTheme.typography.headlineSmall,
+            color = TextPrimary
         )
 
         // ── Name ──────────────────────────────────────────────────────────
@@ -318,7 +519,16 @@ fun ManualWorkflowEditorScreen(
             onValueChange = { name = it },
             label = { Text("Workflow name") },
             modifier = Modifier.fillMaxWidth(),
-            singleLine = true
+            singleLine = true,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = CyanAccent,
+                unfocusedBorderColor = GlassBorder,
+                focusedLabelColor = CyanAccent,
+                unfocusedLabelColor = TextSecondary,
+                cursorColor = CyanAccent,
+                focusedTextColor = TextPrimary,
+                unfocusedTextColor = TextPrimary
+            )
         )
 
         // ── Summary ──────────────────────────────────────────────────────
@@ -327,36 +537,210 @@ fun ManualWorkflowEditorScreen(
             onValueChange = { summary = it },
             label = { Text("Summary (optional)") },
             modifier = Modifier.fillMaxWidth(),
-            minLines = 2
+            minLines = 2,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = CyanAccent,
+                unfocusedBorderColor = GlassBorder,
+                focusedLabelColor = CyanAccent,
+                unfocusedLabelColor = TextSecondary,
+                cursorColor = CyanAccent,
+                focusedTextColor = TextPrimary,
+                unfocusedTextColor = TextPrimary
+            )
         )
 
         HorizontalDivider()
 
-        // ── Trigger type selector ───────────────────────────────────────────
+        // ── Trigger type selector — accordion with categories ─────────────────────────
         Text("Trigger", style = MaterialTheme.typography.titleMedium)
 
-        Column(modifier = Modifier.selectableGroup()) {
-            TRIGGER_TYPES.forEachIndexed { index, (label, _) ->
+        // Search field for triggers
+        var triggerSearchQuery by remember { mutableStateOf("") }
+        val filteredCategories = remember(triggerSearchQuery) {
+            if (triggerSearchQuery.isBlank()) {
+                TRIGGER_CATEGORIES
+            } else {
+                TRIGGER_CATEGORIES.mapValues { (cat, items) ->
+                    items.filter { item ->
+                        item.label.contains(triggerSearchQuery, ignoreCase = true) ||
+                            cat.label.contains(triggerSearchQuery, ignoreCase = true)
+                    }
+                }.filter { (_, items) -> items.isNotEmpty() }
+            }
+        }
+
+        OutlinedTextField(
+            value = triggerSearchQuery,
+            onValueChange = { triggerSearchQuery = it },
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text("Search triggers...", color = TextSecondary) },
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = TextSecondary) },
+            trailingIcon = {
+                if (triggerSearchQuery.isNotEmpty()) {
+                    IconButton(onClick = { triggerSearchQuery = "" }) {
+                        Icon(Icons.Default.Clear, contentDescription = "Clear", tint = TextSecondary)
+                    }
+                }
+            },
+            singleLine = true,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = CyanAccent,
+                unfocusedBorderColor = GlassBorder,
+                focusedLabelColor = CyanAccent,
+                unfocusedLabelColor = TextSecondary,
+                cursorColor = CyanAccent,
+                focusedTextColor = TextPrimary,
+                unfocusedTextColor = TextPrimary
+            )
+        )
+
+        // Find which category + item index the current selection belongs to
+        var selectedCategory by remember { mutableStateOf(TriggerCategory.MANUAL) }
+        var selectedItemIndex by remember { mutableIntStateOf(0) }
+
+        // Sync selection to categories on first load
+        LaunchedEffect(selectedTriggerIndex) {
+            if (selectedTriggerIndex in ALL_TRIGGERS.indices) {
+                val item = ALL_TRIGGERS[selectedTriggerIndex]
+                selectedCategory = item.category
+                selectedItemIndex = ALL_TRIGGERS.indexOf(item)
+            }
+        }
+
+        Column {
+            filteredCategories.forEach { (category, items) ->
+                val isExpanded = selectedCategory == category
+                val hasSelectedItem = items.any { item -> ALL_TRIGGERS.indexOf(item) == selectedTriggerIndex }
+
+                // Category header
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(40.dp)
-                        .selectable(
-                            selected = selectedTriggerIndex == index,
-                            onClick = { selectedTriggerIndex = index },
-                            role = Role.RadioButton
-                        ),
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(
+                            if (isExpanded) category.color.copy(alpha = 0.12f)
+                            else if (hasSelectedItem) category.color.copy(alpha = 0.07f)
+                            else GlassSurface
+                        )
+                        .clickable {
+                            selectedCategory = if (isExpanded) selectedCategory else category
+                        }
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    RadioButton(selected = selectedTriggerIndex == index, onClick = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(label, style = MaterialTheme.typography.bodyMedium)
+                    Icon(
+                        imageVector = category.icon,
+                        contentDescription = null,
+                        tint = if (isExpanded || hasSelectedItem) category.color else TextSecondary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = category.label,
+                        style = MaterialTheme.typography.labelLarge.copy(
+                            color = if (isExpanded || hasSelectedItem) category.color else TextSecondary,
+                            fontWeight = if (isExpanded) FontWeight(600) else FontWeight(400)
+                        )
+                    )
+                    Spacer(modifier = Modifier.weight(1f))
+                    if (hasSelectedItem && !isExpanded) {
+                        val selectedLabel = ALL_TRIGGERS.getOrNull(selectedTriggerIndex)?.label ?: ""
+                        Text(
+                            text = selectedLabel,
+                            style = MaterialTheme.typography.labelSmall.copy(color = TextSecondary)
+                        )
+                    }
+                    Icon(
+                        imageVector = Icons.Default.ExpandMore,
+                        contentDescription = if (isExpanded) "Collapse" else "Expand",
+                        tint = TextSecondary,
+                        modifier = Modifier
+                            .size(18.dp)
+                            .then(
+                                if (isExpanded) Modifier else Modifier
+                            )
+                    )
                 }
+
+                // Items in this category — animated expand/collapse
+                AnimatedVisibility(
+                    visible = isExpanded,
+                    enter = expandVertically(animationSpec = androidx.compose.animation.core.spring()),
+                    exit = shrinkVertically(animationSpec = androidx.compose.animation.core.spring())
+                ) {
+                    Column(modifier = Modifier.padding(start = 16.dp, top = 4.dp, bottom = 8.dp)) {
+                        items.forEach { item ->
+                            val flatIndex = ALL_TRIGGERS.indexOf(item)
+                            val isSelected = selectedTriggerIndex == flatIndex
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(
+                                        if (isSelected) item.category.color.copy(alpha = 0.15f)
+                                        else Color.Transparent
+                                    )
+                                    .clickable {
+                                        selectedTriggerIndex = flatIndex
+                                        selectedCategory = item.category
+                                    }
+                                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = isSelected,
+                                    onClick = {
+                                        selectedTriggerIndex = flatIndex
+                                        selectedCategory = item.category
+                                    },
+                                    colors = RadioButtonDefaults.colors(
+                                        selectedColor = item.category.color,
+                                        unselectedColor = TextSecondary
+                                    )
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Icon(
+                                    imageVector = item.icon,
+                                    contentDescription = null,
+                                    tint = if (isSelected) item.category.color else TextSecondary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = item.label,
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        color = if (isSelected) TextPrimary else TextSecondary
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
             }
         }
 
         // Trigger-specific config
-        when (currentTriggerType.second) {
+        val currentTriggerConfig = ALL_TRIGGERS.getOrNull(selectedTriggerIndex)?.config
+            ?: TriggerConfig.Manual
+
+        when (currentTriggerConfig) {
+            is TriggerConfig.Manual -> {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            "This workflow runs manually from the widget or list.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = TextSecondary
+                        )
+                    }
+                }
+            }
             is TriggerConfig.Time -> {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(
@@ -562,7 +946,7 @@ fun ManualWorkflowEditorScreen(
                         Text(
                             "Fires when a GemmaWorkflow alarm is dismissed or cancelled by the user.",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.outline
+                            color = TextSecondary
                         )
                         OutlinedTextField(
                             value = alarmStoppedType,
@@ -579,18 +963,12 @@ fun ManualWorkflowEditorScreen(
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text(
-                            if (currentTriggerType.second is TriggerConfig.AppOpened) "App Opened" else "App Closed",
+                            if (currentTriggerConfig is TriggerConfig.AppOpened) "App Opened" else "App Closed",
                             style = MaterialTheme.typography.bodyMedium
                         )
-                        OutlinedTextField(
-                            value = appTriggerPatterns.joinToString(", "),
-                            onValueChange = {
-                                appTriggerPatterns = it.split(",").map { s -> s.trim() }.filter { s -> s.isNotEmpty() }
-                            },
-                            label = { Text("App package patterns (comma-separated)") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            placeholder = { Text("e.g. com.instagram.android") }
+                        AppPatternEditor(
+                            patterns = appTriggerPatterns,
+                            onPatternsChange = { appTriggerPatterns = it }
                         )
                         Text("Trigger on:", style = MaterialTheme.typography.bodySmall)
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -615,7 +993,7 @@ fun ManualWorkflowEditorScreen(
                         Text(
                             "Fires when an SMS matching the patterns is received. Requires notification access.",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.outline
+                            color = TextSecondary
                         )
                         OutlinedTextField(
                             value = smsSenderPattern,
@@ -643,7 +1021,7 @@ fun ManualWorkflowEditorScreen(
                         Text(
                             "Fires on notifications from specific apps. Requires notification access.",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.outline
+color = TextSecondary,
                         )
                         OutlinedTextField(
                             value = notifAppPatterns.joinToString(", "),
@@ -690,7 +1068,7 @@ fun ManualWorkflowEditorScreen(
                         Text(
                             "Fires on email notifications. Requires notification access.",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.outline
+color = TextSecondary,
                         )
                         OutlinedTextField(
                             value = emailSenderPattern,
@@ -725,7 +1103,7 @@ fun ManualWorkflowEditorScreen(
                         Text(
                             "Fires when bedtime conditions are met (DND active, charger disconnected).",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.outline
+color = TextSecondary,
                         )
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             OutlinedTextField(
@@ -783,7 +1161,7 @@ fun ManualWorkflowEditorScreen(
                         Text(
                             "Fires when a specific NFC tag is scanned. Requires NFC enabled.",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.outline
+color = TextSecondary,
                         )
                         OutlinedTextField(
                             value = nfcTagId,
@@ -802,7 +1180,7 @@ fun ManualWorkflowEditorScreen(
                         Text(
                             "Fires when content is shared to GemmaWorkflow from any app.",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.outline
+color = TextSecondary,
                         )
                         val stateLabel = when (shareSheetState) {
                             SetupState.Ready -> "Ready"
@@ -813,13 +1191,153 @@ fun ManualWorkflowEditorScreen(
                     }
                 }
             }
-            else -> {}
+            is TriggerConfig.Voice -> {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Voice Intent", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            "Fires when the user speaks a trigger phrase and the Gemini model identifies a matching workflow.",
+                            style = MaterialTheme.typography.bodySmall,
+color = TextSecondary,
+                        )
+                        Text(
+                            "Use the mic button on the main screen to train and trigger voice workflows.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = CyanAccent
+                        )
+                    }
+                }
+            }
+            is TriggerConfig.SoundEvent -> {
+                var expanded by remember { mutableStateOf(false) }
+                var searchQuery by remember { mutableStateOf("") }
+                val allSounds = remember { YamnetClassifier.AUDIOSET_CLASSES.toList() }
+                val filtered = remember(searchQuery) {
+                    if (searchQuery.isBlank()) allSounds
+                    else allSounds.filter { it.contains(searchQuery, ignoreCase = true) }
+                }
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { expanded = !expanded }
+                ) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Sound Event", style = MaterialTheme.typography.bodyMedium)
+                                if (soundEventClasses.isEmpty()) {
+                                    Text(
+                                        "No sound classes configured",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Color(0xFFFFB74D)
+                                    )
+                                } else {
+                                    Text(
+                                        "${soundEventClasses.size} sound${if (soundEventClasses.size != 1) "s" else ""} configured",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = CyanAccent
+                                    )
+                                }
+                            }
+                            Icon(
+                                imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                contentDescription = if (expanded) "Collapse" else "Expand",
+                                tint = TextSecondary,
+                            )
+                        }
+
+                        if (expanded) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            OutlinedTextField(
+                                value = searchQuery,
+                                onValueChange = { searchQuery = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                placeholder = { Text("Search sounds…") },
+                                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                                trailingIcon = {
+                                    if (searchQuery.isNotEmpty()) {
+                                        IconButton(onClick = { searchQuery = "" }) {
+                                            Icon(Icons.Default.Clear, contentDescription = "Clear search")
+                                        }
+                                    }
+                                },
+                                singleLine = true
+                            )
+                            HorizontalDivider()
+                            LazyColumn(
+                                modifier = Modifier.height(200.dp)
+                            ) {
+                                items(filtered.take(50)) { sound ->
+                                    val checked = sound in soundEventClasses
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable {
+                                                soundEventClasses = if (checked) {
+                                                    soundEventClasses - sound
+                                                } else {
+                                                    soundEventClasses + sound
+                                                }
+                                            }
+                                            .padding(vertical = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Checkbox(
+                                            checked = checked,
+                                            onCheckedChange = { selected ->
+                                                soundEventClasses = if (selected) {
+                                                    soundEventClasses + sound
+                                                } else {
+                                                    soundEventClasses - sound
+                                                }
+                                            }
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = sound,
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                    }
+                                }
+                                if (filtered.size > 50) {
+                                    item {
+                                        Text(
+                                            "Showing first 50 results",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = TextSecondary,
+                                            modifier = Modifier.padding(vertical = 8.dp)
+                                        )
+                                    }
+                                }
+                            }
+                            if (soundEventClasses.isNotEmpty()) {
+                                TextButton(
+                                    onClick = { soundEventClasses = emptyList() },
+                                    modifier = Modifier.align(Alignment.End)
+                                ) {
+                                    Text("Clear all")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         HorizontalDivider()
 
         // ── Actions ───────────────────────────────────────────────────────
         Text("Actions", style = MaterialTheme.typography.titleMedium)
+
+        Text(
+            text = "${steps.size} step${if (steps.size != 1) "s" else ""}",
+            style = MaterialTheme.typography.labelMedium,
+            color = TextSecondary
+        )
 
         steps.forEachIndexed { index, step ->
             val spec = ActionSpecRegistry.find(step.id)
@@ -866,7 +1384,7 @@ fun ManualWorkflowEditorScreen(
             Button(
                 onClick = {
                     val trigger = buildTrigger(
-                        triggerType = currentTriggerType,
+                        triggerType = "Trigger" to currentTriggerConfig,
                         timeHour = timePickerState.hour,
                         timeMinute = timePickerState.minute,
                         repeatMode = repeatMode,
@@ -903,7 +1421,8 @@ fun ManualWorkflowEditorScreen(
                         sleepRequireChargerDisconnected = sleepRequireChargerDisconnected,
                         sleepRequireDndActive = sleepRequireDndActive,
                         nfcTagId = nfcTagId,
-                        shareSheetState = shareSheetState
+                        shareSheetState = shareSheetState,
+                        soundEventClasses = soundEventClasses
                     )
                     onSave(
                         PlannedWorkflow(
@@ -946,7 +1465,7 @@ private fun ActionStepCard(
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -971,16 +1490,16 @@ private fun ActionStepCard(
                             step.params.toString(),
                             style = MaterialTheme.typography.bodySmall,
                             fontFamily = FontFamily.Monospace,
-                            color = MaterialTheme.colorScheme.outline
+color = TextSecondary,
                         )
                     }
                 }
             }
             IconButton(onClick = onEdit) {
-                Icon(Icons.Default.Edit, contentDescription = "Edit")
+                Icon(Icons.Default.Edit, contentDescription = "Edit", tint = TextSecondary)
             }
             IconButton(onClick = onDelete) {
-                Icon(Icons.Default.Delete, contentDescription = "Delete")
+                Icon(Icons.Default.Delete, contentDescription = "Delete", tint = TextSecondary)
             }
         }
     }
@@ -1054,29 +1573,98 @@ private fun ActionEditDialog(
 
                 // Params
                 val spec = ActionSpecRegistry.find(selectedActionId)
+                val context = LocalContext.current
                 if (spec != null) {
                     spec.params.forEach { param ->
                         val paramName = param.name
                         val paramErrors = validationErrors.filter { it.paramName == paramName }
-                        OutlinedTextField(
-                            value = params[paramName] ?: "",
-                            onValueChange = { params[paramName] = it },
-                            label = {
-                                Text(
-                                    paramName + if (!param.required) " (optional)" else ""
-                                )
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            isError = paramErrors.isNotEmpty(),
-                            supportingText = {
-                                if (paramErrors.isNotEmpty()) {
-                                    Text(paramErrors.joinToString { it.message }, color = MaterialTheme.colorScheme.error)
-                                } else if (param.description.isNotBlank()) {
-                                    Text(param.description, style = MaterialTheme.typography.labelSmall)
+
+                        when (param.type) {
+                            ParamType.AppPicker -> {
+                                var appExpanded by remember { mutableStateOf(false) }
+                                var searchQuery by remember { mutableStateOf(params[paramName] ?: "") }
+                                val providerId = spec.installedAppListProviderId ?: "installed_apps"
+                                val allApps = remember { ActionSpecRegistry.getInstalledAppList(providerId, context) }
+                                val filteredApps = remember(searchQuery) {
+                                    if (searchQuery.isBlank()) allApps
+                                    else allApps.filter { (label, pkg) ->
+                                        label.contains(searchQuery, ignoreCase = true) ||
+                                                pkg.contains(searchQuery, ignoreCase = true)
+                                    }
+                                }
+                                val selectedLabel = allApps.find { it.second == params[paramName] }?.first
+                                    ?: params[paramName] ?: "Select an app"
+
+                                ExposedDropdownMenuBox(expanded = appExpanded, onExpandedChange = { appExpanded = it }) {
+                                    OutlinedTextField(
+                                        value = selectedLabel,
+                                        onValueChange = { searchQuery = it },
+                                        label = { Text(paramName) },
+                                        placeholder = { Text("Search installed apps...") },
+                                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = appExpanded) },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .menuAnchor(),
+                                        singleLine = true,
+                                        isError = paramErrors.isNotEmpty(),
+                                        supportingText = {
+                                            if (paramErrors.isNotEmpty()) {
+                                                Text(paramErrors.joinToString { it.message }, color = MaterialTheme.colorScheme.error)
+                                            } else {
+                                                Text("Type to filter — tap a result to select", style = MaterialTheme.typography.labelSmall)
+                                            }
+                                        }
+                                    )
+                                    val appsToShow = filteredApps.take(50)
+                                    if (appsToShow.isNotEmpty()) {
+                                        ExposedDropdownMenu(
+                                            expanded = appExpanded,
+                                            onDismissRequest = { appExpanded = false }
+                                        ) {
+                                            appsToShow.forEach { (label, pkg) ->
+                                                DropdownMenuItem(
+                                                    text = {
+                                                        Column {
+                                                            Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                                            Text(pkg, style = MaterialTheme.typography.labelSmall, color = TextSecondary, maxLines = 1)
+                                                        }
+                                                    },
+                                                    onClick = {
+                                                        params = params.toMutableMap().apply { put(paramName, pkg) }
+                                                        searchQuery = label
+                                                        appExpanded = false
+                                                    }
+                                                )
+                                            }
+                                        }
+                                    }
                                 }
                             }
-                        )
+
+                            else -> {
+                                OutlinedTextField(
+                                    value = params[paramName] ?: "",
+                                    onValueChange = { newValue ->
+                                        params = params.toMutableMap().apply { put(paramName, newValue) }
+                                    },
+                                    label = {
+                                        Text(
+                                            paramName + if (!param.required) " (optional)" else ""
+                                        )
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true,
+                                    isError = paramErrors.isNotEmpty(),
+                                    supportingText = {
+                                        if (paramErrors.isNotEmpty()) {
+                                            Text(paramErrors.joinToString { it.message }, color = MaterialTheme.colorScheme.error)
+                                        } else if (param.description.isNotBlank()) {
+                                            Text(param.description, style = MaterialTheme.typography.labelSmall)
+                                        }
+                                    }
+                                )
+                            }
+                        }
                     }
                 }
                 // Show ID-level errors (unknown action)
@@ -1130,6 +1718,8 @@ private fun triggerConfigMatches(a: TriggerConfig, b: TriggerConfig): Boolean {
         a is TriggerConfig.NotificationListenerConfig && b is TriggerConfig.NotificationListenerConfig -> true
         a is TriggerConfig.EmailReceived && b is TriggerConfig.EmailReceived -> true
         a is TriggerConfig.SleepProxy && b is TriggerConfig.SleepProxy -> true
+        a is TriggerConfig.Voice && b is TriggerConfig.Voice -> true
+        a is TriggerConfig.SoundEvent && b is TriggerConfig.SoundEvent -> true
         else -> false
     }
 }
@@ -1224,7 +1814,8 @@ private fun buildTrigger(
     sleepRequireChargerDisconnected: Boolean,
     sleepRequireDndActive: Boolean,
     nfcTagId: String,
-    shareSheetState: SetupState
+    shareSheetState: SetupState,
+    soundEventClasses: List<String>
 ): TriggerConfig {
     return when (triggerType.second) {
         is TriggerConfig.Manual -> TriggerConfig.Manual
@@ -1287,6 +1878,136 @@ private fun buildTrigger(
         )
         is TriggerConfig.Nfc -> TriggerConfig.Nfc(nfcTagId.ifBlank { null })
         is TriggerConfig.ShareSheet -> TriggerConfig.ShareSheet(shareSheetState)
+        is TriggerConfig.Voice -> TriggerConfig.Voice
+        is TriggerConfig.SoundEvent -> TriggerConfig.SoundEvent(soundEventClasses)
         else -> TriggerConfig.Manual
     }
+}
+
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class, androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun AppPatternEditor(
+    patterns: List<String>,
+    onPatternsChange: (List<String>) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    val context = LocalContext.current
+    val allApps = remember { ActionSpecRegistry.getInstalledAppList("installed_apps", context) }
+    val filteredApps = remember(searchQuery) {
+        if (searchQuery.isBlank()) allApps.take(50)
+        else allApps.filter { (label, pkg) ->
+            label.contains(searchQuery, ignoreCase = true) || pkg.contains(searchQuery, ignoreCase = true)
+        }.take(50)
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        // Show selected patterns as chips
+        if (patterns.isNotEmpty()) {
+            androidx.compose.foundation.layout.FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                patterns.forEach { pattern ->
+                    InputChip(
+                        label = { Text(pattern, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        selected = false,
+                        onClick = { onPatternsChange(patterns - pattern) },
+                        trailingIcon = {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = "Remove",
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    )
+                }
+            }
+        }
+
+        // Search + add from installed apps
+        ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                label = { Text("Add app pattern") },
+                placeholder = { Text("Search installed apps...") },
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .menuAnchor(),
+                singleLine = true
+            )
+            if (filteredApps.isNotEmpty()) {
+                ExposedDropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false }
+                ) {
+                    filteredApps.forEach { (label, pkg) ->
+                        DropdownMenuItem(
+                            text = {
+                                Column {
+                                    Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(pkg, style = MaterialTheme.typography.labelSmall, color = TextSecondary, maxLines = 1)
+                                }
+                            },
+                            onClick = {
+                                if (!patterns.contains(pkg)) {
+                                    onPatternsChange(patterns + pkg)
+                                }
+                                searchQuery = ""
+                                expanded = false
+                            }
+                        )
+                    }
+                }
+            }
+        }
+
+        // Manual text input for additional patterns
+        var manualInput by remember { mutableStateOf("") }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            OutlinedTextField(
+                value = manualInput,
+                onValueChange = { manualInput = it },
+                label = { Text("Or enter package pattern") },
+                placeholder = { Text("e.g. com.instagram") },
+                modifier = Modifier.weight(1f),
+                singleLine = true
+            )
+            IconButton(
+                onClick = {
+                    val trimmed = manualInput.trim()
+                    if (trimmed.isNotEmpty() && !patterns.contains(trimmed)) {
+                        onPatternsChange(patterns + trimmed)
+                    }
+                    manualInput = ""
+                },
+                enabled = manualInput.isNotBlank()
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "Add pattern")
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun InputChip(
+    label: @Composable () -> Unit,
+    selected: Boolean,
+    onClick: () -> Unit,
+    trailingIcon: @Composable (() -> Unit)? = null
+) {
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = label,
+        trailingIcon = trailingIcon
+    )
 }

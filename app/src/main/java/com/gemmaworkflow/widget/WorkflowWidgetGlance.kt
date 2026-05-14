@@ -32,6 +32,13 @@ import com.gemmaworkflow.domain.catalog.ActionSpecRegistry
 import com.gemmaworkflow.domain.model.TriggerConfig
 import com.gemmaworkflow.platform.nfc.DeepLinkRouter
 import com.gemmaworkflow.ui.MainActivity
+import com.gemmaworkflow.ui.theme.AmberWarning
+import com.gemmaworkflow.ui.theme.BackgroundDark
+import com.gemmaworkflow.ui.theme.CyanAccent
+import com.gemmaworkflow.ui.theme.GreenSuccess
+import com.gemmaworkflow.ui.theme.TextPrimary
+import com.gemmaworkflow.ui.theme.TextSecondary
+import com.gemmaworkflow.ui.theme.VioletAccent
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -103,6 +110,8 @@ private fun buildSnapshot(context: Context, workflowName: String): WidgetSnapsho
         is TriggerConfig.EmailReceived -> context.getString(R.string.widget_trigger_notification)
         is TriggerConfig.SleepProxy -> context.getString(R.string.widget_trigger_sleep)
         is TriggerConfig.Geofence -> context.getString(R.string.widget_trigger_geofence)
+        is TriggerConfig.Voice -> context.getString(R.string.widget_trigger_voice)
+        is TriggerConfig.SoundEvent -> context.getString(R.string.widget_trigger_sound_event)
         is TriggerConfig.Battery,
         is TriggerConfig.Charger,
         is TriggerConfig.WiFi,
@@ -149,7 +158,7 @@ private fun UnconfiguredContent() {
     Column(
         modifier = GlanceModifier
             .fillMaxSize()
-            .background(ColorProvider(Color(0xFFF2F2F7)))
+            .background(ColorProvider(BackgroundDark))
             .padding(12.dp)
     ) {
         Text(
@@ -157,12 +166,12 @@ private fun UnconfiguredContent() {
             style = TextStyle(
                 fontWeight = FontWeight.Bold,
                 fontSize = 14.sp,
-                color = ColorProvider(Color(0xFF000000))
+                color = ColorProvider(TextPrimary)
             )
         )
         Text(
             text = context.getString(R.string.widget_unconfigured_instruction),
-            style = TextStyle(fontSize = 11.sp, color = ColorProvider(Color.Gray)),
+            style = TextStyle(fontSize = 11.sp, color = ColorProvider(TextSecondary)),
             modifier = GlanceModifier.padding(top = 4.dp)
         )
     }
@@ -182,7 +191,7 @@ private fun DashboardContent(s: WidgetSnapshot) {
     Column(
         modifier = GlanceModifier
             .fillMaxSize()
-            .background(ColorProvider(Color(0xFFF2F2F7)))
+            .background(ColorProvider(BackgroundDark))
             .padding(10.dp)
             .clickable(tapAction)
     ) {
@@ -193,7 +202,7 @@ private fun DashboardContent(s: WidgetSnapshot) {
             style = TextStyle(
                 fontWeight = FontWeight.Bold,
                 fontSize = 14.sp,
-                color = ColorProvider(Color(0xFF000000))
+                color = ColorProvider(TextPrimary)
             ),
             maxLines = 1
         )
@@ -207,16 +216,16 @@ private fun DashboardContent(s: WidgetSnapshot) {
         } else ""
         Text(
             text = s.triggerDisplay + createdStr,
-            style = TextStyle(fontSize = 10.sp, color = ColorProvider(Color(0xFF007AFF))),
+            style = TextStyle(fontSize = 10.sp, color = ColorProvider(CyanAccent)),
             modifier = GlanceModifier.padding(top = 1.dp),
             maxLines = 1
         )
 
         // ── Stats bar ─────────────────────────────────────────────────────────
         val successColor = when {
-            s.totalRuns == 0 -> Color.Gray
-            s.successRate >= 80 -> Color(0xFF34C759)
-            else -> Color(0xFFFF3B30)
+            s.totalRuns == 0 -> TextSecondary
+            s.successRate >= 80 -> GreenSuccess
+            else -> AmberWarning
         }
         val statsText = buildString {
             append(context.getString(R.string.widget_stats_runs, s.totalRuns))
@@ -240,7 +249,7 @@ private fun DashboardContent(s: WidgetSnapshot) {
         if (s.actionLabels.isNotEmpty()) {
             Text(
                 text = s.actionLabels.joinToString("  ·  "),
-                style = TextStyle(fontSize = 10.sp, color = ColorProvider(Color(0xFF636366))),
+                style = TextStyle(fontSize = 10.sp, color = ColorProvider(TextSecondary)),
                 modifier = GlanceModifier.padding(top = 3.dp),
                 maxLines = 1
             )
@@ -256,7 +265,7 @@ private fun DashboardContent(s: WidgetSnapshot) {
                 style = TextStyle(
                     fontWeight = FontWeight.Bold,
                     fontSize = 10.sp,
-                    color = ColorProvider(Color(0xFF000000))
+                    color = ColorProvider(TextPrimary)
                 ),
                 modifier = GlanceModifier.padding(top = 6.dp)
             )
@@ -269,14 +278,12 @@ private fun DashboardContent(s: WidgetSnapshot) {
                         text = if (success) "✓ " else "✗ ",
                         style = TextStyle(
                             fontSize = 10.sp,
-                            color = ColorProvider(
-                                if (success) Color(0xFF34C759) else Color(0xFFFF3B30)
-                            )
+                            color = ColorProvider(if (success) GreenSuccess else AmberWarning)
                         )
                     )
                     Text(
                         text = label,
-                        style = TextStyle(fontSize = 10.sp, color = ColorProvider(Color(0xFF636366))),
+                        style = TextStyle(fontSize = 10.sp, color = ColorProvider(TextSecondary)),
                         maxLines = 1
                     )
                 }
@@ -284,7 +291,7 @@ private fun DashboardContent(s: WidgetSnapshot) {
         } else {
             Text(
                 text = context.getString(R.string.widget_empty),
-                style = TextStyle(fontSize = 11.sp, color = ColorProvider(Color.Gray)),
+                style = TextStyle(fontSize = 11.sp, color = ColorProvider(TextSecondary)),
                 modifier = GlanceModifier.padding(top = 6.dp)
             )
         }
@@ -297,14 +304,14 @@ private fun DashboardContent(s: WidgetSnapshot) {
             ) {
                 Text(
                     text = context.getString(R.string.widget_history_label),
-                    style = TextStyle(fontSize = 10.sp, color = ColorProvider(Color.Gray))
+                    style = TextStyle(fontSize = 10.sp, color = ColorProvider(TextSecondary))
                 )
                 s.recentHistory.forEach { ok ->
                     Text(
                         text = "● ",
                         style = TextStyle(
                             fontSize = 12.sp,
-                            color = ColorProvider(if (ok) Color(0xFF34C759) else Color(0xFFFF3B30))
+                            color = ColorProvider(if (ok) GreenSuccess else AmberWarning)
                         )
                     )
                 }

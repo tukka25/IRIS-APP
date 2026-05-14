@@ -119,6 +119,7 @@ object WorkflowValidator {
                     "$prefix: param '${param.name}' must be one of ${param.enumValues.joinToString()}"
                 }
             }
+            ParamType.AppPicker -> if (primitive?.contentOrNull != null) null else "$prefix: param '${param.name}' must be a string"
         }
     }
 
@@ -152,5 +153,7 @@ object WorkflowValidator {
         is TriggerConfig.EmailReceived -> "email_received"
         is TriggerConfig.SleepProxy -> "sleep_proxy"
         is TriggerConfig.Geofence -> "geofence"
+        is TriggerConfig.Voice -> "voice"
+        is TriggerConfig.SoundEvent -> "sound_event"
     }
 }

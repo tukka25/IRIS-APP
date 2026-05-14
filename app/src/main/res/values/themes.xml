@@ -1,7 +1,15 @@
 <resources>
-    <style name="Theme.GemmaWorkflow" parent="android:style/Theme.Material.Light.NoActionBar">
+    <!-- Base application theme — dark, edge-to-edge, no action bar -->
+    <style name="Theme.GemmaWorkflow" parent="android:style/Theme.Material.NoActionBar">
         <item name="android:windowActionBar">false</item>
         <item name="android:windowNoTitle">true</item>
+        <!-- Edge-to-edge: let content draw behind system bars -->
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <!-- Dark system bars so content shows through -->
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <!-- Splash/launch window background matches app background -->
+        <item name="android:windowBackground">@color/splash_background</item>
     </style>
 </resources>
 

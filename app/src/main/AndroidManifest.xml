@@ -26,6 +26,12 @@
     <!-- Required for reading/writing calendar events silently. -->
     <uses-permission android:name="android.permission.READ_CALENDAR" />
     <uses-permission android:name="android.permission.WRITE_CALENDAR" />
+    <!-- Voice intent trigger + sound event trigger (YAMNet). -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Foreground service for sound event detection (Android 10+). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- Foreground microphone service (Android 14+). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
 
     <!-- NFC: read and write NFC tags to trigger workflows. -->
     <uses-permission android:name="android.permission.NFC" />
@@ -38,12 +44,20 @@
 
     <!-- WiFi: required for WiFi state change detection. -->
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- WiFi SSID requires location permission on Android 10+. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <!-- Geofence background location: required for Arrive/Leave triggers on Android 10+. -->
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+
+    <!-- Action executors: volume, display, app launch, system settings -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.WRITE_SETTINGS" />
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" />
+    <uses-permission android:name="android.permission.WRITE_SYNC_SETTINGS" />
 
     <!-- Package visibility for the declarative ActionSpec registry. -->
     <queries>
@@ -235,6 +249,12 @@
                 android:name="android.accessibilityservice"
                 android:resource="@xml/accessibility_service_config" />
         </service>
+
+        <!-- Sound event trigger: foreground service using YAMNet for continuous audio classification. -->
+        <service
+            android:name=".platform.trigger.sound.SoundEventTriggerService"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
 
         <!-- Receives time trigger confirm/run intents from the notification action buttons. -->
         <activity

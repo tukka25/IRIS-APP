@@ -11,6 +11,7 @@ data class PlannedWorkflow(
     val summary: String = "",
     val trigger: TriggerConfig = TriggerConfig.Manual,
     val actions: List<WorkflowStep> = emptyList(),
+    val scene: String? = null,
     val missingSetup: List<String> = emptyList(),
     val rawModelOutput: String = ""
 )
@@ -153,6 +154,27 @@ sealed class TriggerConfig {
         val transitionType: GeofenceTransition = GeofenceTransition.ENTER_EXIT,
         val dwellDelaySeconds: Int = 0,
         val name: String? = null
+    ) : TriggerConfig()
+
+    /**
+     * Voice intent trigger — activated by the user pressing the mic FAB.
+     * The transcript is fed to the LLM to generate a workflow.
+     * No configuration needed; the user's spoken words ARE the trigger.
+     */
+    @Serializable
+    data object Voice : TriggerConfig()
+
+    /**
+     * Sound event trigger — activated when YAMNet classifies an audio segment
+     * as one of the configured [soundClasses]. Runs the associated workflow
+     * reactively without LLM involvement.
+     *
+     * @param soundClasses List of YAMNet AudioSet class names that trigger
+     *                     this workflow (e.g. ["Dog bark", "Glass breaking"]).
+     */
+    @Serializable
+    data class SoundEvent(
+        val soundClasses: List<String> = emptyList()
     ) : TriggerConfig()
 }
 

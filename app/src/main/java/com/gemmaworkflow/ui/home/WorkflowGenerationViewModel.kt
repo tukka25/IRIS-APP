@@ -29,6 +29,7 @@ import com.gemmaworkflow.platform.trigger.ChargerTriggerManager
 import com.gemmaworkflow.platform.trigger.DndTriggerManager
 import com.gemmaworkflow.platform.trigger.WiFiTriggerManager
 import com.gemmaworkflow.platform.trigger.AirplaneModeTriggerManager
+import com.gemmaworkflow.platform.trigger.sound.SoundEventTriggerRegistry
 import com.gemmaworkflow.platform.location.GeofenceManager
 import com.gemmaworkflow.platform.inference.InferenceManager
 import com.gemmaworkflow.platform.inference.InferenceState
@@ -311,6 +312,8 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
                 is com.gemmaworkflow.domain.model.TriggerConfig.NotificationListenerConfig -> null  // handled by SmsNotificationListener
                 is com.gemmaworkflow.domain.model.TriggerConfig.EmailReceived -> null  // handled by SmsNotificationListener
                 is com.gemmaworkflow.domain.model.TriggerConfig.SleepProxy -> null  // handled by SleepTriggerManager
+                is com.gemmaworkflow.domain.model.TriggerConfig.Voice -> null  // handled by VoiceTriggerHandler
+                is com.gemmaworkflow.domain.model.TriggerConfig.SoundEvent -> null  // handled by SoundEventTriggerService
             }
             if (triggerType != null) {
                 val result = TriggerRegistry.register(workflow.name, triggerType, workflow.trigger)
@@ -496,6 +499,11 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
                 selectedWorkflowName = workflow.name
             )
         }
+    }
+
+    /** Set the raw JSON for the currently selected workflow preview (used by voice trigger). */
+    fun setRawJson(rawJson: String) {
+        _uiState.update { it.copy(rawJson = rawJson) }
     }
 
     fun loadWorkflowDetail(workflowId: String) {
@@ -714,9 +722,67 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
         _uiState.update { it.copy(shareSheetSetupWorkflow = null) }
     }
 
+    /**
+     * Show the Sound Event trigger setup screen for a workflow.
+     */
+    fun showSoundEventTriggerSetup(workflow: PlannedWorkflow) {
+        _uiState.update {
+            it.copy(
+                soundEventTriggerSetupWorkflow = workflow,
+                selectedWorkflowDetail = null
+            )
+        }
+    }
+
+    /**
+     * Save the Sound Event trigger with selected sound classes.
+     */
+    fun saveSoundEventTrigger(workflowName: String, soundClasses: List<String>) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val repo = WorkflowRepository(getApplication())
+            val workflow = repo.get(workflowName) ?: return@launch
+
+            // Register each sound class → workflow mapping in the registry
+            val context = getApplication<Application>()
+            soundClasses.forEach { soundClass ->
+                SoundEventTriggerRegistry.register(context, soundClass, workflowName)
+            }
+
+            val updatedWorkflow = workflow.copy(
+                trigger = com.gemmaworkflow.domain.model.TriggerConfig.SoundEvent(soundClasses)
+            )
+            repo.save(updatedWorkflow)
+
+            val saved = repo.loadAll()
+            withContext(Dispatchers.Main) {
+                _uiState.update {
+                    it.copy(
+                        savedWorkflows = saved,
+                        soundEventTriggerSetupWorkflow = null,
+                        selectedWorkflowDetail = updatedWorkflow
+                    )
+                }
+            }
+            appendDebug("SoundEvent trigger", "Saved ${soundClasses.size} sound classes for '$workflowName'")
+        }
+    }
+
+    /**
+     * Dismiss the Sound Event trigger setup screen.
+     */
+    fun cancelSoundEventTriggerSetup() {
+        _uiState.update { it.copy(soundEventTriggerSetupWorkflow = null) }
+    }
+
     /** Open the manual workflow editor for creating a new workflow. */
     fun openNewWorkflowEditor() {
-        _uiState.update { it.copy(editingWorkflow = null, isNewWorkflow = true) }
+        val placeholder = com.gemmaworkflow.domain.model.PlannedWorkflow(
+            name = "",
+            summary = "",
+            trigger = com.gemmaworkflow.domain.model.TriggerConfig.Manual,
+            actions = emptyList()
+        )
+        _uiState.update { it.copy(editingWorkflow = placeholder, isNewWorkflow = true) }
     }
 
     /** Open the manual workflow editor for editing an existing workflow. */
@@ -783,8 +849,18 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
                 is TriggerConfig.NotificationListenerConfig -> { /* handled by SmsNotificationListener */ }
                 is TriggerConfig.EmailReceived -> { /* handled by SmsNotificationListener */ }
                 is TriggerConfig.SleepProxy -> { /* handled by SleepTriggerManager */ }
+                is TriggerConfig.Voice -> { /* handled by VoiceTriggerHandler */ }
+                is TriggerConfig.SoundEvent -> {
+                    // Register sound class → workflow mappings
+                    val appContext = getApplication<Application>()
+                    trigger.soundClasses.forEach { soundClass ->
+                        SoundEventTriggerRegistry.register(appContext, soundClass, toSave.name)
+                    }
+                    appendDebug("TriggerRegistry", "Re-registered sound event trigger: ${trigger.soundClasses.size} classes")
+                }
             }
 
+            appendDebug("WorkflowGenViewModel", "saveEditedWorkflow completed for '${toSave.name}'")
             val saved = workflowRepo.loadAll()
             withContext(Dispatchers.Main) {
                 _uiState.update {

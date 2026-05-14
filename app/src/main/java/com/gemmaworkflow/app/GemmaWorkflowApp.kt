@@ -35,10 +35,15 @@ class GemmaWorkflowApp : Application() {
 
     companion object {
         private const val TAG = "GemmaWorkflowApp"
+
+        /** Singleton instance — set in onCreate(), available for TriggerRegistry etc. */
+        lateinit var instance: GemmaWorkflowApp
+            private set
     }
 
     override fun onCreate() {
         super.onCreate()
+        instance = this
         // Ensure notification channel is created on startup
         TimeTriggerNotification.init(this)
         rescheduleTriggers()
