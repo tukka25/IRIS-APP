@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Create/use a medium-phone AVD, start it with lighter settings, build/install
-# the debug app, launch GemmaWorkflow, then stream Logcat.
+# the debug app, launch IrisApp, then stream Logcat.
 #
 # Usage:
 #   scripts/run_medium_emulator_app.sh
@@ -45,7 +45,7 @@ API_LEVEL="${API_LEVEL:-35}"
 DEVICE_ID="${DEVICE_ID:-medium_phone}"
 MEMORY_MB="${MEMORY_MB:-4096}"
 GPU_MODE="${GPU_MODE:-host}"
-APP_ID="${APP_ID:-com.gemmaworkflow}"
+APP_ID="${APP_ID:-com.irisapp}"
 DEFAULT_LOG_FILTER="WorkflowGeneration|WorkflowRunner|InferenceManager|ToolInitializer|ToolRegistry|ToolAwareGenerator|Tool call|Tool result|TOOL|get_contact|lookup_contact|Available tools|Installed app list sent to AI|Full capabilities sent to AI|AI output|IntentDiscovery"
 LOG_FILTER="${LOG_FILTER:-$DEFAULT_LOG_FILTER}"
 LOG_ALL="${LOG_ALL:-0}"
@@ -399,7 +399,7 @@ else
     echo "Set LOCAL_MODEL_PATH=/path/to/model.litertlm to push a different file." >&2
 fi
 
-echo "Launching GemmaWorkflow..."
+echo "Launching IrisApp..."
 "$ADB" -e shell am start -n "$APP_ID/.ui.MainActivity"
 
 echo ""

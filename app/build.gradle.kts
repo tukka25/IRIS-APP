@@ -3,14 +3,15 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
+    id("com.google.gms.google-services")
 }
 
 android {
-    namespace = "com.gemmaworkflow"
+    namespace = "com.irisapp"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.gemmaworkflow"
+        applicationId = "com.irisapp"
         minSdk = 26
         targetSdk = 35
         versionCode = 1
@@ -83,6 +84,9 @@ dependencies {
 
     // Serialization: JSON workflow contracts
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+
+    // Firebase Realtime Database: anonymous marketplace (no auth)
+    implementation("com.google.firebase:firebase-database-ktx:21.0.0")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.robolectric:robolectric:4.13")

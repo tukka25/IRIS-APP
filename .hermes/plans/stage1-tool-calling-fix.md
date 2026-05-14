@@ -95,7 +95,7 @@ Tool use:
 
 **Target structure (fixed):**
 ```
-You are a request analyzer for GemmaWorkflow.
+You are a request analyzer for IrisApp.
 You have access to tools. Use them to get accurate times and dates.
 
 --- AUDIT FIRST ---

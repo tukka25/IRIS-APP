@@ -18,7 +18,7 @@ Push to device:
 
 ```bash
 adb push local-models/gemma3-1b-it.litertlm \
-  /sdcard/Android/data/com.gemmaworkflow/files/models/
+  /sdcard/Android/data/com.irisapp/files/models/
 ```
 
 ## Setup

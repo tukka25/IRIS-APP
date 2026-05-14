@@ -133,13 +133,13 @@
     </queries>
 
     <application
-        android:name=".app.GemmaWorkflowApp"
+        android:name=".app.IrisApp"
         android:allowBackup="true"
         android:icon="@drawable/ic_launcher_foreground"
         android:label="@string/app_name"
         android:roundIcon="@drawable/ic_launcher_foreground"
         android:supportsRtl="true"
-        android:theme="@style/Theme.GemmaWorkflow">
+        android:theme="@style/Theme.Iris">
 
         <!-- Required for LiteRT-LM GPU acceleration -->
         <uses-native-library android:name="libOpenCL.so" android:required="false" />
@@ -153,13 +153,13 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- Deep-link: gemmaworkflow://workflow/{workflowId} — used by NFC tags -->
+            <!-- Deep-link: iris://workflow/{workflowId} — used by NFC tags -->
             <intent-filter android:autoVerify="false">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data
-                    android:scheme="gemmaworkflow"
+                    android:scheme="iris"
                     android:host="workflow" />
             </intent-filter>
 
@@ -167,7 +167,7 @@
             <intent-filter>
                 <action android:name="android.nfc.action.NDEF_DISCOVERED" />
                 <category android:name="android.intent.category.DEFAULT" />
-                <data android:scheme="gemmaworkflow" android:host="workflow" />
+                <data android:scheme="iris" android:host="workflow" />
             </intent-filter>
 
             <!-- Share sheet: receive text and images from other apps -->
@@ -189,7 +189,7 @@
         </activity>
 
         <receiver
-            android:name="com.gemmaworkflow.platform.tools.impl.ReminderReceiver"
+            android:name="com.irisapp.platform.tools.impl.ReminderReceiver"
             android:exported="false" />
 
         <!-- Receives the broadcast from AlarmManager when a silent alarm fires. -->
@@ -197,7 +197,7 @@
             android:name=".platform.alarm.AlarmReceiver"
             android:exported="false">
             <intent-filter>
-                <action android:name="com.gemmaworkflow.platform.alarm.ACTION_ALARM_FIRE" />
+                <action android:name="com.irisapp.platform.alarm.ACTION_ALARM_FIRE" />
             </intent-filter>
         </receiver>
 
@@ -206,7 +206,7 @@
             android:name=".platform.alarm.TimeTriggerReceiver"
             android:exported="false">
             <intent-filter>
-                <action android:name="com.gemmaworkflow.platform.alarm.ACTION_TIME_TRIGGER" />
+                <action android:name="com.irisapp.platform.alarm.ACTION_TIME_TRIGGER" />
             </intent-filter>
         </receiver>
 
@@ -263,14 +263,14 @@
             android:launchMode="singleTop"
             android:taskAffinity="">
             <intent-filter>
-                <action android:name="com.gemmaworkflow.ui.trigger.ACTION_TIME_TRIGGER_CONFIRM" />
+                <action android:name="com.irisapp.ui.trigger.ACTION_TIME_TRIGGER_CONFIRM" />
             </intent-filter>
             <intent-filter>
-                <action android:name="com.gemmaworkflow.ui.trigger.ACTION_TIME_TRIGGER_RUN" />
+                <action android:name="com.irisapp.ui.trigger.ACTION_TIME_TRIGGER_RUN" />
             </intent-filter>
             <!-- Also handle direct-run action from notification "Run Now" button. -->
             <intent-filter>
-                <action android:name="com.gemmaworkflow.platform.nfc.ACTION_RUN_WORKFLOW" />
+                <action android:name="com.irisapp.platform.nfc.ACTION_RUN_WORKFLOW" />
             </intent-filter>
         </activity>
 
@@ -288,7 +288,7 @@
             android:name=".platform.nfc.NfcTriggerHandler"
             android:exported="false">
             <intent-filter>
-                <action android:name="com.gemmaworkflow.platform.nfc.ACTION_NFC_SCANNED" />
+                <action android:name="com.irisapp.platform.nfc.ACTION_NFC_SCANNED" />
             </intent-filter>
         </receiver>
 
@@ -308,7 +308,7 @@
         <activity
             android:name=".widget.WorkflowWidgetConfigActivity"
             android:exported="true"
-            android:theme="@style/Theme.GemmaWorkflow">
+            android:theme="@style/Theme.Iris">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
             </intent-filter>

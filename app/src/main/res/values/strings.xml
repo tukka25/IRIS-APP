@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">GemmaWorkflow</string>
+    <string name="app_name">Iris</string>
     <string name="app_monitor_service_description">Monitors app launches and closures to trigger workflows</string>
 </resources>
 

@@ -1,4 +1,4 @@
-# GemmaWorkflow — Android On-Device AI Workflow Automation
+# IrisApp — Android On-Device AI Workflow Automation
 
 > **Platform:** Android (Kotlin + Jetpack Compose + LiteRT-LM)
 > **Goal:** On-device SLM turns natural language into executable cross-app workflows.
@@ -69,7 +69,7 @@ WorkflowRunner   NFC / Time / Share Sheet
 | **NFC** | NfcSetupScreen → write tag with `gemmaworkflow://workflow/{id}` | Scan tag → confirm → run |
 | **Share Sheet** | ShareSheetSetupScreen → enable for workflow | Share content → pick workflow → confirm → run |
 
-**Time trigger persistence:** `BootReceiver` reschedules all time triggers after device reboot. `GemmaWorkflowApp.onCreate()` reschedules on every cold start.
+**Time trigger persistence:** `BootReceiver` reschedules all time triggers after device reboot. `IrisAppApp.onCreate()` reschedules on every cold start.
 
 ---
 
@@ -78,7 +78,7 @@ WorkflowRunner   NFC / Time / Share Sheet
 ```
 app/src/main/java/com/gemmaworkflow/
 ├── app/
-│   └── GemmaWorkflowApp.kt                    # Cold-start: reschedule time triggers
+│   └── IrisAppApp.kt                    # Cold-start: reschedule time triggers
 ├── data/
 │   ├── local/storage/
 │   │   └── JsonFileStorage.kt                 # Generic JSON file CRUD
@@ -152,7 +152,7 @@ app/src/main/java/com/gemmaworkflow/
 ```bash
 # Push model to device (one-time)
 adb push local_models/gemma-4-E2B-it.litertlm \
-  /sdcard/Android/data/com.gemmaworkflow/files/models/
+  /sdcard/Android/data/com.irisapp/files/models/
 
 # Build
 ./gradlew installDebug

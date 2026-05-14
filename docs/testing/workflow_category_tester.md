@@ -1,4 +1,4 @@
-# GemmaWorkflow Category Tester
+# IrisApp Category Tester
 
 Use this as a manual test suite for the RETO planner. Each case is a realistic user query designed to exercise one logical action category from Phase 0.
 

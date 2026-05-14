@@ -47,7 +47,7 @@
 | `platform/location/GeofenceManager.kt` | Singleton with `GeofencingClient`, `registerAll()` / `registerWorkflow()` / `unregisterWorkflow()` | ✅ |
 | `platform/location/GeofenceBroadcastReceiver.kt` | Receives geofence transitions, fires via `TriggerRegistry.fire()` | ✅ |
 | `ui/home/WorkflowGenerationViewModel.kt` | `Geofence` branch in `when` — calls `GeofenceManager.registerWorkflow()` | ✅ |
-| `app/GemmaWorkflowApp.kt` | Calls `GeofenceManager.registerAll()` on startup | ✅ |
+| `app/IrisAppApp.kt` | Calls `GeofenceManager.registerAll()` on startup | ✅ |
 | `AndroidManifest.xml` | Added `ACCESS_BACKGROUND_LOCATION`, declared `GeofenceBroadcastReceiver` | ✅ |
 | `app/build.gradle.kts` | Added `play-services-location:21.3.0` + `osmdroid-android:6.1.18` | ✅ |
 | `ui/home/OsmMapPicker.kt` | New: in-page tap-to-set OpenStreetMap with circle overlay | ✅ |
@@ -163,7 +163,7 @@ Fix: use raw `Overlay.onSingleTapConfirmed` approach (done) and verify `Polygon`
 All P0 managers follow this pattern:
 
 ```
-registerAll(context)         ← called from GemmaWorkflowApp.onCreate
+registerAll(context)         ← called from IrisAppApp.onCreate
   → loads workflows from repo
   → calls registerWorkflow() for each
 
@@ -179,4 +179,4 @@ checkSetup(context): SetupState
   → returns Ready / NeedsSetup / NeedsPermission(permission)
 ```
 
-All managers live in `com.gemmaworkflow.platform.*` (trigger/, location/, alarm/, etc.)
+All managers live in `com.irisapp.platform.*` (trigger/, location/, alarm/, etc.)

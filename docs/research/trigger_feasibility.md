@@ -1,4 +1,4 @@
-# Trigger Feasibility Analysis for GemmaWorkflow
+# Trigger Feasibility Analysis for IrisApp
 
 > Inspired by Apple Shortcuts, Tasker, MacroDroid, and Android automation patterns.
 > Feasibility: ✅ = straightforward, ⚠️ = possible with caveats, 🔒 = restricted/not possible
@@ -16,7 +16,7 @@
 
 **Android API:** `AlarmManager.ACTION_NEXT_ALARM_CLOCK_CHANGED`, AOSP DeskClock custom broadcasts
 **Research:** The AOSP DeskClock app broadcasts `com.android.deskclock.ALARM_SNOOZE`, `ALARM_DISMISS`, `ALARM_ALERT`, and `ALARM_DONE` actions — but these are app-specific, NOT system-wide. The `AlarmClock.ACTION_DISMISS_ALARM` and `ACTION_SNOOZE_ALARM` constants are for *creating* dismiss/snooze intents (sending to a clock app), not *detecting* them. `ACTION_NEXT_ALARM_CLOCK_CHANGED` fires when the next alarm changes, but cannot distinguish snooze vs dismiss.
-**How:** For GemmaWorkflow-created alarms, use `AlarmManager.setAlarmClock()` and track lifecycle internally via `PendingIntent` flags. For system clock alarms, detect `ACTION_NEXT_ALARM_CLOCK_CHANGED` and poll `AlarmManager.getNextAlarmClock()` — but you can only detect that an alarm *changed*, not what action the user took.
+**How:** For IrisApp-created alarms, use `AlarmManager.setAlarmClock()` and track lifecycle internally via `PendingIntent` flags. For system clock alarms, detect `ACTION_NEXT_ALARM_CLOCK_CHANGED` and poll `AlarmManager.getNextAlarmClock()` — but you can only detect that an alarm *changed*, not what action the user took.
 **Caveats:** Cannot reliably detect snooze/dismiss of third-party alarms. Each OEM clock app uses different internal broadcasts. Samsung, Xiaomi, etc. have their own clock apps with no public broadcast contract.
 **Effort:** Medium for own alarms. Not feasible for third-party alarm detection.
 
@@ -85,7 +85,7 @@
 **Feasibility:** ✅ Excellent | **API level:** 10+
 
 **Android API:** `NfcAdapter.ACTION_NDEF_DISCOVERED`, `ACTION_TAG_DISCOVERED`, `ACTION_TECH_DISCOVERED`
-**How:** Register intent filters in `AndroidManifest.xml` for NFC intents. Write NDEF messages to NFC tags with a custom AAR (Android Application Record) that launches GemmaWorkflow. The app receives the tag data and triggers the associated workflow.
+**How:** Register intent filters in `AndroidManifest.xml` for NFC intents. Write NDEF messages to NFC tags with a custom AAR (Android Application Record) that launches IrisApp. The app receives the tag data and triggers the associated workflow.
 **Caveats:** Requires `NFC` permission. App must be in foreground or use foreground dispatch for reliable detection. Tag must contain NDEF data readable by the app.
 **Effort:** Medium. Already partially supported via `nfc` trigger in `TriggerCatalog`.
 
@@ -103,7 +103,7 @@
 **Android API:** `UsageStatsManager` (polling — BROKEN on Android 14+), `AccessibilityService` (real-time — works reliably)
 **Research:** Major finding: `UsageStatsManager.queryUsageStats()` / `queryEvents()` is confirmed broken on Android 14 (API 34). Google intentionally restricted it for privacy — the platform no longer returns the most recent foreground app reliably. Bug report filed in Google Issue Tracker with reproducible example. `AccessibilityService` with `TYPE_WINDOW_STATE_CHANGED` remains the only reliable method, but requires user to manually enable in Settings → Accessibility and carries privacy concerns (Google Play reviews accessibility service usage strictly).
 **How:** `AccessibilityService` with `accessibilityEventTypes = typeWindowStateChanged`. Gets `event.packageName` in real-time when any app opens/closes. No polling needed. Declare service in manifest with `BIND_ACCESSIBILITY_SERVICE` permission and `accessibility_service_config.xml`.
-**Caveats:** `UsageStatsManager` approach is dead on Android 14+. `AccessibilityService` requires user to manually navigate to Settings → Accessibility → GemmaWorkflow and toggle ON. Google Play may reject or require justification for apps using AccessibilityService if not genuinely for accessibility. Many users won't enable it.
+**Caveats:** `UsageStatsManager` approach is dead on Android 14+. `AccessibilityService` requires user to manually navigate to Settings → Accessibility → IrisApp and toggle ON. Google Play may reject or require justification for apps using AccessibilityService if not genuinely for accessibility. Many users won't enable it.
 **Effort:** Medium (AccessibilityService). High rejection risk on Play Store. Best used as opt-in trigger that clearly explains why it's needed.
 
 ## 13. Wallet / Payment
@@ -111,7 +111,7 @@
 
 **Android API:** Google Pay API (restricted), no public transaction-reading API
 **How:** Can detect NFC payment via `HCE` (Host Card Emulation) service if the app is the active payment app. Cannot listen to Google Wallet transactions — they use secure element isolation.
-**Caveats:** No feasible trigger for detecting third-party payments. Only useful if GemmaWorkflow itself implements payment triggering.
+**Caveats:** No feasible trigger for detecting third-party payments. Only useful if IrisApp itself implements payment triggering.
 **Effort:** High. Skip for MVP.
 
 ## 14. Battery Level
@@ -172,7 +172,7 @@
 
 ## Architecture Pattern
 
-All triggers follow the same pattern in GemmaWorkflow:
+All triggers follow the same pattern in IrisApp:
 
 ```
 Trigger Source (Android broadcast / API callback)

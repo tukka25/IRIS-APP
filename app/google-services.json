@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "603911867239",
+    "project_id": "iris-23288",
+    "storage_bucket": "iris-23288.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:603911867239:android:830cc8e7923d58ca8dfdc2",
+        "android_client_info": {
+          "package_name": "com.irisapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBRUKunzp7MqLtAYxrNgwcFXEUiJnfthBI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

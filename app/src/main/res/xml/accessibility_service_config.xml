@@ -6,4 +6,4 @@
     android:canRetrieveWindowContent="false"
     android:description="@string/app_monitor_service_description"
     android:notificationTimeout="200"
-    android:settingsActivity="com.gemmaworkflow.ui.MainActivity" />
+    android:settingsActivity="com.irisapp.ui.MainActivity" />

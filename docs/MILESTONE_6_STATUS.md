@@ -31,7 +31,7 @@ Milestone 6 is substantially complete. The full pipeline from natural language �
 | Save workflow JSON to device | ✅ | `JsonFileStorage.kt`, `WorkflowRepository.kt` |
 | Workflow survives restart | ✅ | JSON files in app internal storage |
 | Execution history persists | ✅ | `ExecutionHistoryRepository.kt` (append-only, last 100) |
-| Load saved workflows on start | ✅ | `GemmaWorkflowApp.kt` + `DemoWorkflowSeeder.kt` |
+| Load saved workflows on start | ✅ | `IrisAppApp.kt` + `DemoWorkflowSeeder.kt` |
 
 ---
 
@@ -73,7 +73,7 @@ Milestone 6 is substantially complete. The full pipeline from natural language �
 | TriggerRegistry register/unregister | ✅ | `TriggerCatalog.kt` |
 | Setup state tracking | ✅ | `NfcTriggerSetupScreen`, `TimeTriggerSetupScreen`, `ShareSheetSetupScreen` |
 
-**Note:** `BootReceiver` reschedules all Time-triggered workflows on device reboot. `GemmaWorkflowApp.onCreate()` reschedules on every cold start.
+**Note:** `BootReceiver` reschedules all Time-triggered workflows on device reboot. `IrisAppApp.onCreate()` reschedules on every cold start.
 
 ---
 
@@ -133,7 +133,7 @@ c6b49d4 feat: add saved workflows list UI and fix JSON parser resilience
 app/build.gradle.kts                              +3 lines  (androidx.browser)
 app/src/main/AndroidManifest.xml                 +102 lines (permissions, intent-filters, receivers)
 app/src/main/java/com/gemmaworkflow/
-  app/GemmaWorkflowApp.kt                         +62 lines  reschedule time triggers on start
+  app/IrisAppApp.kt                         +62 lines  reschedule time triggers on start
   data/local/storage/JsonFileStorage.kt            NEW        JSON file CRUD
   data/repository/ExecutionHistoryRepository.kt    NEW        append-only execution log
   data/repository/WorkflowRepository.kt            modified   wired to JsonFileStorage

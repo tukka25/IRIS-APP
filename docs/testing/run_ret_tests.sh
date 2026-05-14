@@ -1,5 +1,5 @@
 #!/bin/bash
-# GemmaWorkflow RETO Test Runner
+# IrisApp RETO Test Runner
 # Captures Phase 0-4 + final JSON for each test case from workflow_category_tester.md
 #
 # Usage:
@@ -73,7 +73,7 @@ EDGE_CASES=(
 
 echo ""
 echo -e "${CYAN}══════════════════════════════════════════${NC}"
-echo -e "${CYAN}  GemmaWorkflow RETO Test Runner          ${NC}"
+echo -e "${CYAN}  IrisApp RETO Test Runner          ${NC}"
 echo -e "${CYAN}══════════════════════════════════════════${NC}"
 echo ""
 echo -e "Results dir: ${YELLOW}$RESULTS_DIR${NC}"
@@ -155,7 +155,7 @@ run_test() {
 
 # ── Write summary header ──
 cat > "$SUMMARY" << 'HEADER'
-# GemmaWorkflow RETO Test Results
+# IrisApp RETO Test Results
 
 **Date:** TIMESTAMP_PLACEHOLDER
 **Log file:** full_logcat.txt

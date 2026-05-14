@@ -1,5 +1,5 @@
 # Android Home-Screen Widget: Glance vs RemoteViews
-## Technical Research Report for GemmaWorkflow
+## Technical Research Report for IrisApp
 
 ---
 
@@ -229,8 +229,8 @@ scope.launch {
 
 ## 5. Cross-Process Data Bridging
 
-For GemmaWorkflow, the data bridge is simple because:
-- Widget and main app are the **same app package** (`com.gemmaworkflow`)
+For IrisApp, the data bridge is simple because:
+- Widget and main app are the **same app package** (`com.irisapp`)
 - `ExecutionHistoryRepository` reads a JSON file in `context.filesDir`
 - The widget's `Context` and the app's `Context` resolve to the **same filesDir**
 
@@ -313,7 +313,7 @@ val workflowName = glanceState[Preferences.Key("selected_workflow")] ?: "No work
 
 ## 7. Recommendation
 
-**Use Jetpack Glance.** Here is why for GemmaWorkflow specifically:
+**Use Jetpack Glance.** Here is why for IrisApp specifically:
 
 1. **Same language**: The team is already using Jetpack Compose throughout the app. Glance uses the same `@Composable` mental model and many of the same APIs (`Column`, `Row`, `Text`, `LazyColumn`). RemoteViews requires learning an entirely different imperative API.
 
@@ -325,7 +325,7 @@ val workflowName = glanceState[Preferences.Key("selected_workflow")] ?: "No work
 
 5. **Modern tooling**: Glance has `GlanceAppWidgetManager` for listing widgets, `GlanceStateDefinition` for preferences, and `actionRunCallback()` for background click handling — all coroutine-friendly.
 
-6. **Matches minSdk**: Glance requires minSdk 26, which exactly matches GemmaWorkflow's `minSdk = 26`. No compatibility concerns.
+6. **Matches minSdk**: Glance requires minSdk 26, which exactly matches IrisApp's `minSdk = 26`. No compatibility concerns.
 
 ---
 
@@ -499,7 +499,7 @@ res/xml/
     android:targetCellWidth="3"
     android:targetCellHeight="2"
     android:updatePeriodMillis="1800000"
-    android:configure="com.gemmaworkflow.widget.WidgetConfigActivity"
+    android:configure="com.irisapp.widget.WidgetConfigActivity"
     android:initialLayout="@layout/widget_initial"
     android:resizeMode="horizontal|vertical"
     android:widgetCategory="home_screen" />

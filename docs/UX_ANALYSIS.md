@@ -1,4 +1,4 @@
-# UX Analysis — GemmaWorkflow Dark Theme
+# UX Analysis — IrisApp Dark Theme
 
 **Branch:** `new_design` (`249c276` committed)
 **Date:** 2026-05-13
@@ -10,8 +10,8 @@
 
 | # | Element | Issue | Severity |
 |---|---------|-------|----------|
-| 1 | **Hero isolation** | HexHeroIcon sits alone with no visual connection to the prompt below — no shared axis, glow continuity, or layered depth. The 3D isometric home inside the hex has no relationship to the "GemmaWorkflow" wordmark. | Medium |
-| 2 | **"GemmaWorkflow" wordmark** | Static large text — no animation, no gradient, no color pulse. Doesn't match the animated hero above it. | Low |
+| 1 | **Hero isolation** | HexHeroIcon sits alone with no visual connection to the prompt below — no shared axis, glow continuity, or layered depth. The 3D isometric home inside the hex has no relationship to the "IrisApp" wordmark. | Medium |
+| 2 | **"IrisApp" wordmark** | Static large text — no animation, no gradient, no color pulse. Doesn't match the animated hero above it. | Low |
 | 3 | **Saved workflows strip** | Glass boxes with `GlassSurface` fill are visually indistinguishable from plain background. No hover/press feedback differentiating them from surrounding empty space. | Medium |
 | 4 | **Generate action button** | `GradientButton` on "Generate" is well-styled, but the primary action lacks a keyboard shortcut hint or voice input option visible on the screen. | Low |
 | 5 | **Prompt field** | OutlinedTextField has no character counter, no example prompt pre-filled, and the supporting text is easy to miss on first read. | Low |
