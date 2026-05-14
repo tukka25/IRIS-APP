@@ -80,6 +80,13 @@ class DeepLinkRouter {
                         _deepLinkEvents.tryEmit(DeepLink.RunWorkflow(workflowId))
                     }
                 }
+                ACTION_SHOW_WORKFLOW_DETAIL -> {
+                    val workflowId = intent.getStringExtra(EXTRA_WORKFLOW_ID)
+                    if (workflowId != null) {
+                        Log.i(TAG, "Show detail intent for workflow: $workflowId")
+                        _deepLinkEvents.tryEmit(DeepLink.ShowDetail(workflowId))
+                    }
+                }
                 NfcTriggerHandler.ACTION_NFC_SCANNED -> {
                     val workflowId = intent.getStringExtra(NfcTriggerHandler.EXTRA_WORKFLOW_ID)
                     if (workflowId != null) {

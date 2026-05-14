@@ -14,6 +14,8 @@
     <string name="widget_trigger_notification">Notification</string>
     <string name="widget_trigger_sleep">Sleep proxy</string>
     <string name="widget_trigger_geofence">Geofence</string>
+    <string name="widget_trigger_voice">Voice</string>
+    <string name="widget_trigger_sound_event">Sound event</string>
     <string name="widget_trigger_system">System event</string>
     <string name="widget_created_ago">created %1$s ago</string>
     <string name="widget_stats_runs">%1$d runs</string>
