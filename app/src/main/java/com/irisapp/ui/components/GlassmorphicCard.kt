@@ -1,9 +1,11 @@
 package com.irisapp.ui.components
 
+import android.graphics.BlurMaskFilter
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -11,9 +13,13 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Paint
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.irisapp.ui.theme.CyanAccent
 import com.irisapp.ui.theme.GlassBorder
 import com.irisapp.ui.theme.GlassSurface
 import com.irisapp.ui.theme.SurfaceDark
@@ -45,6 +51,56 @@ fun GlassmorphicCard(
             .border(borderWidth, GlassBorder, shape)
     ) {
         content()
+    }
+}
+
+/**
+ * Glassmorphic card variant with an animated outer glow ring.
+ * Pass an animated [glowAlpha] from the caller to make the glow pulse.
+ */
+@Composable
+fun GlowingGlassmorphicCard(
+    modifier: Modifier = Modifier,
+    glowColor: Color = CyanAccent,
+    glowAlpha: Float = 0.35f,
+    cornerRadius: Dp = 16.dp,
+    backgroundColor: Color = GlassSurface,
+    content: @Composable BoxScope.() -> Unit
+) {
+    val cornerPx = cornerRadius
+    Box(
+        modifier = modifier.drawBehind {
+            drawIntoCanvas { canvas ->
+                val paint = Paint().also { p ->
+                    p.asFrameworkPaint().apply {
+                        isAntiAlias = true
+                        color = android.graphics.Color.argb(
+                            (255 * glowAlpha).toInt(),
+                            (glowColor.red * 255).toInt(),
+                            (glowColor.green * 255).toInt(),
+                            (glowColor.blue * 255).toInt()
+                        )
+                        maskFilter = BlurMaskFilter(20f, BlurMaskFilter.Blur.NORMAL)
+                    }
+                }
+                canvas.drawRoundRect(
+                    left = 0f,
+                    top = 0f,
+                    right = size.width,
+                    bottom = size.height,
+                    radiusX = cornerPx.toPx(),
+                    radiusY = cornerPx.toPx(),
+                    paint = paint
+                )
+            }
+        }
+    ) {
+        GlassmorphicCard(
+            modifier = Modifier.fillMaxWidth(),
+            cornerRadius = cornerRadius,
+            backgroundColor = backgroundColor,
+            content = content
+        )
     }
 }
 
