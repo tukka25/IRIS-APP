@@ -344,7 +344,7 @@ AndroidManifest.xml                 → +WRITE_SECURE_SETTINGS, +NET_ADMIN (syst
 ## File Manifest
 
 ```
-app/src/main/java/com/gemmaworkflow/platform/
+app/src/main/java/com/iris/platform/
 
 media/
   MediaControlApiExecutor.kt          [NEW] — play/pause, next, previous

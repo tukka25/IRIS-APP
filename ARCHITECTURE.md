@@ -112,7 +112,7 @@ The app should prove three things:
 ## Package Structure
 
 ```text
-app/src/main/java/com/gemmaworkflow/
+app/src/main/java/com/iris/
 +-- app/
 |   +-- IrisAppApp.kt
 |   +-- AppContainer.kt
@@ -187,13 +187,13 @@ app/src/main/assets/
 LiteRT-LM/                (cloned sibling repo for GPU libs & tools)
 +-- prebuilt/android_arm64/
 
-app/src/test/java/com/gemmaworkflow/
+app/src/test/java/com/iris/
 +-- domain/
 |   +-- parser/
 |   +-- runner/
 |   +-- safety/
 
-app/src/androidTest/java/com/gemmaworkflow/
+app/src/androidTest/java/com/iris/
 +-- data/local/
 +-- ui/
 ```
@@ -369,7 +369,7 @@ Workflow Detail -> Run Now -> WorkflowRunner -> dispatch steps -> history
 
 NFC is the best physical demo trigger:
 
-- Write an NDEF record containing a deep link like `gemmaworkflow://run/{workflowId}`.
+- Write an NDEF record containing a deep link like `iris://run/{workflowId}`.
 - Add an Android intent filter for the deep link.
 - When the tag is scanned, route into the app and run the matching workflow.
 - Keep a foreground write screen for writing the tag.

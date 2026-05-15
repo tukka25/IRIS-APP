@@ -132,7 +132,7 @@ c6b49d4 feat: add saved workflows list UI and fix JSON parser resilience
 ```
 app/build.gradle.kts                              +3 lines  (androidx.browser)
 app/src/main/AndroidManifest.xml                 +102 lines (permissions, intent-filters, receivers)
-app/src/main/java/com/gemmaworkflow/
+app/src/main/java/com/iris/
   app/IrisAppApp.kt                         +62 lines  reschedule time triggers on start
   data/local/storage/JsonFileStorage.kt            NEW        JSON file CRUD
   data/repository/ExecutionHistoryRepository.kt    NEW        append-only execution log

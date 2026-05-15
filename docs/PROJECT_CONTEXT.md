@@ -96,7 +96,7 @@ User request
 ## Main Source Areas
 
 ```text
-app/src/main/java/com/gemmaworkflow/
+app/src/main/java/com/iris/
 ├── app/
 │   └── IrisAppApp.kt
 ├── data/
@@ -134,7 +134,7 @@ app/src/main/java/com/gemmaworkflow/
 Inference is managed by:
 
 ```text
-app/src/main/java/com/gemmaworkflow/platform/inference/InferenceManager.kt
+app/src/main/java/com/iris/platform/inference/InferenceManager.kt
 ```
 
 Responsibilities:
@@ -163,13 +163,13 @@ local-models/gemma-4-E2B-it.litertlm
 The main planner entry point is:
 
 ```text
-app/src/main/java/com/gemmaworkflow/domain/planner/RetoWorkflowPlanner.kt
+app/src/main/java/com/iris/domain/planner/RetoWorkflowPlanner.kt
 ```
 
 It calls:
 
 ```text
-app/src/main/java/com/gemmaworkflow/platform/tools/reto/RetoOrchestrator.kt
+app/src/main/java/com/iris/platform/tools/reto/RetoOrchestrator.kt
 ```
 
 Current normal AI call sequence:
@@ -237,7 +237,7 @@ These are not Android APIs. They are high-level task categories used by the plan
 The canonical action registry is:
 
 ```text
-app/src/main/java/com/gemmaworkflow/domain/catalog/ActionSpecRegistry.kt
+app/src/main/java/com/iris/domain/catalog/ActionSpecRegistry.kt
 ```
 
 Each `ActionSpec` owns:
@@ -314,11 +314,11 @@ Tools are Kotlin functions exposed to the planner as controlled capabilities.
 Main files:
 
 ```text
-app/src/main/java/com/gemmaworkflow/platform/tools/Tool.kt
-app/src/main/java/com/gemmaworkflow/platform/tools/ToolRegistry.kt
-app/src/main/java/com/gemmaworkflow/platform/tools/ToolInitializer.kt
-app/src/main/java/com/gemmaworkflow/platform/tools/FindSkill.kt
-app/src/main/java/com/gemmaworkflow/platform/tools/reto/ToolMetadataRegistry.kt
+app/src/main/java/com/iris/platform/tools/Tool.kt
+app/src/main/java/com/iris/platform/tools/ToolRegistry.kt
+app/src/main/java/com/iris/platform/tools/ToolInitializer.kt
+app/src/main/java/com/iris/platform/tools/FindSkill.kt
+app/src/main/java/com/iris/platform/tools/reto/ToolMetadataRegistry.kt
 ```
 
 Tool categories include:
@@ -353,7 +353,7 @@ Tools are scoped through `ActionSpec` metadata so the model receives only tools 
 Datetime resolution is handled by:
 
 ```text
-app/src/main/java/com/gemmaworkflow/platform/tools/impl/TemporalTools.kt
+app/src/main/java/com/iris/platform/tools/impl/TemporalTools.kt
 ```
 
 Important behavior:
@@ -379,13 +379,13 @@ TOOL: resolve_datetime {
 The parser is:
 
 ```text
-app/src/main/java/com/gemmaworkflow/domain/parser/WorkflowJsonParser.kt
+app/src/main/java/com/iris/domain/parser/WorkflowJsonParser.kt
 ```
 
 The validator is:
 
 ```text
-app/src/main/java/com/gemmaworkflow/domain/safety/WorkflowValidator.kt
+app/src/main/java/com/iris/domain/safety/WorkflowValidator.kt
 ```
 
 Safety layers:
@@ -413,7 +413,7 @@ Safety layers:
 Core model file:
 
 ```text
-app/src/main/java/com/gemmaworkflow/domain/model/WorkflowModels.kt
+app/src/main/java/com/iris/domain/model/WorkflowModels.kt
 ```
 
 Important classes:
@@ -452,7 +452,7 @@ docs/implementation/EXECUTION_PIPELINE.md
 Main runner:
 
 ```text
-app/src/main/java/com/gemmaworkflow/domain/runner/WorkflowRunner.kt
+app/src/main/java/com/iris/domain/runner/WorkflowRunner.kt
 ```
 
 Execution flow:
@@ -498,9 +498,9 @@ Persistence is local file-based JSON storage.
 Main files:
 
 ```text
-app/src/main/java/com/gemmaworkflow/data/local/storage/JsonFileStorage.kt
-app/src/main/java/com/gemmaworkflow/data/repository/WorkflowRepository.kt
-app/src/main/java/com/gemmaworkflow/data/repository/ExecutionHistoryRepository.kt
+app/src/main/java/com/iris/data/local/storage/JsonFileStorage.kt
+app/src/main/java/com/iris/data/repository/WorkflowRepository.kt
+app/src/main/java/com/iris/data/repository/ExecutionHistoryRepository.kt
 ```
 
 No backend is currently required for workflow generation or execution.
@@ -516,11 +516,11 @@ docs/research/trigger_feasibility.md
 Runtime trigger managers live in:
 
 ```text
-app/src/main/java/com/gemmaworkflow/platform/trigger/
-app/src/main/java/com/gemmaworkflow/platform/location/
-app/src/main/java/com/gemmaworkflow/platform/alarm/
-app/src/main/java/com/gemmaworkflow/platform/nfc/
-app/src/main/java/com/gemmaworkflow/platform/share/
+app/src/main/java/com/iris/platform/trigger/
+app/src/main/java/com/iris/platform/location/
+app/src/main/java/com/iris/platform/alarm/
+app/src/main/java/com/iris/platform/nfc/
+app/src/main/java/com/iris/platform/share/
 ```
 
 Current trigger runtime surface:
@@ -582,13 +582,13 @@ Teach PromptBuilder + WorkflowJsonParser + ActionSpec trigger compatibility abou
 Main UI entry:
 
 ```text
-app/src/main/java/com/gemmaworkflow/ui/MainActivity.kt
+app/src/main/java/com/iris/ui/MainActivity.kt
 ```
 
 Main ViewModel:
 
 ```text
-app/src/main/java/com/gemmaworkflow/ui/home/WorkflowGenerationViewModel.kt
+app/src/main/java/com/iris/ui/home/WorkflowGenerationViewModel.kt
 ```
 
 The UI currently supports:
@@ -672,7 +672,7 @@ docs/implementation/EXECUTION_PIPELINE.md
 docs/implementation/P1_TRIGGERS_PLAN.md
 docs/implementation/TRIGGERS_PROGRESS.md
 docs/research/trigger_feasibility.md
-docs/research/reto_tool_orchestration_for_gemmaworkflow.md
+docs/research/reto_tool_orchestration_for_iris.md
 INTENTS.md
 WORKFLOW_FEATURE.md
 TODO.md
