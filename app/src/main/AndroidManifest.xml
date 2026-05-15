@@ -286,9 +286,22 @@
         <!-- Receives NFC tag scan events when the app is backgrounded. -->
         <receiver
             android:name=".platform.nfc.NfcTriggerHandler"
-            android:exported="false">
+            android:exported="true">
             <intent-filter>
                 <action android:name="com.irisapp.platform.nfc.ACTION_NFC_SCANNED" />
+            </intent-filter>
+            <!-- NFC tag scanned while app is backgrounded (cold-start path) -->
+            <intent-filter>
+                <action android:name="android.nfc.action.NDEF_DISCOVERED" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="iris" android:host="workflow" />
+            </intent-filter>
+            <!-- ACTION_VIEW with iris:// scheme (fallback for some launch scenarios) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="iris" android:host="workflow" />
             </intent-filter>
         </receiver>
 

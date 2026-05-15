@@ -3,6 +3,7 @@ package com.irisapp.ui
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.app.PendingIntent
 import android.nfc.NfcAdapter
 import android.nfc.Tag
 import android.os.Build
@@ -67,6 +68,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -129,6 +131,7 @@ import com.irisapp.ui.home.ManualWorkflowEditorScreen
 import com.irisapp.ui.home.WorkflowGenerationViewModel
 import com.irisapp.ui.marketplace.MarketplaceScreen
 import com.irisapp.ui.marketplace.MarketplaceViewModel
+import com.irisapp.ui.home.NfcScanConfirmation
 import com.irisapp.ui.home.WorkflowGenerationUiState
 import com.irisapp.ui.nfc.NfcSetupScreen
 import com.irisapp.ui.theme.IrisTheme
@@ -140,6 +143,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 class MainActivity : ComponentActivity() {
     private val viewModel: WorkflowGenerationViewModel by viewModels()
     private val marketplaceViewModel: MarketplaceViewModel by viewModels()
+    private val nfcAdapter: NfcAdapter? by lazy { NfcAdapter.getDefaultAdapter(this) }
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -203,8 +207,35 @@ class MainActivity : ComponentActivity() {
         handleIntent(intent)
     }
 
+    override fun onResume() {
+        super.onResume()
+        nfcAdapter?.let { adapter ->
+            if (adapter.isEnabled) {
+                val pendingIntent = PendingIntent.getActivity(
+                    this, 0,
+                    Intent(this, javaClass).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+                    PendingIntent.FLAG_MUTABLE
+                )
+                adapter.enableForegroundDispatch(this, pendingIntent, null, null)
+            }
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        nfcAdapter?.disableForegroundDispatch(this)
+    }
+
     private fun handleIntent(intent: Intent?) {
         if (intent == null) return
+
+        // NFC foreground dispatch or cold-start NFC intent: route via DeepLinkRouter.
+        // This handles both foreground tag scans (delivered to onNewIntent) and
+        // cold-start launches from a tag scan while the app was killed.
+        if (DeepLinkRouter.canHandle(intent)) {
+            DeepLinkRouter.routeFromActivity(intent)
+            return
+        }
 
         lifecycleScope.launch {
             // Wait for savedWorkflows to be loaded (it might be empty on cold start)
@@ -337,7 +368,12 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                         is DeepLink.NfcScan -> {
-                            // Already handled via NFC trigger flow; no action needed here.
+                            // NFC tag scanned: load workflow detail and prompt for confirmation.
+                            val workflow = viewModel.uiState.value.savedWorkflows
+                                .find { it.name == deepLink.workflowId }
+                            if (workflow != null) {
+                                viewModel.onNfcTagScanned(deepLink.workflowId)
+                            }
                         }
                     }
                 }
@@ -373,6 +409,7 @@ private fun WorkflowGenerationScreen(
             state.timeTriggerSetupWorkflow != null -> viewModel.cancelTimeTriggerSetup()
             state.shareSheetSetupWorkflow != null -> viewModel.cancelShareSheetSetup()
             state.soundEventTriggerSetupWorkflow != null -> viewModel.cancelSoundEventTriggerSetup()
+            state.showNfcSetup -> viewModel.hideNfcSetup()
             else -> { /* let Activity finish normally */ }
         }
     }
@@ -403,6 +440,34 @@ private fun WorkflowGenerationScreen(
             onDismiss = viewModel::dismissPending)
     }
 
+    // Show NFC scan confirmation dialog when a tag is scanned
+    state.nfcScanConfirmation?.let { confirmation ->
+        NfcScanConfirmationDialog(
+            confirmation = confirmation,
+            onConfirm = viewModel::confirmNfcScan,
+            onDismiss = viewModel::dismissNfcScan
+        )
+    }
+
+    // Show NFC scan error when a tag was scanned but workflow not found
+    state.nfcScanError?.let { error ->
+        Snackbar(
+            modifier = Modifier.padding(16.dp),
+            action = {
+                TextButton(onClick = viewModel::dismissNfcScan) {
+                    Text("Dismiss")
+                }
+            },
+            dismissAction = {
+                TextButton(onClick = viewModel::dismissNfcScan) {
+                    Text("✕")
+                }
+            }
+        ) {
+            Text(error)
+        }
+    }
+
     state.selectedWorkflowDetail?.let { detail ->
         WorkflowDetailScreen(
             workflow = detail,
@@ -411,6 +476,7 @@ private fun WorkflowGenerationScreen(
             onRun = { viewModel.runWorkflow(detail) },
             onSetupTrigger = {
                 when (detail.trigger) {
+                    is TriggerConfig.Nfc -> viewModel.showNfcSetup(detail.name)
                     is TriggerConfig.Time -> viewModel.showTimeTriggerSetup(detail)
                     is TriggerConfig.Manual -> viewModel.showTimeTriggerSetup(detail)
                     is TriggerConfig.ShareSheet -> viewModel.showShareSheetSetup(detail)
@@ -439,6 +505,18 @@ private fun WorkflowGenerationScreen(
             workflowName = workflow.name,
             onSave = { viewModel.saveShareSheetTrigger(workflow.name, TriggerConfig.ShareSheet(setupState = com.irisapp.domain.model.SetupState.Ready)) },
             onCancel = viewModel::cancelShareSheetSetup
+        )
+        return
+    }
+
+    // Show NFC tag setup screen (write workflow ID to a tag)
+    if (state.showNfcSetup) {
+        NfcSetupScreen(
+            workflowIdToWrite = state.nfcWriteWorkflowId,
+            onWorkflowSelected = viewModel::onNfcWorkflowSelected,
+            onWriteSuccess = { viewModel.onNfcTagWritten(it) },
+            onWriteError = { msg -> viewModel.onNfcTagWriteError(state.nfcWriteWorkflowId ?: "", msg) },
+            onTagScanned = { /* already handled via DeepLinkRouter → onNfcTagScanned */ }
         )
         return
     }
@@ -1198,7 +1276,7 @@ private fun RunResultRow(result: ExecutionResult) {
         Column {
             Text(result.stepId, style = MaterialTheme.typography.bodySmall)
             if (result.message.isNotBlank()) {
-                Text(result.message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                Text(result.message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
@@ -1253,6 +1331,42 @@ private fun ConfirmationDialog(
         dismissButton = {
             TextButton(onClick = onDismiss) {
                 Text("Skip Step")
+            }
+        }
+    )
+}
+
+/**
+ * Shown when an NFC tag is scanned and the app is in the foreground.
+ * Prompts the user to confirm running the workflow before executing it.
+ */
+@Composable
+private fun NfcScanConfirmationDialog(
+    confirmation: NfcScanConfirmation,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = { /* Force explicit action */ },
+        title = { Text("\uD83D\uDD17 NFC Tag Scanned") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Run workflow \"${confirmation.workflowName}\"?")
+                Text(
+                    "Tap confirmation to execute the workflow now.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.outline
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = onConfirm) {
+                Text("Run")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
             }
         }
     )
@@ -1463,7 +1577,7 @@ private fun WorkflowDetailScreen(
                             params,
                             style = MaterialTheme.typography.bodySmall,
                             fontFamily = FontFamily.Monospace,
-                            color = MaterialTheme.colorScheme.outline
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -1489,6 +1603,7 @@ private fun WorkflowDetailScreen(
         val triggerConfig = workflow.trigger
         val showScheduleButton = triggerConfig is TriggerConfig.Manual || triggerConfig is TriggerConfig.Time
         val showShareSheetSetupButton = triggerConfig is TriggerConfig.ShareSheet
+        val showNfcSetupButton = triggerConfig is TriggerConfig.Nfc
 
         if (showScheduleButton) {
             val label = if (triggerConfig is TriggerConfig.Time) "\u23F0 Edit Schedule" else "\u23F0 Schedule"
@@ -1506,6 +1621,15 @@ private fun WorkflowDetailScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("\uD83D\uDCE4 Set up Share Sheet")
+            }
+        }
+
+        if (showNfcSetupButton) {
+            OutlinedButton(
+                onClick = onSetupTrigger,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("\uD83D\uDD17 Write NFC Tag")
             }
         }
 
@@ -1562,7 +1686,7 @@ private fun ShareSheetPicker(
                         Text(
                             "Image: ${sharedContent.uri.lastPathSegment ?: sharedContent.uri}",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.outline
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }

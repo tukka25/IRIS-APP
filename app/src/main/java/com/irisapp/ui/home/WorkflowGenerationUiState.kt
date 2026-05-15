@@ -126,6 +126,8 @@ data class WorkflowGenerationUiState(
     val nfcWriteWorkflowId: String? = null,
     /** Pending NFC scan awaiting user confirmation to run. */
     val nfcScanConfirmation: NfcScanConfirmation? = null,
+    /** Error message when an NFC tag was scanned but the workflow was not found. */
+    val nfcScanError: String? = null,
 
     // ── Manual editor state ─────────────────────────────────────────────
     /** Non-null when the manual workflow editor should be shown. */

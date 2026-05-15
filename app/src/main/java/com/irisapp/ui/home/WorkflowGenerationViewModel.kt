@@ -584,7 +584,11 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
         val workflow = uiState.value.savedWorkflows.find { it.name == workflowId }
         if (workflow != null) {
             _uiState.update {
-                it.copy(nfcScanConfirmation = NfcScanConfirmation(workflowId, workflow.name))
+                it.copy(nfcScanConfirmation = NfcScanConfirmation(workflowId, workflow.name), nfcScanError = null)
+            }
+        } else {
+            _uiState.update {
+                it.copy(nfcScanConfirmation = null, nfcScanError = "Workflow '$workflowId' not found. It may have been deleted.")
             }
         }
     }
@@ -605,7 +609,7 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
      * User dismissed the NFC scan confirmation.
      */
     fun dismissNfcScan() {
-        _uiState.update { it.copy(nfcScanConfirmation = null) }
+        _uiState.update { it.copy(nfcScanConfirmation = null, nfcScanError = null) }
     }
 
     /** Show the NFC tag setup screen for a given workflow. */
