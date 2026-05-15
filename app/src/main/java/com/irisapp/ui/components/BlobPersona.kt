@@ -1,13 +1,16 @@
 package com.irisapp.ui.components
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -15,12 +18,15 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -42,6 +48,7 @@ fun BlobPersona(
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "blob_ambient")
 
+    // ── Continuous ambient animations ──────────────────────────────────────
     val breatheScale by infiniteTransition.animateFloat(
         initialValue = 0.96f,
         targetValue = 1.04f,
@@ -79,7 +86,7 @@ fun BlobPersona(
         label = "glow_alpha"
     )
 
-    // Ripple for LISTENING / PROCESSING
+    // Ripple ring 1 — primary wave
     val rippleScale by infiniteTransition.animateFloat(
         initialValue = 1.0f,
         targetValue = 1.5f,
@@ -97,6 +104,26 @@ fun BlobPersona(
             repeatMode = RepeatMode.Restart
         ),
         label = "ripple_alpha"
+    )
+
+    // Ripple ring 2 — staggered offset for layered wave feel
+    val ripple2Scale by infiniteTransition.animateFloat(
+        initialValue = 1.0f,
+        targetValue = 1.65f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1900, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "ripple2_scale"
+    )
+    val ripple2Alpha by infiniteTransition.animateFloat(
+        initialValue = 0.30f,
+        targetValue = 0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1900, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "ripple2_alpha"
     )
 
     // Spinning ring for PROCESSING
@@ -131,8 +158,30 @@ fun BlobPersona(
         label = "glow_radius"
     )
 
+    // ── State-change impact pulse (fires on every BlobState change) ────────
+    val impactAnim = remember { Animatable(1f) }
+    LaunchedEffect(blobState) {
+        impactAnim.snapTo(1f)
+        impactAnim.animateTo(1.16f, tween(90, easing = FastOutSlowInEasing))
+        impactAnim.animateTo(0.93f, tween(130, easing = FastOutSlowInEasing))
+        impactAnim.animateTo(1.0f, spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMedium))
+    }
+
+    // ── DONE success burst (one-shot expanding ring) ───────────────────────
+    val doneRingAnim = remember { Animatable(0f) }
+    LaunchedEffect(blobState) {
+        if (blobState == BlobState.DONE) {
+            doneRingAnim.snapTo(1f)
+            doneRingAnim.animateTo(0f, tween(900, easing = FastOutSlowInEasing))
+        } else {
+            doneRingAnim.snapTo(0f)
+        }
+    }
+
     val context = LocalContext.current
     val resId = context.resources.getIdentifier("iris_character", "drawable", context.packageName)
+
+    val combinedScale = breatheScale * impactAnim.value
 
     Box(
         modifier = modifier.size(size * 1.8f),
@@ -169,7 +218,13 @@ fun BlobPersona(
                     color = glowColor.copy(alpha = rippleAlpha),
                     radius = baseR * rippleScale,
                     center = Offset(cx, cy),
-                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
+                    style = Stroke(width = 2.dp.toPx())
+                )
+                drawCircle(
+                    color = glowColor.copy(alpha = ripple2Alpha * 0.65f),
+                    radius = baseR * ripple2Scale,
+                    center = Offset(cx, cy),
+                    style = Stroke(width = 1.5.dp.toPx())
                 )
             }
         }
@@ -195,7 +250,30 @@ fun BlobPersona(
                     ),
                     radius = ringR,
                     center = Offset(cx, cy),
-                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.5.dp.toPx())
+                    style = Stroke(width = 2.5.dp.toPx())
+                )
+            }
+        }
+
+        // ── DONE success burst (one-shot expanding rings) ─────────────────────
+        if (doneRingAnim.value > 0f) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val cx = this.size.width / 2f
+                val cy = this.size.height / 2f
+                val progress = 1f - doneRingAnim.value  // 0 → 1 as burst fades
+                val outerR = size.toPx() * (0.5f + 1.2f * progress)
+                val innerR = size.toPx() * (0.5f + 0.75f * progress)
+                drawCircle(
+                    color = GreenSuccess.copy(alpha = doneRingAnim.value * 0.70f),
+                    radius = outerR,
+                    center = Offset(cx, cy),
+                    style = Stroke(width = 2.dp.toPx())
+                )
+                drawCircle(
+                    color = GreenSuccess.copy(alpha = doneRingAnim.value * 0.40f),
+                    radius = innerR,
+                    center = Offset(cx, cy),
+                    style = Stroke(width = 1.5.dp.toPx())
                 )
             }
         }
@@ -208,8 +286,8 @@ fun BlobPersona(
                 modifier = Modifier
                     .size(size)
                     .graphicsLayer {
-                        scaleX = breatheScale
-                        scaleY = breatheScale
+                        scaleX = combinedScale
+                        scaleY = combinedScale
                         translationY = floatOffsetY * density
                     },
                 contentScale = ContentScale.Fit
@@ -217,7 +295,7 @@ fun BlobPersona(
         } else {
             FallbackBlobCanvas(
                 glowColor = glowColor,
-                breatheScale = breatheScale,
+                breatheScale = combinedScale,
                 floatOffsetY = floatOffsetY,
                 size = size
             )

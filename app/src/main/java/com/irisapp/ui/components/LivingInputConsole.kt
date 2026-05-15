@@ -20,11 +20,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -57,7 +54,6 @@ fun LivingInputConsole(
     onValueChange: (String) -> Unit,
     modifier: Modifier = Modifier,
     isGenerating: Boolean = false,
-    onMicClick: () -> Unit = {},
     onSendClick: () -> Unit = {},
     sendEnabled: Boolean = false,
     placeholder: String = "What should IrisApp do?"
@@ -143,18 +139,9 @@ fun LivingInputConsole(
             }
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+            modifier = Modifier.padding(start = 18.dp, end = 10.dp, top = 10.dp, bottom = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = {}, modifier = Modifier.size(36.dp)) {
-                Icon(
-                    Icons.Default.Add,
-                    contentDescription = "Attach",
-                    tint = TextSecondary,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-
             BasicTextField(
                 value = value,
                 onValueChange = onValueChange,
@@ -177,17 +164,9 @@ fun LivingInputConsole(
                 }
             )
 
-            IconButton(onClick = onMicClick, modifier = Modifier.size(36.dp)) {
-                Icon(
-                    Icons.Default.Mic,
-                    contentDescription = "Voice",
-                    tint = if (consoleState == ConsoleState.GENERATING) CyanAccent else TextSecondary,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-
             Box(
                 modifier = Modifier
+                    .padding(start = 10.dp)
                     .size(32.dp)
                     .clip(CircleShape)
                     .background(if (sendEnabled) Brush.linearGradient(listOf(ElectricCyan, LiquidViolet)) else Brush.linearGradient(listOf(Color.DarkGray, Color.DarkGray)))

@@ -9,9 +9,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.irisapp.R
 
 // ── Lumen Dark Palette ─────────────────────────────────────────────────────────
 
@@ -48,6 +51,16 @@ val GlassSurface      = Color(0x0DFFFFFF)   // rgba(255,255,255,0.03)
 // Surface elevation tints
 val SurfaceTintCyan   = Color(0x1A5EF2FF)   // ~10% cyan overlay
 val SurfaceTintViolet  = Color(0x1AB57BFF)   // ~10% violet overlay
+
+// ── Space Grotesk font family ──────────────────────────────────────────────────
+val SpaceGrotesk = FontFamily(
+    Font(R.font.space_grotesk_regular,  FontWeight.Normal),
+    Font(R.font.space_grotesk_medium,   FontWeight.Medium),
+    Font(R.font.space_grotesk_semibold, FontWeight.SemiBold),
+    Font(R.font.space_grotesk_bold,     FontWeight.Bold),
+    Font(R.font.space_grotesk_bold,     FontWeight.ExtraBold),
+    Font(R.font.space_grotesk_bold,     FontWeight.Black),
+)
 
 // ── Gradient brushes ───────────────────────────────────────────────────────────
 
@@ -101,17 +114,18 @@ private val DarkColors = darkColorScheme(
 // ── Typography (iOS scale, white on dark) ─────────────────────────────────────
 
 private val DarkTypography = Typography(
-    displayLarge  = TextStyle(fontSize = 34.sp, fontWeight = FontWeight.Bold,   color = TextPrimary),
-    headlineMedium= TextStyle(fontSize = 28.sp, fontWeight = FontWeight.Bold,   color = TextPrimary),
-    headlineSmall = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.Bold,   color = TextPrimary),
-    titleLarge    = TextStyle(fontSize = 20.sp, fontWeight = FontWeight(600),   color = TextPrimary),
-    titleMedium   = TextStyle(fontSize = 17.sp, fontWeight = FontWeight(600),   color = TextPrimary),
-    titleSmall    = TextStyle(fontSize = 15.sp, fontWeight = FontWeight(600),   color = TextPrimary),
-    bodyLarge     = TextStyle(fontSize = 17.sp, fontWeight = FontWeight.Normal, color = TextPrimary),
-    bodyMedium    = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.Normal, color = TextPrimary),
-    bodySmall     = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Normal, color = TextSecondary),
-    labelMedium   = TextStyle(fontSize = 12.sp, fontWeight = FontWeight(600),   color = TextTertiary, letterSpacing = 0.5.sp),
-    labelSmall    = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Normal, color = TextTertiary),
+    displayLarge   = TextStyle(fontFamily = SpaceGrotesk, fontSize = 34.sp, fontWeight = FontWeight.Bold,     color = TextPrimary,   letterSpacing = (-1).sp),
+    displaySmall   = TextStyle(fontFamily = SpaceGrotesk, fontSize = 30.sp, fontWeight = FontWeight.Bold,     color = TextPrimary,   letterSpacing = (-1).sp),
+    headlineMedium = TextStyle(fontFamily = SpaceGrotesk, fontSize = 28.sp, fontWeight = FontWeight.Bold,     color = TextPrimary,   letterSpacing = (-0.5).sp),
+    headlineSmall  = TextStyle(fontFamily = SpaceGrotesk, fontSize = 22.sp, fontWeight = FontWeight.Bold,     color = TextPrimary,   letterSpacing = (-0.5).sp),
+    titleLarge     = TextStyle(fontFamily = SpaceGrotesk, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary),
+    titleMedium    = TextStyle(fontFamily = SpaceGrotesk, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary),
+    titleSmall     = TextStyle(fontFamily = SpaceGrotesk, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary),
+    bodyLarge      = TextStyle(fontFamily = SpaceGrotesk, fontSize = 17.sp, fontWeight = FontWeight.Normal,   color = TextPrimary),
+    bodyMedium     = TextStyle(fontFamily = SpaceGrotesk, fontSize = 15.sp, fontWeight = FontWeight.Normal,   color = TextPrimary),
+    bodySmall      = TextStyle(fontFamily = SpaceGrotesk, fontSize = 13.sp, fontWeight = FontWeight.Normal,   color = TextSecondary),
+    labelMedium    = TextStyle(fontFamily = SpaceGrotesk, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextTertiary,  letterSpacing = 0.3.sp),
+    labelSmall     = TextStyle(fontFamily = SpaceGrotesk, fontSize = 11.sp, fontWeight = FontWeight.Medium,   color = TextTertiary),
 )
 
 // ── Shapes (Apple HIG radii — preserved from original) ─────────────────────────

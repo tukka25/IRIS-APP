@@ -80,7 +80,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.irisapp.domain.model.PlannedWorkflow
 import com.irisapp.platform.inference.InferenceState
-import com.irisapp.platform.trigger.voice.VoiceTriggerFab
 import com.irisapp.ui.components.BlobPersona
 import com.irisapp.ui.components.BlobState
 import com.irisapp.ui.components.GlassmorphicCard
@@ -182,7 +181,7 @@ fun GenerateTabContent(
                 exit = fadeOut(tween(180))
             ) {
                 Text(
-                    text = "IrisApp",
+                    text = "IRIS",
                     style = MaterialTheme.typography.displaySmall.copy(
                         fontWeight = HeadlineWeight,
                         letterSpacing = (-2).sp,
@@ -284,21 +283,6 @@ fun GenerateTabContent(
             }
         }
 
-        // ── Layer 8: Voice FAB ────────────────────────────────────────────
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = 16.dp, bottom = 20.dp)
-        ) {
-            VoiceTriggerFab(
-                onWorkflowGenerated = { wf, rawJson, transcript ->
-                    viewModel.updatePrompt(transcript)
-                    viewModel.selectWorkflow(wf)
-                    viewModel.setRawJson(rawJson)
-                },
-                onTranscriptReceived = viewModel::updatePrompt
-            )
-        }
     }
 }
 
@@ -511,9 +495,9 @@ private fun IdleBottomContent(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .padding(bottom = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+            .padding(horizontal = 20.dp)
+            .padding(bottom = 100.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         // Arc-arranged workflow preset chips
         if (state.savedWorkflows.isNotEmpty()) {
@@ -528,7 +512,6 @@ private fun IdleBottomContent(
             value = state.prompt,
             onValueChange = viewModel::updatePrompt,
             isGenerating = state.isBusy,
-            onMicClick = {},
             onSendClick = viewModel::generate,
             sendEnabled = state.canGenerate
         )
