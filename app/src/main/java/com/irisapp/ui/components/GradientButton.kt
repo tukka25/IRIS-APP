@@ -1,6 +1,5 @@
 package com.irisapp.ui.components
 
-import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
@@ -36,8 +35,8 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -67,21 +66,22 @@ fun GradientButton(
     )
 
     val t = rememberInfiniteTransition(label = "btn_border")
-    val borderAngle by t.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            tween(4000, easing = LinearEasing), RepeatMode.Restart
-        ),
-        label = "border_angle"
-    )
     val borderAlpha by t.animateFloat(
-        initialValue = 0.55f,
-        targetValue = 0.95f,
+        initialValue = 0.40f,
+        targetValue = 0.90f,
         animationSpec = infiniteRepeatable(
-            tween(2200), RepeatMode.Reverse
+            tween(2400), RepeatMode.Reverse
         ),
         label = "border_alpha"
+    )
+    // Slow hue shift: morphs the 3 accent colors into each other
+    val colorShift by t.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            tween(3600), RepeatMode.Reverse
+        ),
+        label = "color_shift"
     )
 
     Box(
@@ -96,20 +96,21 @@ fun GradientButton(
             .drawBehind {
                 val cornerRad = size.minDimension / 2f
                 if (enabled) {
-                    rotate(borderAngle) {
-                        drawRoundRect(
-                            brush = Brush.sweepGradient(
-                                colors = listOf(
-                                    ElectricCyan.copy(alpha = borderAlpha),
-                                    LiquidViolet.copy(alpha = borderAlpha * 0.85f),
-                                    Color(0xFFFF006E).copy(alpha = borderAlpha * 0.70f),
-                                    ElectricCyan.copy(alpha = borderAlpha)
-                                )
-                            ),
-                            cornerRadius = CornerRadius(cornerRad),
-                            style = Stroke(width = 1.2.dp.toPx())
-                        )
-                    }
+                    val c1 = lerp(ElectricCyan,       LiquidViolet,       colorShift)
+                    val c2 = lerp(LiquidViolet,       Color(0xFFFF006E),  colorShift)
+                    val c3 = lerp(Color(0xFFFF006E),  ElectricCyan,       colorShift)
+                    drawRoundRect(
+                        brush = Brush.sweepGradient(
+                            colors = listOf(
+                                c1.copy(alpha = borderAlpha),
+                                c2.copy(alpha = borderAlpha * 0.80f),
+                                c3.copy(alpha = borderAlpha * 0.65f),
+                                c1.copy(alpha = borderAlpha)
+                            )
+                        ),
+                        cornerRadius = CornerRadius(cornerRad),
+                        style = Stroke(width = 1.2.dp.toPx())
+                    )
                 } else {
                     drawRoundRect(
                         color = GlassBorder,

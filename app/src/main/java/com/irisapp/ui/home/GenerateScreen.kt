@@ -42,6 +42,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Settings
@@ -49,6 +50,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -134,10 +136,13 @@ fun GenerateTabContent(
         label = "char_scale"
     )
 
+    // Resets whenever a new workflow is generated
+    var resultDismissed by remember(state.workflowPreview) { mutableStateOf(false) }
+
     val blobState = when {
         isGenerating                                   -> BlobState.PROCESSING
         state.inferenceState is InferenceState.Loading -> BlobState.LISTENING
-        state.workflowPreview != null                  -> BlobState.DONE
+        state.workflowPreview != null && !resultDismissed -> BlobState.DONE
         else                                           -> BlobState.IDLE
     }
 
@@ -256,7 +261,7 @@ fun GenerateTabContent(
         }
 
         // ── Layer 6: Workflow result panel (post-generation) ──────────────
-        val hasResult = state.workflowPreview != null && !isGenerating
+        val hasResult = state.workflowPreview != null && !isGenerating && !resultDismissed
         AnimatedVisibility(
             visible = hasResult,
             enter = fadeIn(tween(500)) + slideInVertically { it },
@@ -267,6 +272,7 @@ fun GenerateTabContent(
                 WorkflowResultPanel(
                     state = state,
                     viewModel = viewModel,
+                    onDismiss = { resultDismissed = true },
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
             }
@@ -539,19 +545,13 @@ private fun ArcWorkflowChips(
         modifier = Modifier
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        workflows.take(count).forEachIndexed { i, wf ->
-            // Parabolic arc: ends dip down, center rises
-            // y(t) = maxBow * (1 - 4*(t-0.5)^2)  where t ∈ [0,1]
-            val t = if (count > 1) i.toFloat() / (count - 1) else 0.5f
-            val arc = (1f - 4f * (t - 0.5f) * (t - 0.5f))  // 0→1→0
-            val yOffset = -(arc * 10f).dp                     // negative = up
-
+        workflows.take(count).forEach { wf ->
             ArcChip(
                 name = wf.name,
                 stepCount = wf.actions.size,
-                yOffset = yOffset,
                 onClick = { onSelect(wf) }
             )
         }
@@ -562,7 +562,6 @@ private fun ArcWorkflowChips(
 private fun ArcChip(
     name: String,
     stepCount: Int,
-    yOffset: Dp,
     onClick: () -> Unit
 ) {
     var pressed by remember { mutableStateOf(false) }
@@ -574,7 +573,6 @@ private fun ArcChip(
 
     Box(
         modifier = Modifier
-            .offset(y = yOffset)
             .graphicsLayer { scaleX = scale; scaleY = scale }
             .clip(RoundedCornerShape(14.dp))
             .background(
@@ -719,6 +717,7 @@ private fun GenerateShimmerBar(modifier: Modifier = Modifier) {
 private fun WorkflowResultPanel(
     state: WorkflowGenerationUiState,
     viewModel: WorkflowGenerationViewModel,
+    onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val workflow = state.workflowPreview ?: return
@@ -780,19 +779,34 @@ private fun WorkflowResultPanel(
                     )
                 }
             }
-            Box(
-                modifier = Modifier
-                    .padding(start = 12.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(GreenSuccess.copy(alpha = 0.15f))
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Text(
-                    text = "${workflow.actions.size} actions",
-                    fontSize = 11.sp,
-                    fontWeight = SubtitleWeight,
-                    color = GreenSuccess
-                )
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(GreenSuccess.copy(alpha = 0.15f))
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = "${workflow.actions.size} actions",
+                        fontSize = 11.sp,
+                        fontWeight = SubtitleWeight,
+                        color = GreenSuccess
+                    )
+                }
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = "Dismiss",
+                        tint = TextSecondary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
             }
         }
 
