@@ -34,13 +34,19 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.border
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
@@ -49,9 +55,13 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.AccountTree
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
+import androidx.compose.material.icons.filled.Store
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -61,18 +71,11 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -84,8 +87,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -94,16 +103,22 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import com.irisapp.ui.components.AmbientBackground
+import com.irisapp.ui.components.BlobPersona
+import com.irisapp.ui.components.BlobState
 import com.irisapp.ui.components.GlassmorphicCard
 import com.irisapp.ui.components.GradientButton
-import com.irisapp.ui.components.HexHeroIcon
+import com.irisapp.ui.components.LivingInputConsole
 import com.irisapp.ui.components.SceneChip
 import com.irisapp.ui.components.SceneChipStrip
 import com.irisapp.ui.components.SceneChipData
 import com.irisapp.ui.theme.BackgroundDark
 import com.irisapp.ui.theme.CyanAccent
+import com.irisapp.ui.theme.ElectricCyan
 import com.irisapp.ui.theme.GlassBorder
 import com.irisapp.ui.theme.GlassSurface
+import com.irisapp.ui.theme.LiquidViolet
+import com.irisapp.ui.theme.ObsidianDark
 import com.irisapp.ui.theme.SurfaceDark
 import com.irisapp.ui.theme.SurfaceVariantDark
 import com.irisapp.ui.theme.TextPrimary
@@ -129,6 +144,7 @@ import com.irisapp.ui.home.ShareSheetSetupScreen
 import com.irisapp.ui.home.SoundEventTriggerSetupScreen
 import com.irisapp.ui.home.ManualWorkflowEditorScreen
 import com.irisapp.ui.home.WorkflowGenerationViewModel
+import com.irisapp.ui.home.GenerateTabContent
 import com.irisapp.ui.marketplace.MarketplaceScreen
 import com.irisapp.ui.marketplace.MarketplaceViewModel
 import com.irisapp.ui.home.NfcScanConfirmation
@@ -576,375 +592,43 @@ private fun WorkflowGenerationScreen(
         return
     }
 
-    Scaffold(
-        containerColor = BackgroundDark,
-        bottomBar = {
-            DarkNavigationBar(
-                selectedTab = state.selectedTab,
-                onTabSelected = { viewModel.selectTab(it) },
-                tabLabels = listOf("Generate", "Workflows", "Marketplace", "Debug"),
-                tabIcons = listOf("⚡", "⚙", "🛒", "🔍")
-            )
-        }
-    ) { paddingValues ->
-        // Use paddingValues to avoid content under nav bar
-        Box(modifier = Modifier.padding(paddingValues).fillMaxSize()) {
-            when (state.selectedTab) {
-                0 -> GenerateTabContent(viewModel, state)
-                1 -> WorkflowsTabContent(
-                    workflows = state.savedWorkflows,
-                    onSelect = { wf -> viewModel.loadWorkflowDetail(wf.name) },
-                    onEdit = viewModel::openEditWorkflowEditor,
-                    onNew = viewModel::openNewWorkflowEditor
-                )
-                2 -> {
-                    MarketplaceScreen(
-                        viewModel = marketplaceViewModel,
-                        onBack = { }
-                    )
-                }
-                3 -> DebugTabContent(state)
-            }
-        }
-    }
-}
-
-@Composable
-private fun GenerateTabContent(viewModel: WorkflowGenerationViewModel, state: WorkflowGenerationUiState) {
     Box(modifier = Modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-        Spacer(modifier = Modifier.height(8.dp))
-        // Hero block: animated hexagonal icon
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 4.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            // Radial glow halo behind the icon, matching the hex-edge gradient
+        AmbientBackground(modifier = Modifier.fillMaxSize()) {
             Box(
                 modifier = Modifier
-                    .size(160.dp)
-                    .background(
-                        Brush.radialGradient(
-                            colors = listOf(
-                                CyanAccent.copy(alpha = 0.15f),
-                                VioletAccent.copy(alpha = 0.08f),
-                                Color.Transparent
-                            )
-                        ),
-                        shape = RoundedCornerShape(80.dp)
+                    .fillMaxSize()
+                    .statusBarsPadding()
+                    .padding(bottom = 80.dp)
+            ) {
+                when (state.selectedTab) {
+                    0 -> GenerateTabContent(viewModel, state)
+                    1 -> WorkflowsTabContent(
+                        workflows = state.savedWorkflows,
+                        onSelect = { wf -> viewModel.loadWorkflowDetail(wf.name) },
+                        onEdit = viewModel::openEditWorkflowEditor,
+                        onNew = viewModel::openNewWorkflowEditor
                     )
-            )
-            HexHeroIcon(size = 120.dp)
-        }
-
-        // Wordmark — gradient tinted to match hero glow
-        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-            Text(
-                text = "IrisApp",
-                style = MaterialTheme.typography.headlineMedium.copy(
-                    fontWeight = FontWeight(700),
-                    fontSize = 24.sp,
-                    brush = Brush.horizontalGradient(listOf(CyanAccent, VioletAccent))
-                )
-            )
-        }
-
-        // Model load / unload switch
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(GlassSurface, MaterialTheme.shapes.medium)
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column {
-                Text(
-                    text = "Model",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium,
-                    color = TextPrimary
-                )
-                Text(
-                    text = when {
-                        state.inferenceState is InferenceState.Loading -> "Loading..."
-                        state.inferenceState is InferenceState.Ready -> "Ready (${(state.inferenceState as InferenceState.Ready).backend})"
-                        state.inferenceState is InferenceState.Idle -> "Off"
-                        state.inferenceState is InferenceState.MissingModel -> "Model not found"
-                        state.inferenceState is InferenceState.GpuUnavailable -> "GPU unavailable"
-                        state.inferenceState is InferenceState.Error -> "Error"
-                        else -> "Unknown"
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary
-                )
-            }
-            Switch(
-                checked = state.isModelLoaded,
-                onCheckedChange = { if (it) viewModel.loadModel() else viewModel.unloadModel() },
-                enabled = state.inferenceState !is InferenceState.Loading,
-                colors = SwitchDefaults.colors(
-                    checkedThumbColor = CyanAccent,
-                    checkedTrackColor = CyanAccent.copy(alpha = 0.4f),
-                    uncheckedThumbColor = TextSecondary,
-                    uncheckedTrackColor = SurfaceDark
-                )
-            )
-        }
-
-        if (state.savedWorkflows.isNotEmpty()) {
-            Row(
-                modifier = Modifier.horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                state.savedWorkflows.take(6).forEach { wf ->
-                    var pressed by remember { mutableStateOf(false) }
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(if (pressed) SurfaceDark else GlassSurface)
-                            .border(
-                                width = if (pressed) 1.5.dp else 1.dp,
-                                color = if (pressed) CyanAccent else GlassBorder,
-                                shape = RoundedCornerShape(12.dp)
-                            )
-                            .clickable { pressed = !pressed; viewModel.loadWorkflowDetail(wf.name) }
-                            .padding(horizontal = 14.dp, vertical = 8.dp)
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                wf.name,
-                                maxLines = 1,
-                                style = MaterialTheme.typography.bodySmall.copy(
-                                    color = if (pressed) CyanAccent else TextPrimary,
-                                    fontWeight = FontWeight(500)
-                                )
-                            )
-                            Text(
-                                "${wf.actions.size} steps",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    color = if (pressed) CyanAccent.copy(alpha = 0.8f) else CyanAccent,
-                                    fontSize = 10.sp
-                                )
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        OutlinedTextField(
-            value = state.prompt,
-            onValueChange = viewModel::updatePrompt,
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(GlassSurface, MaterialTheme.shapes.medium),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = CyanAccent,
-                unfocusedBorderColor = GlassBorder,
-                focusedLabelColor = CyanAccent,
-                unfocusedLabelColor = TextSecondary,
-                cursorColor = CyanAccent,
-                focusedTextColor = TextPrimary,
-                unfocusedTextColor = TextPrimary
-            ),
-            minLines = 2,
-            label = { Text("What should IrisApp do?") },
-            supportingText = { Text("e.g. \"When I tap this, open Maps\u2026\"", color = TextSecondary) }
-        )
-
-        GradientButton(
-            text = if (state.isBusy) "Generating\u2026" else "Generate Workflow",
-            onClick = viewModel::generate,
-            enabled = state.canGenerate
-        )
-
-        if (state.isBusy) {
-            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(state.stage, style = MaterialTheme.typography.bodySmall)
-                Text(
-                    "${state.elapsedSeconds}s",
-                    style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-
-            // Stage timeline + token usage
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                state.stageTimeline.forEachIndexed { index, stage ->
-                    val tokenInfo = state.stageTokenUsage.getOrNull(index)
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        val (icon, iconColor) = when (stage.status) {
-                            StageStatus.Done -> Icons.Default.CheckCircle to CyanAccent
-                            StageStatus.Running -> Icons.Default.PlayArrow to VioletAccent
-                            StageStatus.Pending -> Icons.Default.RadioButtonUnchecked to TextSecondary
-                        }
-                        Icon(icon, contentDescription = null, tint = iconColor, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(stage.label, color = iconColor, style = MaterialTheme.typography.bodySmall)
-                            // Token usage bar
-                            if (tokenInfo != null && tokenInfo.estimatedTokens > 0) {
-                                val pct = (tokenInfo.estimatedTokens.toFloat() / tokenInfo.contextWindow).coerceAtMost(1f)
-                                val barColor = when {
-                                    pct > 0.8f -> Color(0xFFFF6B6B)
-                                    pct > 0.5f -> VioletAccent
-                                    else -> CyanAccent
-                                }
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    // Mini progress bar
-                                    androidx.compose.material3.LinearProgressIndicator(
-                                        progress = { pct },
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .height(6.dp),
-                                        color = barColor,
-                                        trackColor = barColor.copy(alpha = 0.15f),
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        "${tokenInfo.estimatedTokens} / ${tokenInfo.contextWindow}",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontFamily = FontFamily.Monospace,
-                                        color = barColor
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        if (state.error != null) {
-            GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    text = state.error.orEmpty(),
-                    modifier = Modifier.padding(12.dp),
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodyMedium)
-            }
-        }
-
-        val workflow = state.workflowPreview
-        if (workflow != null) {
-            HorizontalDivider()
-
-            Text("Generated Workflow", style = MaterialTheme.typography.titleMedium)
-
-            GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(workflow.name, style = MaterialTheme.typography.titleSmall)
-                    if (workflow.summary.isNotBlank()) {
-                        Text(workflow.summary, style = MaterialTheme.typography.bodyMedium)
-                    }
-                    Text("Trigger: ${triggerLabel(workflow)}", style = MaterialTheme.typography.bodySmall)
-                    Text("Actions (${workflow.actions.size}):", style = MaterialTheme.typography.labelMedium)
-                    workflow.actions.forEach { step ->
-                        Text(
-                            "  \u2022 ${step.id} ${step.params}",
-                            style = MaterialTheme.typography.bodySmall,
-                            fontFamily = FontFamily.Monospace
+                    2 -> {
+                        MarketplaceScreen(
+                            viewModel = marketplaceViewModel,
+                            onBack = { }
                         )
                     }
-                    if (workflow.missingSetup.isNotEmpty()) {
-                        Text(
-                            "Needs setup: ${workflow.missingSetup.joinToString()}",
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
+                    3 -> DebugTabContent(state)
                 }
             }
-
-            if (state.validationErrors.isNotEmpty()) {
-                GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Text("Validation errors:", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.error)
-                        state.validationErrors.forEach { err ->
-                            Text("  \u2022 $err", style = MaterialTheme.typography.bodySmall)
-                        }
-                    }
-                }
-            }
-
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedButton(
-                    onClick = viewModel::saveWorkflow,
-                    enabled = !state.saved
-                ) {
-                    Text(if (state.saved) "Saved" else "Save")
-                }
-                Button(
-                    onClick = viewModel::runWorkflow,
-                    enabled = state.isValid && !state.isBusy
-                ) {
-                    Text("Run Now")
-                }
-            }
-
-            if (state.rawJson != null) {
-                Text("Raw Model Output", style = MaterialTheme.typography.titleSmall)
-                SelectionContainer {
-                    GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
-                        Text(
-                            text = state.rawJson.orEmpty(),
-                            modifier = Modifier.padding(12.dp),
-                            fontFamily = FontFamily.Monospace,
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
-                }
-            }
-        }
-
-        if (state.runResults.isNotEmpty()) {
-            HorizontalDivider()
-            Text("Execution Results", style = MaterialTheme.typography.titleMedium)
-            state.runResults.forEach { result ->
-                RunResultRow(result)
-            }
-        }
-
-        Spacer(modifier = Modifier.height(80.dp))
-        }
-
-        // Voice FAB integration
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(16.dp)
-        ) {
-            VoiceTriggerFab(
-                onWorkflowGenerated = { workflow, rawJson, transcript ->
-                    viewModel.updatePrompt(transcript)
-                    viewModel.selectWorkflow(workflow)
-                    viewModel.setRawJson(rawJson)
-                },
-                onTranscriptReceived = { transcript ->
-                    viewModel.updatePrompt(transcript)
-                }
+            FloatingPillNavigationDock(
+                selectedTab = state.selectedTab,
+                onTabSelected = { viewModel.selectTab(it) },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    .padding(bottom = 16.dp)
             )
         }
     }
 }
+
 
 @Composable
 private fun MarketplaceComingSoon() {
@@ -1763,7 +1447,98 @@ private fun ShareSheetPicker(
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Dark Navigation Bar — Lumen-inspired bottom tab bar
+// Floating Pill Navigation Dock (Gemini-style)
+// ═══════════════════════════════════════════════════════════════
+@Composable
+private fun FloatingPillNavigationDock(
+    selectedTab: Int,
+    onTabSelected: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val tabIcons = listOf(
+        Icons.Filled.AutoAwesome,
+        Icons.Filled.AccountTree,
+        Icons.Filled.Store,
+        Icons.Filled.BugReport
+    )
+    val tabLabels = listOf("Generate", "Workflows", "Market", "Debug")
+    val tabCount  = tabIcons.size
+
+    val indicatorFraction by animateFloatAsState(
+        targetValue = selectedTab.toFloat() / (tabCount - 1),
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness    = Spring.StiffnessMedium
+        ),
+        label = "nav_indicator"
+    )
+
+    val dockShape = RoundedCornerShape(32.dp)
+    Box(
+        modifier = modifier
+            .clip(dockShape)
+            .background(Color(0xFF0A0A14).copy(alpha = 0.90f))
+            .border(0.5.dp, GlassBorder, dockShape)
+            .height(60.dp)
+    ) {
+        // Sliding active indicator
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val tabWidth = size.width / tabCount
+            val indicatorW = tabWidth * 0.85f
+            val xOffset = indicatorFraction * (size.width - tabWidth) + (tabWidth - indicatorW) / 2f
+            drawRoundRect(
+                color = CyanAccent.copy(alpha = 0.15f),
+                topLeft = Offset(xOffset, 4f),
+                size = Size(indicatorW, this.size.height - 8f),
+                cornerRadius = CornerRadius(28.dp.toPx())
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxSize(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            tabIcons.forEachIndexed { index, icon ->
+                val isSelected = selectedTab == index
+                val iconColor by animateColorAsState(
+                    targetValue = if (isSelected) CyanAccent else TextSecondary.copy(alpha = 0.5f),
+                    animationSpec = tween(250),
+                    label = "icon_color_$index"
+                )
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .clickable { onTabSelected(index) }
+                        .padding(horizontal = 4.dp, vertical = 6.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = tabLabels[index],
+                        tint = iconColor,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = tabLabels[index],
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 10.sp,
+                            fontWeight = if (isSelected) FontWeight(600) else FontWeight(400)
+                        ),
+                        color = iconColor
+                    )
+                }
+            }
+        }
+    }
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// Dark Navigation Bar — kept for reference, no longer used
 // ═══════════════════════════════════════════════════════════════
 @Composable
 private fun DarkNavigationBar(
