@@ -18,13 +18,13 @@ object ModelDownloader {
 
     /**
      * Downloads a file from [url] to [targetFile].
-     * [onProgress] is called with values from 0.0 to 1.0.
+     * [onProgress] is called with detailed download metrics.
      * Returns true if successful, false otherwise.
      */
     suspend fun download(
         url: String,
         targetFile: File,
-        onProgress: (Float) -> Unit
+        onProgress: (progress: Float, downloaded: Long, total: Long, speed: Long, eta: Long) -> Unit
     ): Boolean = withContext(Dispatchers.IO) {
         var connection: HttpURLConnection? = null
         try {
@@ -50,6 +50,7 @@ object ModelDownloader {
             val fileLength = connection.contentLengthLong
             Log.i(TAG, "File length: $fileLength bytes")
 
+            val startTime = System.currentTimeMillis()
             connection.inputStream.use { input ->
                 FileOutputStream(tempFile).use { output ->
                     val data = ByteArray(BUFFER_SIZE)
@@ -63,9 +64,13 @@ object ModelDownloader {
 
                         // Update progress at most every 200ms to avoid flooding UI
                         val now = System.currentTimeMillis()
-                        if (now - lastUpdate > 200) {
+                        if (now - lastUpdate > 400) {
                             val progress = if (fileLength > 0) total.toFloat() / fileLength else 0f
-                            onProgress(progress)
+                            val elapsedMillis = now - startTime
+                            val speed = if (elapsedMillis > 0) (total * 1000) / elapsedMillis else 0L
+                            val eta = if (speed > 0 && fileLength > 0) (fileLength - total) / speed else 0L
+                            
+                            onProgress(progress, total, fileLength, speed, eta)
                             lastUpdate = now
                         }
                     }
@@ -75,7 +80,7 @@ object ModelDownloader {
             // Rename temp file to target file
             if (tempFile.renameTo(targetFile)) {
                 Log.i(TAG, "Download complete: ${targetFile.absolutePath}")
-                onProgress(1.0f)
+                onProgress(1.0f, fileLength, fileLength, 0L, 0L)
                 true
             } else {
                 Log.e(TAG, "Failed to rename temp file to target file")
