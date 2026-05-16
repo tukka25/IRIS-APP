@@ -28,6 +28,7 @@
     <uses-permission android:name="android.permission.WRITE_CALENDAR" />
     <!-- Voice intent trigger + sound event trigger (YAMNet). -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <!-- Foreground service for sound event detection (Android 10+). -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <!-- Foreground microphone service (Android 14+). -->
@@ -197,7 +198,11 @@
         <service
             android:name=".platform.app.LaunchAppService"
             android:exported="false"
-            android:foregroundServiceType="specialUse" />
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="appLaunch" />
+        </service>
 
         <!-- Receives the broadcast from AlarmManager when a silent alarm fires. -->
         <receiver
