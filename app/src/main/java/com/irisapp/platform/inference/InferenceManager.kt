@@ -13,6 +13,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /**
@@ -32,31 +34,37 @@ object InferenceManager {
     private val _state = MutableStateFlow<InferenceState>(InferenceState.Idle)
     val inferenceState: StateFlow<InferenceState> = _state.asStateFlow()
 
+    /** The name of the currently loaded model, or null if none is loaded. */
+    val currentModelName: String? get() = _currentModelName
+
     private var initialized = false
-    private var currentModelName: String? = null
+    private var _currentModelName: String? = null
+
+    /** Serializes initialize / close / downloadAndInit to prevent concurrent coroutine races. */
+    private val mutex = Mutex()
 
     /**
      * Load the specified LiteRT-LM model, preferring GPU.
      * If [modelName] is null, uses the default model from ModelFileLocator.
      */
-    suspend fun initialize(context: Context, modelName: String? = null) {
+    suspend fun initialize(context: Context, modelName: String? = null) = mutex.withLock {
         val targetModel = modelName ?: ModelFileLocator.DEFAULT_MODEL_NAME
-        if (initialized && currentModelName == targetModel) return
-        
+        if (initialized && _currentModelName == targetModel) return@withLock
+
         // If already initialized with a different model, close it first
         if (initialized) {
             close()
         }
-        
+
         initialized = true
-        currentModelName = targetModel
+        _currentModelName = targetModel
         _state.value = InferenceState.Loading
 
         runCatching {
             withContext(Dispatchers.Default) {
                 val locator = ModelFileLocator(context)
                 val modelFile = File(locator.getModelPath(targetModel))
-                
+
                 if (!modelFile.exists()) {
                     throw IllegalStateException("Model not found at ${modelFile.absolutePath}")
                 }
@@ -107,7 +115,7 @@ object InferenceManager {
             }
         }.onFailure { throwable ->
             initialized = false
-            currentModelName = null
+            _currentModelName = null
             Log.e(TAG, "Failed to load model", throwable)
             val message = throwable.message ?: "Unknown error"
 
@@ -131,10 +139,11 @@ object InferenceManager {
     /**
      * Downloads the specified model and initializes it once complete.
      */
-    suspend fun downloadAndInit(context: Context, modelName: String, url: String) {
-        if (_state.value is InferenceState.Downloading) {
-            Log.w(TAG, "Download already in progress. Ignoring request for $modelName")
-            return
+    suspend fun downloadAndInit(context: Context, modelName: String, url: String) = mutex.withLock {
+        val current = _state.value
+        if (current is InferenceState.Downloading || current is InferenceState.Loading) {
+            Log.w(TAG, "Model operation already in progress (${current::class.simpleName}). Ignoring request for $modelName")
+            return@withLock
         }
 
         val locator = ModelFileLocator(context)
@@ -172,12 +181,12 @@ object InferenceManager {
         }
     }
 
-    fun close() {
+    suspend fun close() = mutex.withLock {
         engine?.close()
         engine = null
         _state.value = InferenceState.Idle
         initialized = false
-        currentModelName = null
+        _currentModelName = null
     }
 
     /** Log current memory usage. Helps diagnose OOM kills. */

@@ -27,13 +27,14 @@ object ModelDownloader {
         onProgress: (progress: Float, downloaded: Long, total: Long, speed: Long, eta: Long) -> Unit
     ): Boolean = withContext(Dispatchers.IO) {
         var connection: HttpURLConnection? = null
+        var tempFile: File? = null
         try {
             // Ensure parent directory exists
             targetFile.parentFile?.mkdirs()
 
             // Temporary file to avoid partial downloads being detected as complete
-            val tempFile = File(targetFile.absolutePath + ".tmp")
-            if (tempFile.exists()) tempFile.delete()
+            tempFile = File(targetFile.absolutePath + ".tmp")
+            if (tempFile!!.exists()) tempFile!!.delete()
 
             Log.i(TAG, "Starting download from $url to ${targetFile.absolutePath}")
             val downloadUrl = URL(url)
@@ -47,7 +48,7 @@ object ModelDownloader {
                 return@withContext false
             }
 
-            val fileLength = connection.contentLengthLong
+            val fileLength = connection.contentLengthLong.coerceAtLeast(0)
             Log.i(TAG, "File length: $fileLength bytes")
 
             val startTime = System.currentTimeMillis()
@@ -88,7 +89,8 @@ object ModelDownloader {
             }
         } catch (e: Exception) {
             Log.e(TAG, "Download failed", e)
-            if (targetFile.exists()) targetFile.delete()
+            // Clean up temp file; leave targetFile intact in case a valid model is already there.
+            tempFile?.delete()
             false
         } finally {
             connection?.disconnect()

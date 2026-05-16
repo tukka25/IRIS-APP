@@ -79,7 +79,6 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -97,7 +96,6 @@ import com.irisapp.ui.theme.GlassSurface
 import com.irisapp.ui.theme.GreenSuccess
 import com.irisapp.ui.theme.LiquidViolet
 import com.irisapp.ui.theme.SurfaceDark
-import com.irisapp.ui.theme.SurfaceVariantDark
 import com.irisapp.ui.theme.TextPrimary
 import com.irisapp.ui.theme.TextSecondary
 import com.irisapp.ui.theme.VioletAccent

@@ -93,21 +93,24 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
     }
 
     private fun refreshAvailableModels() {
-        val locator = com.irisapp.platform.inference.litert.ModelFileLocator(getApplication())
-        
-        val items = com.irisapp.platform.inference.litert.ModelFileLocator.AVAILABLE_MODELS.map { meta ->
-            ModelItemUiState(
-                id = meta.id,
-                fileName = meta.fileName,
-                label = meta.label,
-                description = meta.description,
-                sizeLabel = meta.sizeLabel,
-                downloadUrl = meta.downloadUrl,
-                isDownloaded = locator.modelExists(meta.fileName),
-                isActive = false // Will be updated if loaded
-            )
+        viewModelScope.launch(Dispatchers.IO) {
+            val locator = com.irisapp.platform.inference.litert.ModelFileLocator(getApplication())
+            val currentModel = InferenceManager.currentModelName
+
+            val items = com.irisapp.platform.inference.litert.ModelFileLocator.AVAILABLE_MODELS.map { meta ->
+                ModelItemUiState(
+                    id = meta.id,
+                    fileName = meta.fileName,
+                    label = meta.label,
+                    description = meta.description,
+                    sizeLabel = meta.sizeLabel,
+                    downloadUrl = meta.downloadUrl,
+                    isDownloaded = locator.modelExists(meta.fileName),
+                    isActive = meta.fileName == currentModel
+                )
+            }
+            _uiState.update { it.copy(availableModels = items) }
         }
-        _uiState.update { it.copy(availableModels = items) }
     }
 
     fun toggleModelManager() {
@@ -140,7 +143,7 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
     }
 
     fun unloadModel() {
-        InferenceManager.close()
+        viewModelScope.launch { InferenceManager.close() }
     }
 
     /**
