@@ -8,6 +8,7 @@ import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
 import com.irisapp.platform.inference.litert.ModelFileLocator
 import com.irisapp.platform.tools.ToolInitializer
+import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -32,25 +33,33 @@ object InferenceManager {
     val inferenceState: StateFlow<InferenceState> = _state.asStateFlow()
 
     private var initialized = false
+    private var currentModelName: String? = null
 
     /**
-     * Load the default LiteRT-LM model, preferring GPU.
-     *
-     * When BuildConfig.FORCE_GPU_INFERENCE is true, GPU init failure becomes
-     * GpuUnavailable instead of silently falling back to CPU. This is useful for
-     * physical-phone validation where we need to prove the model is really on GPU.
-     * Safe to call multiple times — subsequent calls are no-ops if already loaded.
+     * Load the specified LiteRT-LM model, preferring GPU.
+     * If [modelName] is null, uses the default model from ModelFileLocator.
      */
-    suspend fun initialize(context: Context) {
-        if (initialized) return
+    suspend fun initialize(context: Context, modelName: String? = null) {
+        val targetModel = modelName ?: ModelFileLocator.DEFAULT_MODEL_NAME
+        if (initialized && currentModelName == targetModel) return
+        
+        // If already initialized with a different model, close it first
+        if (initialized) {
+            close()
+        }
+        
         initialized = true
-
+        currentModelName = targetModel
         _state.value = InferenceState.Loading
 
         runCatching {
             withContext(Dispatchers.Default) {
                 val locator = ModelFileLocator(context)
-                val modelFile = locator.requireDefaultModel()
+                val modelFile = File(locator.getModelPath(targetModel))
+                
+                if (!modelFile.exists()) {
+                    throw IllegalStateException("Model not found at ${modelFile.absolutePath}")
+                }
 
                 Log.i(TAG, "Loading model: ${modelFile.absolutePath}")
                 logMemory("Before load")
@@ -98,6 +107,7 @@ object InferenceManager {
             }
         }.onFailure { throwable ->
             initialized = false
+            currentModelName = null
             Log.e(TAG, "Failed to load model", throwable)
             val message = throwable.message ?: "Unknown error"
 
@@ -118,11 +128,56 @@ object InferenceManager {
         }
     }
 
+    /**
+     * Downloads the specified model and initializes it once complete.
+     */
+    suspend fun downloadAndInit(context: Context, modelName: String, url: String) {
+        if (_state.value is InferenceState.Downloading) {
+            Log.w(TAG, "Download already in progress. Ignoring request for $modelName")
+            return
+        }
+
+        val locator = ModelFileLocator(context)
+        val targetFile = File(locator.getModelPath(modelName))
+
+        // Initial zero-progress state
+        _state.value = InferenceState.Downloading(
+            progress = 0f,
+            downloadedBytes = 0,
+            totalBytes = 0,
+            speedBytesPerSecond = 0,
+            etaSeconds = 0,
+            modelId = modelName
+        )
+
+        val success = com.irisapp.platform.inference.litert.ModelDownloader.download(
+            url = url,
+            targetFile = targetFile,
+            onProgress = { progress, downloaded, total, speed, eta ->
+                _state.value = InferenceState.Downloading(
+                    progress = progress,
+                    downloadedBytes = downloaded,
+                    totalBytes = total,
+                    speedBytesPerSecond = speed,
+                    etaSeconds = eta,
+                    modelId = modelName
+                )
+            }
+        )
+
+        if (success) {
+            initialize(context, modelName)
+        } else {
+            _state.value = InferenceState.Error("Download failed for $modelName")
+        }
+    }
+
     fun close() {
         engine?.close()
         engine = null
         _state.value = InferenceState.Idle
         initialized = false
+        currentModelName = null
     }
 
     /** Log current memory usage. Helps diagnose OOM kills. */
@@ -143,11 +198,19 @@ enum class InferenceBackend {
 sealed class InferenceState {
     data object Idle : InferenceState()
     data object Loading : InferenceState()
+    data class Downloading(
+        val progress: Float,
+        val downloadedBytes: Long,
+        val totalBytes: Long,
+        val speedBytesPerSecond: Long,
+        val etaSeconds: Long,
+        val modelId: String? = null
+    ) : InferenceState()
     data class Ready(val backend: InferenceBackend) : InferenceState()
     data object MissingModel : InferenceState()
     data class GpuUnavailable(val reason: String) : InferenceState()
     data class Error(val message: String) : InferenceState()
 
     val isReady: Boolean get() = this is Ready
-    val isBusy: Boolean get() = this is Loading
+    val isBusy: Boolean get() = this is Loading || this is Downloading
 }
