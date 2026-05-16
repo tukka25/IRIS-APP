@@ -62,7 +62,7 @@ object ModelDownloader {
                         total += count
                         output.write(data, 0, count)
 
-                        // Update progress at most every 200ms to avoid flooding UI
+                        // Update progress at most every 400ms to avoid flooding UI
                         val now = System.currentTimeMillis()
                         if (now - lastUpdate > 400) {
                             val progress = if (fileLength > 0) total.toFloat() / fileLength else 0f
