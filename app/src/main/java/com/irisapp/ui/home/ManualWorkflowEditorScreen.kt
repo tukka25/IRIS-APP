@@ -125,6 +125,7 @@ import com.irisapp.ui.theme.TextSecondary
 import com.irisapp.ui.theme.VioletAccent
 import com.irisapp.ui.components.GlassmorphicCard
 import com.irisapp.ui.components.GradientButton
+import com.irisapp.ui.components.GradientOutlinedButton
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -728,7 +729,7 @@ fun ManualWorkflowEditorScreen(
 
         when (currentTriggerConfig) {
             is TriggerConfig.Manual -> {
-                Card(modifier = Modifier.fillMaxWidth()) {
+                GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(16.dp),
                         horizontalArrangement = Arrangement.Center
@@ -742,7 +743,7 @@ fun ManualWorkflowEditorScreen(
                 }
             }
             is TriggerConfig.Time -> {
-                Card(modifier = Modifier.fillMaxWidth()) {
+                GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -785,7 +786,7 @@ fun ManualWorkflowEditorScreen(
                 }
             }
             is TriggerConfig.Battery -> {
-                Card(modifier = Modifier.fillMaxWidth()) {
+                GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text("Battery level: $batteryLevel%", style = MaterialTheme.typography.bodyMedium)
                         Slider(
@@ -807,7 +808,7 @@ fun ManualWorkflowEditorScreen(
                 }
             }
             is TriggerConfig.Charger -> {
-                Card(modifier = Modifier.fillMaxWidth()) {
+                GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text("Connection type:", style = MaterialTheme.typography.bodyMedium)
                         Spacer(modifier = Modifier.height(8.dp))
@@ -842,7 +843,7 @@ fun ManualWorkflowEditorScreen(
                 )
             }
             is TriggerConfig.AirplaneMode -> {
-                Card(modifier = Modifier.fillMaxWidth()) {
+                GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -856,7 +857,7 @@ fun ManualWorkflowEditorScreen(
                 }
             }
             is TriggerConfig.DoNotDisturb -> {
-                Card(modifier = Modifier.fillMaxWidth()) {
+                GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text("Do Not Disturb trigger", style = MaterialTheme.typography.bodyMedium)
                         Text("Fires on any DND interruption filter change.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
@@ -864,7 +865,7 @@ fun ManualWorkflowEditorScreen(
                 }
             }
             is TriggerConfig.Geofence -> {
-                Card(modifier = Modifier.fillMaxWidth()) {
+                GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text("Geofence trigger", style = MaterialTheme.typography.bodyMedium)
 
@@ -940,7 +941,7 @@ fun ManualWorkflowEditorScreen(
                 }
             }
             is TriggerConfig.AlarmStopped -> {
-                Card(modifier = Modifier.fillMaxWidth()) {
+                GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("Alarm Stopped", style = MaterialTheme.typography.bodyMedium)
                         Text(
@@ -960,7 +961,7 @@ fun ManualWorkflowEditorScreen(
                 }
             }
             is TriggerConfig.AppOpened, is TriggerConfig.AppClosed -> {
-                Card(modifier = Modifier.fillMaxWidth()) {
+                GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text(
                             if (currentTriggerConfig is TriggerConfig.AppOpened) "App Opened" else "App Closed",
@@ -987,7 +988,7 @@ fun ManualWorkflowEditorScreen(
                 }
             }
             is TriggerConfig.SmsReceived -> {
-                Card(modifier = Modifier.fillMaxWidth()) {
+                GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("SMS Received", style = MaterialTheme.typography.bodyMedium)
                         Text(
@@ -1015,7 +1016,7 @@ fun ManualWorkflowEditorScreen(
                 }
             }
             is TriggerConfig.NotificationListenerConfig -> {
-                Card(modifier = Modifier.fillMaxWidth()) {
+                GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("App Notification", style = MaterialTheme.typography.bodyMedium)
                         Text(
@@ -1062,7 +1063,7 @@ color = TextSecondary,
                 }
             }
             is TriggerConfig.EmailReceived -> {
-                Card(modifier = Modifier.fillMaxWidth()) {
+                GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("Email Received", style = MaterialTheme.typography.bodyMedium)
                         Text(
@@ -1097,7 +1098,7 @@ color = TextSecondary,
                 }
             }
             is TriggerConfig.SleepProxy -> {
-                Card(modifier = Modifier.fillMaxWidth()) {
+                GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text("Sleep Proxy", style = MaterialTheme.typography.bodyMedium)
                         Text(
@@ -1155,7 +1156,7 @@ color = TextSecondary,
                 }
             }
             is TriggerConfig.Nfc -> {
-                Card(modifier = Modifier.fillMaxWidth()) {
+                GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("NFC Tag", style = MaterialTheme.typography.bodyMedium)
                         Text(
@@ -1174,7 +1175,7 @@ color = TextSecondary,
                 }
             }
             is TriggerConfig.ShareSheet -> {
-                Card(modifier = Modifier.fillMaxWidth()) {
+                GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("Share Sheet", style = MaterialTheme.typography.bodyMedium)
                         Text(
@@ -1192,7 +1193,7 @@ color = TextSecondary,
                 }
             }
             is TriggerConfig.Voice -> {
-                Card(modifier = Modifier.fillMaxWidth()) {
+                GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("Voice Intent", style = MaterialTheme.typography.bodyMedium)
                         Text(
@@ -1357,16 +1358,13 @@ color = TextSecondary,
             )
         }
 
-        OutlinedButton(
+        GradientOutlinedButton(
+            text = "+ Add Action",
             onClick = {
                 steps = steps + WorkflowStep(id = "browser.open_url", params = buildJsonObject { put("url", "") })
             },
             modifier = Modifier.fillMaxWidth()
-        ) {
-            Icon(Icons.Default.Add, contentDescription = null)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("Add Action")
-        }
+        )
 
         Spacer(modifier = Modifier.height(8.dp))
 
@@ -1375,13 +1373,13 @@ color = TextSecondary,
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            OutlinedButton(
+            GradientOutlinedButton(
+                text = "Cancel",
                 onClick = onCancel,
                 modifier = Modifier.weight(1f)
-            ) {
-                Text("Cancel")
-            }
-            Button(
+            )
+            GradientButton(
+                text = "Save",
                 onClick = {
                     val trigger = buildTrigger(
                         triggerType = "Trigger" to currentTriggerConfig,
@@ -1435,9 +1433,7 @@ color = TextSecondary,
                 },
                 modifier = Modifier.weight(1f),
                 enabled = name.isNotBlank() && steps.isNotEmpty()
-            ) {
-                Text("Save")
-            }
+            )
         }
 
         Spacer(modifier = Modifier.height(32.dp))
@@ -1676,17 +1672,17 @@ private fun ActionEditDialog(
         },
         confirmButton = {
             val canSave = validationErrors.isEmpty()
-            Button(
+            GradientButton(
+                text = "Save",
                 onClick = {
                     val json = buildJsonObject {
                         params.forEach { (k, v) -> put(k, v) }
                     }
                     onSave(WorkflowStep(id = selectedActionId, params = json))
                 },
-                enabled = canSave
-            ) {
-                Text("Save")
-            }
+                enabled = canSave,
+                fillWidth = false
+            )
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {

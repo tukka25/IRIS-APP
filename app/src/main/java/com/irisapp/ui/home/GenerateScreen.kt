@@ -54,12 +54,16 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
+import com.irisapp.platform.trigger.voice.VoiceIntentTrigger
+import com.irisapp.platform.trigger.voice.VoiceRecognitionContract
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
@@ -114,19 +118,7 @@ fun GenerateTabContent(
     state: WorkflowGenerationUiState
 ) {
     val isGenerating = state.isBusy
-    val configuration = LocalConfiguration.current
-    val density = LocalDensity.current
-    val screenHeightDp = configuration.screenHeightDp.dp
 
-    // Character translates from upper-center (idle) → dead-center (generating)
-    val charTranslateY by animateDpAsState(
-        targetValue = if (isGenerating) 0.dp else -(screenHeightDp * 0.19f),
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow
-        ),
-        label = "char_y"
-    )
     val charScale by animateFloatAsState(
         targetValue = if (isGenerating) 1.48f else 1.0f,
         animationSpec = spring(
@@ -161,42 +153,42 @@ fun GenerateTabContent(
             GenerationAura(modifier = Modifier.fillMaxSize())
         }
 
-        // ── Layer 1: Character + wordmark (always rendered, position animated)
-        val charTranslateYPx = with(density) { charTranslateY.toPx() }
+        // ── Layer 1: "iRiS." wordmark — top-left ─────────────────────────
+        AnimatedVisibility(
+            visible = !isGenerating,
+            enter = fadeIn(tween(400, delayMillis = 120)),
+            exit = fadeOut(tween(180)),
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(start = 20.dp, top = 6.dp)
+        ) {
+            Text(
+                text = "iRiS",
+                style = MaterialTheme.typography.displaySmall.copy(
+                    fontWeight = FontWeight.Light,
+                    letterSpacing = 2.sp,
+                    fontSize = 34.sp,
+                    color = Color.White.copy(alpha = 0.80f)
+                )
+            )
+        }
+
+        // ── Layer 2: Character — lifted above bottom content ─────────────
         Column(
             modifier = Modifier
                 .align(Alignment.Center)
-                .graphicsLayer { translationY = charTranslateYPx },
+                .offset(y = (-70).dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
             BlobPersona(
                 blobState = blobState,
-                size = 160.dp,
+                size = 200.dp,
                 modifier = Modifier.graphicsLayer {
                     scaleX = charScale
                     scaleY = charScale
                 }
             )
-
-            // "IrisApp" wordmark — exits when generating
-            AnimatedVisibility(
-                visible = !isGenerating,
-                enter = fadeIn(tween(400, delayMillis = 120)),
-                exit = fadeOut(tween(180))
-            ) {
-                Text(
-                    text = "IRIS",
-                    style = MaterialTheme.typography.displaySmall.copy(
-                        fontWeight = HeadlineWeight,
-                        letterSpacing = (-2).sp,
-                        fontSize = 34.sp,
-                        brush = Brush.horizontalGradient(
-                            listOf(ElectricCyan, CyanAccent, VioletAccent)
-                        )
-                    )
-                )
-            }
 
             // "Thinking…" caption — enters when generating
             AnimatedVisibility(
@@ -514,12 +506,17 @@ private fun IdleBottomContent(
         }
 
         // Living input console (Gemini-style glowing pill)
+        val context = LocalContext.current
+        val voiceTrigger = remember { VoiceIntentTrigger(context) }
+        val speechLauncher = rememberLauncherForActivityResult(VoiceRecognitionContract()) { (code, data) ->
+            voiceTrigger.parseResult(code, data)
+                .onSuccess { transcript -> viewModel.updatePrompt(transcript) }
+        }
         LivingInputConsole(
             value = state.prompt,
             onValueChange = viewModel::updatePrompt,
             isGenerating = state.isBusy,
-            onSendClick = viewModel::generate,
-            sendEnabled = state.canGenerate
+            onMicClick = { if (voiceTrigger.isAvailable) speechLauncher.launch(Unit) }
         )
 
         // Generate button

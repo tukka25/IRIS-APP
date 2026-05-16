@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SLM Monitor Bar — TOOL_CALL state. LiquidViolet (#B200FF) iridescent border. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <!-- Violet-tinted fill: gives a deep purple glow impression -->
+    <solid android:color="#CC0C0814" />
+    <!-- LiquidViolet at ~55% alpha -->
+    <stroke android:width="1dp" android:color="#8CB200FF" />
+    <corners android:radius="12dp" />
+</shape>

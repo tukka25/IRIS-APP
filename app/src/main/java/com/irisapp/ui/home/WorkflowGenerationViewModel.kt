@@ -28,12 +28,14 @@ import com.irisapp.platform.trigger.BluetoothTriggerManager
 import com.irisapp.platform.trigger.ChargerTriggerManager
 import com.irisapp.platform.trigger.DndTriggerManager
 import com.irisapp.platform.trigger.WiFiTriggerManager
+import android.content.Intent
 import com.irisapp.platform.trigger.AirplaneModeTriggerManager
 import com.irisapp.platform.trigger.sound.SoundEventTriggerRegistry
 import com.irisapp.platform.location.GeofenceManager
 import com.irisapp.platform.inference.InferenceManager
 import com.irisapp.platform.inference.InferenceState
 import com.irisapp.platform.tools.reto.RetoTrace
+import com.irisapp.widget.IrisWidgetStateRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -926,6 +928,37 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
                 selectedWorkflowDetail = workflow,
                 prompt = promptHint
             )
+        }
+    }
+
+    fun deleteWorkflow(name: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            workflowRepo.delete(name)
+            val updated = workflowRepo.loadAll()
+            _uiState.update { it.copy(savedWorkflows = updated) }
+        }
+    }
+
+    fun shareWorkflow(workflow: PlannedWorkflow) {
+        val text = buildString {
+            append(workflow.name)
+            if (workflow.summary.isNotBlank()) append("\n${workflow.summary}")
+            append("\n${workflow.actions.size} step${if (workflow.actions.size != 1) "s" else ""}")
+        }
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, text)
+        }
+        getApplication<Application>().startActivity(
+            Intent.createChooser(intent, "Share Routine").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        )
+    }
+
+    fun addToWidgetSuggestions(workflowName: String) {
+        viewModelScope.launch {
+            val names = workflowRepo.listNames()
+            val prioritised = (listOf(workflowName) + names.filter { it != workflowName }).take(3)
+            IrisWidgetStateRepository.updateSuggestions(getApplication(), prioritised)
         }
     }
 

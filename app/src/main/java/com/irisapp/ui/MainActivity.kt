@@ -32,6 +32,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.border
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.LinearEasing
@@ -56,18 +58,31 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.AccountTree
 import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Store
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.Widgets
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -81,6 +96,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -92,7 +108,11 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.lerp
+import kotlin.math.PI
+import kotlin.math.sin
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -106,15 +126,20 @@ import com.irisapp.ui.components.BlobPersona
 import com.irisapp.ui.components.BlobState
 import com.irisapp.ui.components.GlassmorphicCard
 import com.irisapp.ui.components.GradientButton
+import com.irisapp.ui.components.GradientOutlinedButton
 import com.irisapp.ui.components.LivingInputConsole
 import com.irisapp.ui.components.SceneChip
 import com.irisapp.ui.components.SceneChipStrip
 import com.irisapp.ui.components.SceneChipData
+import com.irisapp.data.repository.ExecutionHistoryRepository
+import com.irisapp.domain.model.ExecutionLogEntry
+import com.irisapp.ui.theme.AmberWarning
 import com.irisapp.ui.theme.BackgroundDark
 import com.irisapp.ui.theme.CyanAccent
 import com.irisapp.ui.theme.ElectricCyan
 import com.irisapp.ui.theme.GlassBorder
 import com.irisapp.ui.theme.GlassSurface
+import com.irisapp.ui.theme.GreenSuccess
 import com.irisapp.ui.theme.LiquidViolet
 import com.irisapp.ui.theme.ObsidianDark
 import com.irisapp.ui.theme.SurfaceDark
@@ -501,7 +526,9 @@ private fun WorkflowGenerationScreen(
                         workflows = state.savedWorkflows,
                         onSelect = { wf -> viewModel.loadWorkflowDetail(wf.name) },
                         onEdit = viewModel::openEditWorkflowEditor,
-                        onNew = viewModel::openNewWorkflowEditor
+                        onNew = viewModel::openNewWorkflowEditor,
+                        onDelete = { wf -> viewModel.deleteWorkflow(wf.name) },
+                        onShare = viewModel::shareWorkflow
                     )
                     2 -> {
                         MarketplaceScreen(
@@ -509,9 +536,16 @@ private fun WorkflowGenerationScreen(
                             onBack = { }
                         )
                     }
-                    3 -> DebugTabContent(state)
+                    3 -> HistoryTabContent(viewModel = viewModel)
                 }
             }
+            BottomNavGlow(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(200.dp)
+                    .navigationBarsPadding()
+            )
             FloatingPillNavigationDock(
                 selectedTab = state.selectedTab,
                 onTabSelected = { viewModel.selectTab(it) },
@@ -560,7 +594,9 @@ private fun WorkflowsTabContent(
     workflows: List<PlannedWorkflow>,
     onSelect: (PlannedWorkflow) -> Unit,
     onEdit: (PlannedWorkflow) -> Unit,
-    onNew: () -> Unit
+    onNew: () -> Unit,
+    onDelete: (PlannedWorkflow) -> Unit,
+    onShare: (PlannedWorkflow) -> Unit
 ) {
     // Scene selection state — null means "show all"
     var selectedSceneId by remember { mutableStateOf<String?>(null) }
@@ -589,7 +625,7 @@ private fun WorkflowsTabContent(
     ) {
         Spacer(modifier = Modifier.height(16.dp))
         Text(
-            "Workflows",
+            "Routines",
             style = MaterialTheme.typography.headlineMedium.copy(
                 fontWeight = FontWeight(700),
                 fontSize = 28.sp,
@@ -617,8 +653,8 @@ private fun WorkflowsTabContent(
         ) {
             val headerLabel = if (selectedSceneId != null) {
                 val sceneName = scenes.find { it.id == selectedSceneId }?.name ?: ""
-                "$sceneName Workflows"
-            } else "Saved Workflows"
+                "$sceneName Routines"
+            } else "Saved Routines"
 
             Text(
                 headerLabel,
@@ -627,7 +663,7 @@ private fun WorkflowsTabContent(
                     fontWeight = FontWeight(600)
                 )
             )
-            GradientButton(text = "+ New", onClick = onNew)
+            GradientButton(text = "+ New", onClick = onNew, fillWidth = false, modifier = Modifier.wrapContentWidth())
         }
 
         val isFiltering = selectedSceneId != null
@@ -649,7 +685,7 @@ private fun WorkflowsTabContent(
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Text(
-                                "No workflows yet",
+                                "No routines yet",
                                 style = MaterialTheme.typography.titleMedium.copy(color = TextPrimary)
                             )
                             Row(
@@ -698,11 +734,11 @@ private fun WorkflowsTabContent(
                         ) {
                             val sceneName = scenes.find { it.id == selectedSceneId }?.name ?: ""
                             Text(
-                                "No $sceneName workflows",
+                                "No $sceneName routines",
                                 style = MaterialTheme.typography.titleMedium.copy(color = TextPrimary)
                             )
                             TextButton(onClick = { selectedSceneId = null }) {
-                                Text("Show all workflows", color = CyanAccent)
+                                Text("Show all routines", color = CyanAccent)
                             }
                         }
                     }
@@ -712,7 +748,9 @@ private fun WorkflowsTabContent(
                         WorkflowListCard(
                             workflow = workflow,
                             onSelect = { onSelect(workflow) },
-                            onEdit = { onEdit(workflow) }
+                            onEdit = { onEdit(workflow) },
+                            onDelete = { onDelete(workflow) },
+                            onShare = { onShare(workflow) }
                         )
                     }
                 }
@@ -819,8 +857,21 @@ private fun DebugTabContent(state: WorkflowGenerationUiState) {
 private fun WorkflowListCard(
     workflow: PlannedWorkflow,
     onSelect: () -> Unit,
-    onEdit: () -> Unit
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    onShare: () -> Unit
 ) {
+    var isEnabled by rememberSaveable(workflow.name) {
+        mutableStateOf(workflow.trigger !is TriggerConfig.Manual)
+    }
+    var menuExpanded by remember { mutableStateOf(false) }
+
+    val switchTrackColor by animateColorAsState(
+        targetValue = if (isEnabled) ElectricCyan else GlassBorder,
+        animationSpec = tween(300),
+        label = "switch_track"
+    )
+
     GlassmorphicCard(
         modifier = Modifier.fillMaxWidth(),
         glowColor = null
@@ -851,17 +902,45 @@ private fun WorkflowListCard(
                     color = CyanAccent
                 )
             }
-            OutlinedButton(
-                onClick = onSelect,
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = CyanAccent)
-            ) {
-                Text("View")
-            }
-            OutlinedButton(
-                onClick = onEdit,
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = VioletAccent)
-            ) {
-                Text("Edit")
+            Switch(
+                checked = isEnabled,
+                onCheckedChange = { isEnabled = it },
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = Color(0xFF000000),
+                    checkedTrackColor = switchTrackColor,
+                    uncheckedTrackColor = GlassBorder
+                )
+            )
+            Box {
+                IconButton(onClick = { menuExpanded = true }) {
+                    Icon(Icons.Default.MoreVert, contentDescription = "More", tint = TextSecondary)
+                }
+                DropdownMenu(
+                    expanded = menuExpanded,
+                    onDismissRequest = { menuExpanded = false },
+                    modifier = Modifier.background(GlassSurface)
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("View", color = TextPrimary) },
+                        leadingIcon = { Icon(Icons.Default.Visibility, contentDescription = null, tint = TextPrimary, modifier = Modifier.size(18.dp)) },
+                        onClick = { menuExpanded = false; onSelect() }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Edit", color = CyanAccent) },
+                        leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null, tint = CyanAccent, modifier = Modifier.size(18.dp)) },
+                        onClick = { menuExpanded = false; onEdit() }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Share", color = VioletAccent) },
+                        leadingIcon = { Icon(Icons.Default.Share, contentDescription = null, tint = VioletAccent, modifier = Modifier.size(18.dp)) },
+                        onClick = { menuExpanded = false; onShare() }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Delete", color = AmberWarning) },
+                        leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = AmberWarning, modifier = Modifier.size(18.dp)) },
+                        onClick = { menuExpanded = false; onDelete() }
+                    )
+                }
             }
         }
     }
@@ -1105,28 +1184,30 @@ private fun WorkflowDetailScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Workflow Detail", style = MaterialTheme.typography.headlineSmall)
+            Text(
+                "Routine Detail",
+                style = MaterialTheme.typography.headlineMedium.copy(
+                    fontWeight = FontWeight(700),
+                    color = TextPrimary
+                )
+            )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = onEdit) {
-                    Text("Edit")
-                }
-                OutlinedButton(onClick = onBack) {
-                    Text("Back")
-                }
+                GradientOutlinedButton(text = "Edit", onClick = onEdit)
+                GradientOutlinedButton(text = "Back", onClick = onBack)
             }
         }
 
-        Card(modifier = Modifier.fillMaxWidth()) {
+        GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(workflow.name, style = MaterialTheme.typography.titleMedium)
+                Text(workflow.name, style = MaterialTheme.typography.titleMedium.copy(color = TextPrimary))
                 if (workflow.summary.isNotBlank()) {
-                    Text(workflow.summary, style = MaterialTheme.typography.bodyMedium)
+                    Text(workflow.summary, style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
                 }
-                Text("Trigger: ${triggerLabel(workflow)}", style = MaterialTheme.typography.bodySmall)
+                Text("Trigger: ${triggerLabel(workflow)}", style = MaterialTheme.typography.bodySmall, color = CyanAccent)
             }
         }
 
-        Text("Steps", style = MaterialTheme.typography.titleSmall)
+        Text("Steps", style = MaterialTheme.typography.titleSmall.copy(color = TextPrimary, fontWeight = FontWeight(700)))
         workflow.actions.forEach { step ->
             val spec = ActionSpecRegistry.find(step.id)
             val icon = stepIcon(step.id)
@@ -1135,19 +1216,20 @@ private fun WorkflowDetailScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 4.dp),
+                    .background(GlassSurface, RoundedCornerShape(8.dp))
+                    .padding(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(icon, style = MaterialTheme.typography.titleMedium)
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(label, style = MaterialTheme.typography.bodyMedium)
+                    Text(label, style = MaterialTheme.typography.bodyMedium, color = TextPrimary)
                     if (params.isNotBlank()) {
                         Text(
                             params,
                             style = MaterialTheme.typography.bodySmall,
                             fontFamily = FontFamily.Monospace,
-                            color = MaterialTheme.colorScheme.outline
+                            color = TextSecondary
                         )
                     }
                 }
@@ -1161,13 +1243,11 @@ private fun WorkflowDetailScreen(
             }
         }
 
-        Button(
+        GradientButton(
+            text = if (isBusy) "Running\u2026" else "Run Now",
             onClick = onRun,
-            enabled = !isBusy,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(if (isBusy) "Running\u2026" else "Run")
-        }
+            enabled = !isBusy
+        )
 
         // Show "Schedule" or "Set up trigger" button based on trigger type
         val triggerConfig = workflow.trigger
@@ -1176,21 +1256,15 @@ private fun WorkflowDetailScreen(
 
         if (showScheduleButton) {
             val label = if (triggerConfig is TriggerConfig.Time) "\u23F0 Edit Schedule" else "\u23F0 Schedule"
-            OutlinedButton(
-                onClick = onSetupTrigger,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(label)
-            }
+            GradientOutlinedButton(text = label, onClick = onSetupTrigger, modifier = Modifier.fillMaxWidth())
         }
 
         if (showShareSheetSetupButton) {
-            OutlinedButton(
+            GradientOutlinedButton(
+                text = "\uD83D\uDCE4 Set up Share Sheet",
                 onClick = onSetupTrigger,
                 modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("\uD83D\uDCE4 Set up Share Sheet")
-            }
+            )
         }
 
         Spacer(modifier = Modifier.height(32.dp))
@@ -1296,6 +1370,234 @@ private fun ShareSheetPicker(
 }
 
 // ═══════════════════════════════════════════════════════════════
+// Bottom Nav Glow (ambient particles above dock)
+// ═══════════════════════════════════════════════════════════════
+@Composable
+private fun BottomNavGlow(modifier: Modifier = Modifier) {
+    val t = rememberInfiniteTransition(label = "hill_grid")
+
+    // Scrolls the terrain toward the viewer
+    val scrollPhase by t.animateFloat(
+        initialValue = 0f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(8000, easing = LinearEasing), RepeatMode.Restart),
+        label = "scroll"
+    )
+    // Slowly cycles the light color between cyan and violet — long duration keeps it smooth
+    val lightCycle by t.animateFloat(
+        initialValue = 0f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(14000, easing = LinearEasing), RepeatMode.Reverse),
+        label = "light"
+    )
+
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+
+        val cols  = 16
+        val rows  = 22
+        val vpX   = w * 0.5f    // vanishing point — horizontal center
+        val vpY   = h * 0.02f   // vanishing point — near the top (where the dock light comes from)
+
+        // Hill displacement at a grid vertex.
+        // Scrolling in the −phase direction makes hills flow toward the viewer (row = rows).
+        fun hillAt(col: Int, row: Int): Float {
+            val xf    = col.toFloat() / cols
+            val zf    = row.toFloat() / rows
+            // phase completes exactly one full 2π cycle so both sines loop seamlessly on restart
+            val phase = scrollPhase * 2f * PI.toFloat()
+            val primary   = sin(zf * PI.toFloat() * 4f - phase) * 0.42f
+            val secondary = sin(xf * PI.toFloat() * 3f + zf * PI.toFloat() * 2f - phase) * 0.20f
+            return primary + secondary
+        }
+
+        // Perspective-project a grid vertex onto screen space.
+        // row 0 = far / horizon (top of canvas), row = rows = near / viewer (bottom of canvas).
+        fun project(col: Int, row: Int): Offset {
+            val normX = col.toFloat() / cols - 0.5f   // −0.5 … +0.5
+            val normZ = row.toFloat() / rows           //  0   …  1 (near)
+            val hill  = hillAt(col, row)
+
+            // Perspective factor — boosted so the grid overfills the screen width.
+            // pz ranges from 0.50 (far/horizon) to 2.10 (near/viewer).
+            val pz      = 0.50f + normZ * 1.60f
+            val screenX = vpX + normX * w * pz
+            // Base Y marches from vpY (far) down to h (near); hills displace upward.
+            val baseY   = vpY + (h - vpY) * normZ
+            val screenY = baseY - hill * (h - vpY) * 0.28f * pz
+            return Offset(screenX, screenY)
+        }
+
+        // Color for a grid line: rows near the top (horizon / light source) are brighter.
+        // Hill peaks catch more reflected light than valleys.
+        fun lineColor(row: Int, hillAvg: Float): Color {
+            val normRow     = row.toFloat() / rows
+            val lightAmount = (1f - normRow * 0.72f) * 0.65f + ((hillAvg + 1f) * 0.15f).coerceIn(0f, 0.30f)
+            val alpha       = (0.06f + lightAmount * 0.62f).coerceIn(0.03f, 0.75f)
+            // Small per-row spatial tint (no modulo — eliminates color-wrap jumps)
+            val colorT      = (lightCycle + normRow * 0.08f).coerceIn(0f, 1f)
+            return lerp(ElectricCyan, LiquidViolet, colorT).copy(alpha = alpha)
+        }
+
+        // ── Horizontal lines (terrain rows — the "hill contours") ────────────
+        for (row in 0..rows) {
+            val path = Path()
+            var moved = false
+            for (col in 0..cols) {
+                val pt = project(col, row)
+                if (!moved) { path.moveTo(pt.x, pt.y); moved = true }
+                else path.lineTo(pt.x, pt.y)
+            }
+            val avgHill = (0..cols).sumOf { hillAt(it, row).toDouble() }.toFloat() / (cols + 1)
+            // Near rows are drawn thicker (stronger reflection from the dock light above)
+            val sw = (0.3f + (row.toFloat() / rows) * 1.3f).dp.toPx()
+            drawPath(path, lineColor(row, avgHill), style = Stroke(sw))
+        }
+
+        // ── Vertical lines (the "slope ribs" of the tilted grid) ─────────────
+        for (col in 0..cols) {
+            val path = Path()
+            var moved = false
+            for (row in 0..rows) {
+                val pt = project(col, row)
+                if (!moved) { path.moveTo(pt.x, pt.y); moved = true }
+                else path.lineTo(pt.x, pt.y)
+            }
+            val avgHill = (0..rows).sumOf { hillAt(col, it).toDouble() }.toFloat() / (rows + 1)
+            val base = lineColor(rows / 2, avgHill)
+            drawPath(path, base.copy(alpha = base.alpha * 0.55f), style = Stroke(0.45f.dp.toPx()))
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// History Tab
+// ═══════════════════════════════════════════════════════════════
+@Composable
+private fun HistoryTabContent(viewModel: WorkflowGenerationViewModel) {
+    val context = LocalContext.current
+    val entries = remember { ExecutionHistoryRepository(context).recent(20) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            "History",
+            style = MaterialTheme.typography.headlineMedium.copy(
+                fontWeight = FontWeight(700),
+                color = TextPrimary
+            )
+        )
+        if (entries.isEmpty()) {
+            Text("No executions yet.", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+        } else {
+            entries.reversed().forEach { entry ->
+                HistoryEntryCard(entry = entry, onSaveToWidget = { viewModel.addToWidgetSuggestions(entry.workflowName) })
+            }
+        }
+        Spacer(modifier = Modifier.height(32.dp))
+    }
+}
+
+@Composable
+private fun HistoryEntryCard(entry: ExecutionLogEntry, onSaveToWidget: () -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(entry.workflowName, style = MaterialTheme.typography.titleMedium.copy(color = TextPrimary))
+                    Text(
+                        formatRelativeTime(entry.timestampMillis),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = TextSecondary
+                    )
+                }
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .background(
+                                if (entry.allSuccess) GreenSuccess else AmberWarning,
+                                CircleShape
+                            )
+                    )
+                    IconButton(onClick = onSaveToWidget, modifier = Modifier.size(32.dp)) {
+                        Icon(
+                            Icons.Default.Widgets,
+                            contentDescription = "Save to widget",
+                            tint = CyanAccent,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    IconButton(onClick = { expanded = !expanded }, modifier = Modifier.size(32.dp)) {
+                        Icon(
+                            if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            contentDescription = "Expand",
+                            tint = TextSecondary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+            }
+            Text(
+                "${entry.results.size} step${if (entry.results.size != 1) "s" else ""} · ${entry.results.count { it.success }} succeeded",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary
+            )
+            AnimatedVisibility(visible = expanded) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                    entry.results.forEach { result ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                if (result.success) "✓" else "✗",
+                                color = if (result.success) GreenSuccess else AmberWarning,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            Column {
+                                Text(result.stepId, style = MaterialTheme.typography.bodySmall, color = TextPrimary)
+                                if (result.output.isNotBlank()) {
+                                    Text(
+                                        "→ ${result.output}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = TextSecondary
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun formatRelativeTime(timestampMillis: Long): String {
+    val diff = System.currentTimeMillis() - timestampMillis
+    return when {
+        diff < 60_000L -> "just now"
+        diff < 3_600_000L -> "${diff / 60_000}m ago"
+        diff < 86_400_000L -> "${diff / 3_600_000}h ago"
+        else -> "${diff / 86_400_000}d ago"
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
 // Floating Pill Navigation Dock (Gemini-style)
 // ═══════════════════════════════════════════════════════════════
 @Composable
@@ -1308,9 +1610,9 @@ private fun FloatingPillNavigationDock(
         Icons.Filled.AutoAwesome,
         Icons.Filled.AccountTree,
         Icons.Filled.Store,
-        Icons.Filled.BugReport
+        Icons.Filled.History
     )
-    val tabLabels = listOf("Generate", "Workflows", "Market", "Debug")
+    val tabLabels = listOf("Generate", "Routines", "Marketplace", "History")
     val tabCount  = tabIcons.size
 
     val indicatorFraction by animateFloatAsState(
