@@ -95,6 +95,18 @@ fun NfcSetupScreen(
                 }
                 is DeepLink.RunWorkflow -> onTagScanned(deepLink.workflowId)
                 is DeepLink.ShowDetail -> onTagScanned(deepLink.workflowId)
+                is DeepLink.WriteComplete -> {
+                    if (deepLink.workflowId == selectedWorkflowId) {
+                        if (deepLink.success) {
+                            writeState = WriteState.Success(deepLink.workflowId)
+                            onWriteSuccess(deepLink.workflowId)
+                        } else {
+                            writeState = WriteState.Error(deepLink.message)
+                            onWriteError(deepLink.message)
+                        }
+                        DeepLinkRouter.clearWriteMode()
+                    }
+                }
                 else -> { /* unknown DeepLink variant — ignore */ }
             }
         }
@@ -225,6 +237,7 @@ fun NfcSetupScreen(
                         if (selectedWorkflowId.isNotBlank()) {
                             Button(
                                 onClick = {
+                                    DeepLinkRouter.setWriteMode(selectedWorkflowId)
                                     writeState = WriteState.Waiting
                                 },
                                 modifier = Modifier.fillMaxWidth(),
@@ -261,7 +274,10 @@ fun NfcSetupScreen(
                             }
                         }
                         OutlinedButton(
-                            onClick = { writeState = WriteState.Idle },
+                            onClick = {
+                                DeepLinkRouter.clearWriteMode()
+                                writeState = WriteState.Idle
+                            },
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text("Write Another")
@@ -286,7 +302,10 @@ fun NfcSetupScreen(
                             }
                         }
                         OutlinedButton(
-                            onClick = { writeState = WriteState.Idle },
+                            onClick = {
+                                DeepLinkRouter.clearWriteMode()
+                                writeState = WriteState.Idle
+                            },
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text("Try Again")

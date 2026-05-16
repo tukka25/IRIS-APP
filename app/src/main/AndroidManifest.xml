@@ -188,9 +188,16 @@
             </intent-filter>
         </activity>
 
-        <receiver
-            android:name="com.irisapp.platform.tools.impl.ReminderReceiver"
+<receiver
+            android:name=".platform.tools.impl.ReminderReceiver"
             android:exported="false" />
+
+        <!-- Launches apps from workflow steps via a foreground Service so the
+             target Activity has a valid task/back-stack on Android 12+. -->
+        <service
+            android:name=".platform.app.LaunchAppService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse" />
 
         <!-- Receives the broadcast from AlarmManager when a silent alarm fires. -->
         <receiver

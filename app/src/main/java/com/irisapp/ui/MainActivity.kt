@@ -207,6 +207,10 @@ class MainActivity : ComponentActivity() {
         handleIntent(intent)
     }
 
+    private val nfcWriter: NfcTriggerWriter by lazy {
+        NfcTriggerWriter(this, com.irisapp.data.repository.WorkflowRepository(this))
+    }
+
     override fun onResume() {
         super.onResume()
         nfcAdapter?.let { adapter ->
@@ -233,6 +237,26 @@ class MainActivity : ComponentActivity() {
         // This handles both foreground tag scans (delivered to onNewIntent) and
         // cold-start launches from a tag scan while the app was killed.
         if (DeepLinkRouter.canHandle(intent)) {
+            // Intercept write mode: if active and this is a foreground NFC tag discovery,
+            // write to the tag instead of running the workflow.
+            if (DeepLinkRouter.isWriteModeActive() && intent.action in listOf(
+                    NfcAdapter.ACTION_NDEF_DISCOVERED,
+                    NfcAdapter.ACTION_TECH_DISCOVERED
+                )) {
+                val tag = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                    intent.getParcelableExtra(NfcAdapter.EXTRA_TAG, android.nfc.Tag::class.java)
+                } else {
+                    @Suppress("DEPRECATION")
+                    intent.getParcelableExtra(NfcAdapter.EXTRA_TAG)
+                }
+                val workflowId = DeepLinkRouter.writeModeWorkflowId()
+                if (tag != null && workflowId != null) {
+                    val result = nfcWriter.writeTag(tag, workflowId)
+                    DeepLinkRouter.emitWriteComplete(workflowId, result.success, result.message)
+                }
+                DeepLinkRouter.clearWriteMode()
+                return
+            }
             DeepLinkRouter.routeFromActivity(intent)
             return
         }
@@ -374,6 +398,9 @@ class MainActivity : ComponentActivity() {
                             if (workflow != null) {
                                 viewModel.onNfcTagScanned(deepLink.workflowId)
                             }
+                        }
+                        is DeepLink.WriteComplete -> {
+                            viewModel.onNfcWriteResult(deepLink.success, deepLink.message)
                         }
                     }
                 }
