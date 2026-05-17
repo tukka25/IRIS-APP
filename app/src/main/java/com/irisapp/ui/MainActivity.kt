@@ -397,6 +397,9 @@ class MainActivity : ComponentActivity() {
                         is DeepLink.NfcScan -> {
                             // Already handled via NFC trigger flow; no action needed here.
                         }
+                        is DeepLink.WriteComplete -> {
+                            // Write completion is handled in NfcSetupScreen; no action needed here.
+                        }
                     }
                 }
             }
