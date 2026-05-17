@@ -165,6 +165,7 @@ import com.irisapp.ui.home.StageStatus
 import com.irisapp.ui.home.TimeTriggerSetupScreen
 import com.irisapp.ui.home.ShareSheetSetupScreen
 import com.irisapp.ui.home.SoundEventTriggerSetupScreen
+import com.irisapp.ui.home.ImportWorkflowScreen
 import com.irisapp.ui.home.ManualWorkflowEditorScreen
 import com.irisapp.ui.home.WorkflowGenerationViewModel
 import com.irisapp.ui.home.GenerateTabContent
@@ -339,6 +340,22 @@ class MainActivity : ComponentActivity() {
                 return@launch
             }
 
+            // Handle iris://import/{shareId} OR https://iris-23288.web.app/import/{shareId}
+            // Both routes extract the share ID and open the import confirmation screen.
+            val shareId = when (intent.data?.host) {
+                "import" -> intent.data?.lastPathSegment                                           // iris://import/{id}
+                "iris-23288.web.app" -> {
+                    if (intent.data?.path?.startsWith("/import/") == true)
+                        intent.data?.pathSegments?.lastOrNull()                                   // https://iris-23288.web.app/import/{id}
+                    else null
+                }
+                else -> null
+            }
+            if (shareId != null) {
+                viewModel.setPendingImport(shareId)
+                return@launch
+            }
+
             // Handle confirmation/dismiss from TriggerRegistry notification (background triggers).
             val action = intent.getStringExtra(TriggerRegistry.EXTRA_ACTION)
             if (action == TriggerRegistry.ACTION_CONFIRM || action == TriggerRegistry.ACTION_DISMISS) {
@@ -420,11 +437,13 @@ private fun WorkflowGenerationScreen(
 
     // Show the manual editor if open
     state.editingWorkflow?.let { workflow ->
-        ManualWorkflowEditorScreen(
-            initialWorkflow = if (state.isNewWorkflow) null else workflow,
-            onSave = { viewModel.saveEditedWorkflow(it) },
-            onCancel = viewModel::cancelEditWorkflow
-        )
+        AmbientBackground(modifier = Modifier.fillMaxSize()) {
+            ManualWorkflowEditorScreen(
+                initialWorkflow = if (state.isNewWorkflow) null else workflow,
+                onSave = { viewModel.saveEditedWorkflow(it) },
+                onCancel = viewModel::cancelEditWorkflow
+            )
+        }
         return
     }
 
@@ -445,22 +464,24 @@ private fun WorkflowGenerationScreen(
     }
 
     state.selectedWorkflowDetail?.let { detail ->
-        WorkflowDetailScreen(
-            workflow = detail,
-            isBusy = state.isBusy,
-            onBack = viewModel::clearWorkflowDetail,
-            onRun = { viewModel.runWorkflow(detail) },
-            onSetupTrigger = {
-                when (detail.trigger) {
-                    is TriggerConfig.Time -> viewModel.showTimeTriggerSetup(detail)
-                    is TriggerConfig.Manual -> viewModel.showTimeTriggerSetup(detail)
-                    is TriggerConfig.ShareSheet -> viewModel.showShareSheetSetup(detail)
-                    is TriggerConfig.SoundEvent -> viewModel.showSoundEventTriggerSetup(detail)
-                    else -> { /* other triggers not yet supported */ }
-                }
-            },
-            onEdit = { viewModel.openEditWorkflowEditor(detail) }
-        )
+        AmbientBackground(modifier = Modifier.fillMaxSize()) {
+            WorkflowDetailScreen(
+                workflow = detail,
+                isBusy = state.isBusy,
+                onBack = viewModel::clearWorkflowDetail,
+                onRun = { viewModel.runWorkflow(detail) },
+                onSetupTrigger = {
+                    when (detail.trigger) {
+                        is TriggerConfig.Time -> viewModel.showTimeTriggerSetup(detail)
+                        is TriggerConfig.Manual -> viewModel.showTimeTriggerSetup(detail)
+                        is TriggerConfig.ShareSheet -> viewModel.showShareSheetSetup(detail)
+                        is TriggerConfig.SoundEvent -> viewModel.showSoundEventTriggerSetup(detail)
+                        else -> { /* other triggers not yet supported */ }
+                    }
+                },
+                onEdit = { viewModel.openEditWorkflowEditor(detail) }
+            )
+        }
         return
     }
 
@@ -509,6 +530,18 @@ private fun WorkflowGenerationScreen(
             },
             onDismiss = { viewModel.clearSharedContent() }
         )
+        return
+    }
+
+    // Show import confirmation screen when app was opened via iris://import/{id}
+    state.pendingImportShareId?.let { shareId ->
+        AmbientBackground(modifier = Modifier.fillMaxSize()) {
+            ImportWorkflowScreen(
+                shareId = shareId,
+                onConfirm = viewModel::confirmImport,
+                onCancel = viewModel::clearPendingImport
+            )
+        }
         return
     }
 

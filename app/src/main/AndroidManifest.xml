@@ -157,6 +157,16 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!-- Deep-link: iris://import/{id} — shared workflow import -->
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="iris"
+                    android:host="import" />
+            </intent-filter>
+
             <!-- Deep-link: iris://workflow/{workflowId} — used by NFC tags -->
             <intent-filter android:autoVerify="false">
                 <action android:name="android.intent.action.VIEW" />

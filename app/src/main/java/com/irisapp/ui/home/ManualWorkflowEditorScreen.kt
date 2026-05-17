@@ -113,8 +113,17 @@ import com.irisapp.domain.model.PlannedWorkflow
 import com.irisapp.domain.model.SetupState
 import com.irisapp.domain.model.TriggerConfig
 import com.irisapp.domain.model.WorkflowStep
-import com.irisapp.ui.theme.BackgroundDark
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.CompositingStrategy
 import com.irisapp.ui.theme.CyanAccent
+import com.irisapp.ui.theme.CyanVioletGradientDiagonal
+import com.irisapp.ui.theme.CyanVioletStart
+import com.irisapp.ui.theme.CyanVioletEnd
 import com.irisapp.ui.theme.GlassBorder
 import com.irisapp.ui.theme.GlassSurface
 import com.irisapp.platform.sound.YamnetClassifier
@@ -190,38 +199,184 @@ private val ALL_TRIGGERS: List<TriggerItem> = TRIGGER_CATEGORIES.values.flatten(
 /** Returns true for ExecutionSpec variants that can be executed by the app. */
 private fun ExecutionSpec.isRunnable(): Boolean = this !is ExecutionSpec.PackageLaunch
 
-private val TRIGGER_TYPES = listOf(
-    "Manual" to TriggerConfig.Manual,
-    "Time" to TriggerConfig.Time(9, 0, emptyList()),
-    "Battery" to TriggerConfig.Battery(20, BatteryCondition.BELOW),
-    "Charger" to TriggerConfig.Charger(ChargerType.ANY),
-    "WiFi" to TriggerConfig.WiFi(null),
-    "Bluetooth" to TriggerConfig.Bluetooth(null),
-    "Airplane Mode" to TriggerConfig.AirplaneMode(true),
-    "Do Not Disturb" to TriggerConfig.DoNotDisturb(null),
-    "Geofence" to TriggerConfig.Geofence(0.0, 0.0, 100f, GeofenceTransition.ENTER_EXIT),
-    "Alarm Stopped" to TriggerConfig.AlarmStopped("default"),
-    "App Opened" to TriggerConfig.AppOpened(emptyList(), true, false),
-    "App Closed" to TriggerConfig.AppClosed(emptyList(), false, true),
-    "SMS Received" to TriggerConfig.SmsReceived(null, null),
-    "Notification" to TriggerConfig.NotificationListenerConfig(emptyList(), null, null, false),
-    "Email Received" to TriggerConfig.EmailReceived(null, null),
-    "Sleep Proxy" to TriggerConfig.SleepProxy(22, 0, 7, 0, true, true),
-    "NFC Tag" to TriggerConfig.Nfc(null),
-    "Share Sheet" to TriggerConfig.ShareSheet(SetupState.NeedsSetup),
-)
-
 private val CHARGER_TYPES = listOf("Any", "USB", "AC", "Wireless")
 
 /**
+ * State holder for the Trigger configuration.
+ */
+private class TriggerEditorState(initialTrigger: TriggerConfig?) {
+    var selectedTriggerIndex by mutableIntStateOf(
+        initialTrigger?.let { wf ->
+            ALL_TRIGGERS.indexOfFirst { triggerConfigMatches(wf, it.config) }
+                .coerceAtLeast(0)
+        } ?: 0
+    )
+
+    // Time trigger state
+    var timeHour by mutableIntStateOf((initialTrigger as? TriggerConfig.Time)?.hour ?: 9)
+    var timeMinute by mutableIntStateOf((initialTrigger as? TriggerConfig.Time)?.minute ?: 0)
+    var repeatDays by mutableStateOf((initialTrigger as? TriggerConfig.Time)?.repeatDays ?: emptyList())
+    var repeatMode by mutableIntStateOf(
+        when {
+            repeatDays.isEmpty() -> 0
+            repeatDays == listOf(2, 3, 4, 5, 6) -> 1
+            repeatDays == listOf(1, 7) -> 2
+            repeatDays == (1..7).toList() -> 3
+            else -> 4
+        }
+    )
+    var selectedDays by mutableStateOf(repeatDays.toSet())
+
+    // Battery trigger state
+    var batteryLevel by mutableIntStateOf((initialTrigger as? TriggerConfig.Battery)?.levelThreshold ?: 20)
+    var batteryCondition by mutableStateOf((initialTrigger as? TriggerConfig.Battery)?.condition ?: BatteryCondition.BELOW)
+
+    // Charger trigger state
+    var chargerTypeIndex by mutableIntStateOf(
+        when ((initialTrigger as? TriggerConfig.Charger)?.connectionType) {
+            ChargerType.USB -> 1
+            ChargerType.AC -> 2
+            ChargerType.WIRELESS -> 3
+            else -> 0
+        }
+    )
+
+    // WiFi trigger state
+    var wifiSsid by mutableStateOf((initialTrigger as? TriggerConfig.WiFi)?.ssid ?: "")
+
+    // Bluetooth trigger state
+    var bluetoothAddress by mutableStateOf((initialTrigger as? TriggerConfig.Bluetooth)?.deviceAddress ?: "")
+
+    // AirplaneMode trigger state
+    var airplaneEnabled by mutableStateOf((initialTrigger as? TriggerConfig.AirplaneMode)?.enabled ?: true)
+
+    // Geofence trigger state
+    var geofenceLatitude by mutableStateOf((initialTrigger as? TriggerConfig.Geofence)?.latitude ?: 0.0)
+    var geofenceLongitude by mutableStateOf((initialTrigger as? TriggerConfig.Geofence)?.longitude ?: 0.0)
+    var geofenceRadiusMeters by mutableStateOf((initialTrigger as? TriggerConfig.Geofence)?.radiusMeters ?: 100f)
+    var geofenceTransitionType by mutableStateOf((initialTrigger as? TriggerConfig.Geofence)?.transitionType ?: GeofenceTransition.ENTER_EXIT)
+    var geofenceName by mutableStateOf((initialTrigger as? TriggerConfig.Geofence)?.name ?: "")
+    var geofenceDwellDelay by mutableIntStateOf((initialTrigger as? TriggerConfig.Geofence)?.dwellDelaySeconds ?: 0)
+
+    // AlarmStopped trigger state
+    var alarmStoppedType by mutableStateOf((initialTrigger as? TriggerConfig.AlarmStopped)?.alarmType ?: "default")
+
+    // AppOpened/AppClosed trigger state
+    var appTriggerPatterns by mutableStateOf(
+        (initialTrigger as? TriggerConfig.AppOpened)?.appPackagePatterns
+            ?: (initialTrigger as? TriggerConfig.AppClosed)?.appPackagePatterns
+            ?: emptyList()
+    )
+    var appTriggerOnOpen by mutableStateOf((initialTrigger as? TriggerConfig.AppOpened)?.triggerOnOpen ?: true)
+    var appTriggerOnClose by mutableStateOf((initialTrigger as? TriggerConfig.AppClosed)?.triggerOnClose ?: true)
+
+    // Sound Event trigger state
+    var soundEventClasses by mutableStateOf((initialTrigger as? TriggerConfig.SoundEvent)?.soundClasses ?: emptyList())
+
+    // SmsReceived trigger state
+    var smsSenderPattern by mutableStateOf((initialTrigger as? TriggerConfig.SmsReceived)?.senderPattern ?: "")
+    var smsBodyPattern by mutableStateOf((initialTrigger as? TriggerConfig.SmsReceived)?.bodyPattern ?: "")
+
+    // NotificationListenerConfig trigger state
+    var notifAppPatterns by mutableStateOf((initialTrigger as? TriggerConfig.NotificationListenerConfig)?.appPackagePatterns ?: emptyList())
+    var notifSenderPattern by mutableStateOf((initialTrigger as? TriggerConfig.NotificationListenerConfig)?.senderPattern ?: "")
+    var notifBodyPattern by mutableStateOf((initialTrigger as? TriggerConfig.NotificationListenerConfig)?.bodyPattern ?: "")
+    var notifTriggerOnDismiss by mutableStateOf((initialTrigger as? TriggerConfig.NotificationListenerConfig)?.triggerOnDismiss ?: false)
+
+    // EmailReceived trigger state
+    var emailSenderPattern by mutableStateOf((initialTrigger as? TriggerConfig.EmailReceived)?.senderPattern ?: "")
+    var emailSubjectPattern by mutableStateOf((initialTrigger as? TriggerConfig.EmailReceived)?.subjectPattern ?: "")
+    var emailAppPackage by mutableStateOf((initialTrigger as? TriggerConfig.EmailReceived)?.appPackage ?: "com.google.android.gm")
+
+    // SleepProxy trigger state
+    var sleepStartHour by mutableIntStateOf((initialTrigger as? TriggerConfig.SleepProxy)?.startTimeHour ?: 22)
+    var sleepStartMinute by mutableIntStateOf((initialTrigger as? TriggerConfig.SleepProxy)?.startTimeMinute ?: 0)
+    var sleepEndHour by mutableIntStateOf((initialTrigger as? TriggerConfig.SleepProxy)?.endTimeHour ?: 7)
+    var sleepEndMinute by mutableIntStateOf((initialTrigger as? TriggerConfig.SleepProxy)?.endTimeMinute ?: 0)
+    var sleepRequireChargerDisconnected by mutableStateOf((initialTrigger as? TriggerConfig.SleepProxy)?.requireChargerDisconnected ?: true)
+    var sleepRequireDndActive by mutableStateOf((initialTrigger as? TriggerConfig.SleepProxy)?.requireDndActive ?: true)
+
+    // Nfc trigger state
+    var nfcTagId by mutableStateOf((initialTrigger as? TriggerConfig.Nfc)?.tagId ?: "")
+
+    // ShareSheet trigger state
+    var shareSheetState by mutableStateOf((initialTrigger as? TriggerConfig.ShareSheet)?.setupState ?: SetupState.NeedsSetup)
+
+    fun build(): TriggerConfig {
+        val currentItem = ALL_TRIGGERS.getOrNull(selectedTriggerIndex) ?: return TriggerConfig.Manual
+        return when (currentItem.config) {
+            is TriggerConfig.Manual -> TriggerConfig.Manual
+            is TriggerConfig.Time -> {
+                val days = when (repeatMode) {
+                    0 -> emptyList()
+                    1 -> listOf(2, 3, 4, 5, 6)
+                    2 -> listOf(1, 7)
+                    3 -> (1..7).toList()
+                    else -> selectedDays.sorted()
+                }
+                TriggerConfig.Time(timeHour, timeMinute, days)
+            }
+            is TriggerConfig.Battery -> TriggerConfig.Battery(batteryLevel, batteryCondition)
+            is TriggerConfig.Charger -> TriggerConfig.Charger(
+                when (chargerTypeIndex) {
+                    1 -> ChargerType.USB
+                    2 -> ChargerType.AC
+                    3 -> ChargerType.WIRELESS
+                    else -> ChargerType.ANY
+                }
+            )
+            is TriggerConfig.WiFi -> TriggerConfig.WiFi(wifiSsid.ifBlank { null })
+            is TriggerConfig.Bluetooth -> TriggerConfig.Bluetooth(bluetoothAddress.ifBlank { null })
+            is TriggerConfig.AirplaneMode -> TriggerConfig.AirplaneMode(airplaneEnabled)
+            is TriggerConfig.DoNotDisturb -> TriggerConfig.DoNotDisturb(null)
+            is TriggerConfig.Geofence -> TriggerConfig.Geofence(
+                geofenceLatitude, geofenceLongitude, geofenceRadiusMeters,
+                geofenceTransitionType, geofenceDwellDelay,
+                geofenceName.ifBlank { null }
+            )
+            is TriggerConfig.AlarmStopped -> TriggerConfig.AlarmStopped(alarmStoppedType.ifBlank { "default" })
+            is TriggerConfig.AppOpened -> TriggerConfig.AppOpened(appTriggerPatterns, appTriggerOnOpen, appTriggerOnClose)
+            is TriggerConfig.AppClosed -> TriggerConfig.AppClosed(appTriggerPatterns, appTriggerOnOpen, appTriggerOnClose)
+            is TriggerConfig.SmsReceived -> TriggerConfig.SmsReceived(smsSenderPattern.ifBlank { null }, smsBodyPattern.ifBlank { null })
+            is TriggerConfig.NotificationListenerConfig -> TriggerConfig.NotificationListenerConfig(
+                notifAppPatterns, notifSenderPattern.ifBlank { null }, notifBodyPattern.ifBlank { null }, notifTriggerOnDismiss
+            )
+            is TriggerConfig.EmailReceived -> TriggerConfig.EmailReceived(emailSenderPattern.ifBlank { null }, emailSubjectPattern.ifBlank { null }, emailAppPackage)
+            is TriggerConfig.SleepProxy -> TriggerConfig.SleepProxy(sleepStartHour, sleepStartMinute, sleepEndHour, sleepEndMinute, sleepRequireChargerDisconnected, sleepRequireDndActive)
+            is TriggerConfig.Nfc -> TriggerConfig.Nfc(nfcTagId.ifBlank { null })
+            is TriggerConfig.ShareSheet -> TriggerConfig.ShareSheet(shareSheetState)
+            is TriggerConfig.Voice -> TriggerConfig.Voice
+            is TriggerConfig.SoundEvent -> TriggerConfig.SoundEvent(soundEventClasses)
+            else -> TriggerConfig.Manual
+        }
+    }
+}
+
+/**
+ * State holder for the Manual Workflow Editor.
+ */
+private class ManualWorkflowEditorState(initialWorkflow: PlannedWorkflow?) {
+    var name by mutableStateOf(initialWorkflow?.name ?: "")
+    var summary by mutableStateOf(initialWorkflow?.summary ?: "")
+    val triggerState = TriggerEditorState(initialWorkflow?.trigger)
+    var steps by mutableStateOf(
+        initialWorkflow?.actions
+            ?: listOf(WorkflowStep(id = "browser.open_url", params = buildJsonObject { put("url", "") }))
+    )
+    var editingStepIndex by mutableIntStateOf(-1)
+
+    fun buildWorkflow(): PlannedWorkflow {
+        return PlannedWorkflow(
+            name = name.ifBlank { "Untitled" },
+            summary = summary,
+            trigger = triggerState.build(),
+            actions = steps
+        )
+    }
+}
+
+/**
  * Full-screen editor for building or editing a workflow manually — without AI generation.
- *
- * Supports all trigger types and an arbitrary list of actions picked from the
- * [ActionSpecRegistry]. Parameters are edited inline with text fields.
- *
- * @param initialWorkflow  Non-null when editing an existing workflow; null when creating new.
- * @param onSave           Called with the final [PlannedWorkflow] when the user saves.
- * @param onCancel         Go back without saving.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -230,205 +385,11 @@ fun ManualWorkflowEditorScreen(
     onSave: (PlannedWorkflow) -> Unit,
     onCancel: () -> Unit
 ) {
-    // ── Basic fields ────────────────────────────────────────────────────────
-    var name by remember { mutableStateOf(initialWorkflow?.name ?: "") }
-    var summary by remember { mutableStateOf(initialWorkflow?.summary ?: "") }
-
-    // ── Trigger ─────────────────────────────────────────────────────────────
-    var selectedTriggerIndex by remember {
-        mutableIntStateOf(
-            initialWorkflow?.let { wf ->
-                ALL_TRIGGERS.indexOfFirst { triggerConfigMatches(wf.trigger, it.config) }
-                    .coerceAtLeast(0)
-            } ?: 0
-        )
-    }
-
-    // Time trigger state
-    var timeHour by remember {
-        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.Time)?.hour ?: 9)
-    }
-    var timeMinute by remember {
-        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.Time)?.minute ?: 0)
-    }
-    var repeatDays by remember {
-        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.Time)?.repeatDays ?: emptyList())
-    }
-    var repeatMode by remember {
-        mutableStateOf(
-            when {
-                repeatDays.isEmpty() -> 0       // One-time
-                repeatDays == listOf(2,3,4,5,6) -> 1  // Weekdays
-                repeatDays == listOf(1,7) -> 2    // Weekends
-                repeatDays == (1..7).toList() -> 3    // Daily
-                else -> 4                         // Custom
-            }
-        )
-    }
-    var selectedDays by remember { mutableStateOf(repeatDays.toSet()) }
-
-    val timePickerState = rememberTimePickerState(
-        initialHour = timeHour,
-        initialMinute = timeMinute,
-        is24Hour = true
-    )
-
-    // Battery trigger state
-    var batteryLevel by remember {
-        mutableIntStateOf((initialWorkflow?.trigger as? TriggerConfig.Battery)?.levelThreshold ?: 20)
-    }
-    var batteryCondition by remember {
-        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.Battery)?.condition ?: BatteryCondition.BELOW)
-    }
-
-    // Charger trigger state
-    var chargerTypeIndex by remember {
-        mutableIntStateOf(
-            when ((initialWorkflow?.trigger as? TriggerConfig.Charger)?.connectionType) {
-                ChargerType.USB -> 1
-                ChargerType.AC -> 2
-                ChargerType.WIRELESS -> 3
-                else -> 0
-            }
-        )
-    }
-
-    // WiFi trigger state
-    var wifiSsid by remember {
-        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.WiFi)?.ssid ?: "")
-    }
-
-    // Bluetooth trigger state
-    var bluetoothAddress by remember {
-        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.Bluetooth)?.deviceAddress ?: "")
-    }
-
-    // AirplaneMode trigger state
-    var airplaneEnabled by remember {
-        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.AirplaneMode)?.enabled ?: true)
-    }
-
-    // Geofence trigger state
-    var geofenceLatitude by remember {
-        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.Geofence)?.latitude ?: 0.0)
-    }
-    var geofenceLongitude by remember {
-        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.Geofence)?.longitude ?: 0.0)
-    }
-    var geofenceRadiusMeters by remember {
-        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.Geofence)?.radiusMeters ?: 100f)
-    }
-    var geofenceTransitionType by remember {
-        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.Geofence)?.transitionType ?: GeofenceTransition.ENTER_EXIT)
-    }
-    var geofenceName by remember {
-        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.Geofence)?.name ?: "")
-    }
-    var geofenceDwellDelay by remember {
-        mutableIntStateOf((initialWorkflow?.trigger as? TriggerConfig.Geofence)?.dwellDelaySeconds ?: 0)
-    }
-
-    // AlarmStopped trigger state
-    var alarmStoppedType by remember {
-        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.AlarmStopped)?.alarmType ?: "default")
-    }
-
-    // AppOpened/AppClosed trigger state
-    var appTriggerPatterns by remember {
-        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.AppOpened)?.appPackagePatterns
-            ?: (initialWorkflow?.trigger as? TriggerConfig.AppClosed)?.appPackagePatterns
-            ?: emptyList())
-    }
-    var appTriggerOnOpen by remember {
-        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.AppOpened)?.triggerOnOpen
-            ?: true)
-    }
-    var appTriggerOnClose by remember {
-        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.AppClosed)?.triggerOnClose
-            ?: true)
-    }
-
-    // Sound Event trigger state
-    var soundEventClasses by remember {
-        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.SoundEvent)?.soundClasses ?: emptyList())
-    }
-
-    // SmsReceived trigger state
-    var smsSenderPattern by remember {
-        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.SmsReceived)?.senderPattern ?: "")
-    }
-    var smsBodyPattern by remember {
-        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.SmsReceived)?.bodyPattern ?: "")
-    }
-
-    // NotificationListenerConfig trigger state
-    var notifAppPatterns by remember {
-        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.NotificationListenerConfig)?.appPackagePatterns ?: emptyList())
-    }
-    var notifSenderPattern by remember {
-        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.NotificationListenerConfig)?.senderPattern ?: "")
-    }
-    var notifBodyPattern by remember {
-        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.NotificationListenerConfig)?.bodyPattern ?: "")
-    }
-    var notifTriggerOnDismiss by remember {
-        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.NotificationListenerConfig)?.triggerOnDismiss ?: false)
-    }
-
-    // EmailReceived trigger state
-    var emailSenderPattern by remember {
-        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.EmailReceived)?.senderPattern ?: "")
-    }
-    var emailSubjectPattern by remember {
-        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.EmailReceived)?.subjectPattern ?: "")
-    }
-    var emailAppPackage by remember {
-        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.EmailReceived)?.appPackage ?: "com.google.android.gm")
-    }
-
-    // SleepProxy trigger state
-    var sleepStartHour by remember {
-        mutableIntStateOf((initialWorkflow?.trigger as? TriggerConfig.SleepProxy)?.startTimeHour ?: 22)
-    }
-    var sleepStartMinute by remember {
-        mutableIntStateOf((initialWorkflow?.trigger as? TriggerConfig.SleepProxy)?.startTimeMinute ?: 0)
-    }
-    var sleepEndHour by remember {
-        mutableIntStateOf((initialWorkflow?.trigger as? TriggerConfig.SleepProxy)?.endTimeHour ?: 7)
-    }
-    var sleepEndMinute by remember {
-        mutableIntStateOf((initialWorkflow?.trigger as? TriggerConfig.SleepProxy)?.endTimeMinute ?: 0)
-    }
-    var sleepRequireChargerDisconnected by remember {
-        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.SleepProxy)?.requireChargerDisconnected ?: true)
-    }
-    var sleepRequireDndActive by remember {
-        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.SleepProxy)?.requireDndActive ?: true)
-    }
-
-    // Nfc trigger state
-    var nfcTagId by remember {
-        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.Nfc)?.tagId ?: "")
-    }
-
-    // ShareSheet trigger state
-    var shareSheetState by remember {
-        mutableStateOf((initialWorkflow?.trigger as? TriggerConfig.ShareSheet)?.setupState ?: SetupState.NeedsSetup)
-    }
-
-    // ── Actions ─────────────────────────────────────────────────────────────
-    var steps by remember {
-        mutableStateOf(
-            initialWorkflow?.actions
-                ?: listOf(WorkflowStep(id = "browser.open_url", params = buildJsonObject { put("url", "") }))
-        )
-    }
-    var editingStepIndex by remember { mutableStateOf(-1) }
+    val state = remember { ManualWorkflowEditorState(initialWorkflow) }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BackgroundDark)
             .verticalScroll(rememberScrollState())
             .padding(20.dp)
             .statusBarsPadding()
@@ -436,77 +397,7 @@ fun ManualWorkflowEditorScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         // ── Top bar ───────────────────────────────────────────────────────────
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Back",
-                tint = TextPrimary,
-                modifier = Modifier
-                    .size(28.dp)
-                    .clickable { onCancel() }
-            )
-            GradientButton(
-                text = "Save",
-                onClick = {
-                    val trigger = buildTrigger(
-                        triggerType = Pair(
-                            "",
-                            ALL_TRIGGERS.getOrNull(selectedTriggerIndex)?.config ?: TriggerConfig.Manual
-                        ),
-                        timeHour = timeHour,
-                        timeMinute = timeMinute,
-                        repeatMode = repeatMode,
-                        selectedDays = selectedDays,
-                        batteryLevel = batteryLevel,
-                        batteryCondition = batteryCondition,
-                        chargerTypeIndex = chargerTypeIndex,
-                        wifiSsid = wifiSsid,
-                        bluetoothAddress = bluetoothAddress,
-                        airplaneEnabled = airplaneEnabled,
-                        geofenceLatitude = geofenceLatitude,
-                        geofenceLongitude = geofenceLongitude,
-                        geofenceRadiusMeters = geofenceRadiusMeters,
-                        geofenceTransitionType = geofenceTransitionType,
-                        geofenceName = geofenceName,
-                        geofenceDwellDelay = geofenceDwellDelay,
-                        alarmStoppedType = alarmStoppedType,
-                        appTriggerPatterns = appTriggerPatterns,
-                        appTriggerOnOpen = appTriggerOnOpen,
-                        appTriggerOnClose = appTriggerOnClose,
-                        smsSenderPattern = smsSenderPattern,
-                        smsBodyPattern = smsBodyPattern,
-                        notifAppPatterns = notifAppPatterns,
-                        notifSenderPattern = notifSenderPattern,
-                        notifBodyPattern = notifBodyPattern,
-                        notifTriggerOnDismiss = notifTriggerOnDismiss,
-                        emailSenderPattern = emailSenderPattern,
-                        emailSubjectPattern = emailSubjectPattern,
-                        emailAppPackage = emailAppPackage,
-                        sleepStartHour = sleepStartHour,
-                        sleepStartMinute = sleepStartMinute,
-                        sleepEndHour = sleepEndHour,
-                        sleepEndMinute = sleepEndMinute,
-                        sleepRequireChargerDisconnected = sleepRequireChargerDisconnected,
-                        sleepRequireDndActive = sleepRequireDndActive,
-                        nfcTagId = nfcTagId,
-                        shareSheetState = shareSheetState,
-                        soundEventClasses = soundEventClasses
-                    )
-                    val workflow = PlannedWorkflow(
-                        name = name.ifBlank { "Untitled" },
-                        summary = summary,
-                        trigger = trigger,
-                        actions = steps
-                    )
-                    onSave(workflow)
-                },
-                modifier = Modifier.height(36.dp)
-            )
-        }
+        EditorTopBar(state, onSave, onCancel)
 
         Text(
             text = if (initialWorkflow != null) "Edit Workflow" else "New Workflow",
@@ -514,940 +405,1019 @@ fun ManualWorkflowEditorScreen(
             color = TextPrimary
         )
 
-        // ── Name ──────────────────────────────────────────────────────────
-        OutlinedTextField(
-            value = name,
-            onValueChange = { name = it },
-            label = { Text("Workflow name") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = CyanAccent,
-                unfocusedBorderColor = GlassBorder,
-                focusedLabelColor = CyanAccent,
-                unfocusedLabelColor = TextSecondary,
-                cursorColor = CyanAccent,
-                focusedTextColor = TextPrimary,
-                unfocusedTextColor = TextPrimary
-            )
-        )
-
-        // ── Summary ──────────────────────────────────────────────────────
-        OutlinedTextField(
-            value = summary,
-            onValueChange = { summary = it },
-            label = { Text("Summary (optional)") },
-            modifier = Modifier.fillMaxWidth(),
-            minLines = 2,
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = CyanAccent,
-                unfocusedBorderColor = GlassBorder,
-                focusedLabelColor = CyanAccent,
-                unfocusedLabelColor = TextSecondary,
-                cursorColor = CyanAccent,
-                focusedTextColor = TextPrimary,
-                unfocusedTextColor = TextPrimary
-            )
-        )
+        // ── Basic fields ────────────────────────────────────────────────────────
+        BasicInfoFields(state)
 
         HorizontalDivider()
 
-        // ── Trigger type selector — accordion with categories ─────────────────────────
-        Text("Trigger", style = MaterialTheme.typography.titleMedium)
-
-        // Search field for triggers
-        var triggerSearchQuery by remember { mutableStateOf("") }
-        val filteredCategories = remember(triggerSearchQuery) {
-            if (triggerSearchQuery.isBlank()) {
-                TRIGGER_CATEGORIES
-            } else {
-                TRIGGER_CATEGORIES.mapValues { (cat, items) ->
-                    items.filter { item ->
-                        item.label.contains(triggerSearchQuery, ignoreCase = true) ||
-                            cat.label.contains(triggerSearchQuery, ignoreCase = true)
-                    }
-                }.filter { (_, items) -> items.isNotEmpty() }
-            }
-        }
-
-        OutlinedTextField(
-            value = triggerSearchQuery,
-            onValueChange = { triggerSearchQuery = it },
-            modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("Search triggers...", color = TextSecondary) },
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = TextSecondary) },
-            trailingIcon = {
-                if (triggerSearchQuery.isNotEmpty()) {
-                    IconButton(onClick = { triggerSearchQuery = "" }) {
-                        Icon(Icons.Default.Clear, contentDescription = "Clear", tint = TextSecondary)
-                    }
-                }
-            },
-            singleLine = true,
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = CyanAccent,
-                unfocusedBorderColor = GlassBorder,
-                focusedLabelColor = CyanAccent,
-                unfocusedLabelColor = TextSecondary,
-                cursorColor = CyanAccent,
-                focusedTextColor = TextPrimary,
-                unfocusedTextColor = TextPrimary
-            )
-        )
-
-        // Find which category + item index the current selection belongs to
-        var selectedCategory by remember { mutableStateOf(TriggerCategory.MANUAL) }
-        var selectedItemIndex by remember { mutableIntStateOf(0) }
-
-        // Sync selection to categories on first load
-        LaunchedEffect(selectedTriggerIndex) {
-            if (selectedTriggerIndex in ALL_TRIGGERS.indices) {
-                val item = ALL_TRIGGERS[selectedTriggerIndex]
-                selectedCategory = item.category
-                selectedItemIndex = ALL_TRIGGERS.indexOf(item)
-            }
-        }
-
-        Column {
-            filteredCategories.forEach { (category, items) ->
-                val isExpanded = selectedCategory == category
-                val hasSelectedItem = items.any { item -> ALL_TRIGGERS.indexOf(item) == selectedTriggerIndex }
-
-                // Category header
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(
-                            if (isExpanded) category.color.copy(alpha = 0.12f)
-                            else if (hasSelectedItem) category.color.copy(alpha = 0.07f)
-                            else GlassSurface
-                        )
-                        .clickable {
-                            selectedCategory = if (isExpanded) selectedCategory else category
-                        }
-                        .padding(horizontal = 14.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = category.icon,
-                        contentDescription = null,
-                        tint = if (isExpanded || hasSelectedItem) category.color else TextSecondary,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = category.label,
-                        style = MaterialTheme.typography.labelLarge.copy(
-                            color = if (isExpanded || hasSelectedItem) category.color else TextSecondary,
-                            fontWeight = if (isExpanded) FontWeight(600) else FontWeight(400)
-                        )
-                    )
-                    Spacer(modifier = Modifier.weight(1f))
-                    if (hasSelectedItem && !isExpanded) {
-                        val selectedLabel = ALL_TRIGGERS.getOrNull(selectedTriggerIndex)?.label ?: ""
-                        Text(
-                            text = selectedLabel,
-                            style = MaterialTheme.typography.labelSmall.copy(color = TextSecondary)
-                        )
-                    }
-                    Icon(
-                        imageVector = Icons.Default.ExpandMore,
-                        contentDescription = if (isExpanded) "Collapse" else "Expand",
-                        tint = TextSecondary,
-                        modifier = Modifier
-                            .size(18.dp)
-                            .then(
-                                if (isExpanded) Modifier else Modifier
-                            )
-                    )
-                }
-
-                // Items in this category — animated expand/collapse
-                AnimatedVisibility(
-                    visible = isExpanded,
-                    enter = expandVertically(animationSpec = androidx.compose.animation.core.spring()),
-                    exit = shrinkVertically(animationSpec = androidx.compose.animation.core.spring())
-                ) {
-                    Column(modifier = Modifier.padding(start = 16.dp, top = 4.dp, bottom = 8.dp)) {
-                        items.forEach { item ->
-                            val flatIndex = ALL_TRIGGERS.indexOf(item)
-                            val isSelected = selectedTriggerIndex == flatIndex
-
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(
-                                        if (isSelected) item.category.color.copy(alpha = 0.15f)
-                                        else Color.Transparent
-                                    )
-                                    .clickable {
-                                        selectedTriggerIndex = flatIndex
-                                        selectedCategory = item.category
-                                    }
-                                    .padding(horizontal = 10.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                RadioButton(
-                                    selected = isSelected,
-                                    onClick = {
-                                        selectedTriggerIndex = flatIndex
-                                        selectedCategory = item.category
-                                    },
-                                    colors = RadioButtonDefaults.colors(
-                                        selectedColor = item.category.color,
-                                        unselectedColor = TextSecondary
-                                    )
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Icon(
-                                    imageVector = item.icon,
-                                    contentDescription = null,
-                                    tint = if (isSelected) item.category.color else TextSecondary,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = item.label,
-                                    style = MaterialTheme.typography.bodyMedium.copy(
-                                        color = if (isSelected) TextPrimary else TextSecondary
-                                    )
-                                )
-                            }
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(4.dp))
-            }
-        }
-
-        // Trigger-specific config
-        val currentTriggerConfig = ALL_TRIGGERS.getOrNull(selectedTriggerIndex)?.config
-            ?: TriggerConfig.Manual
-
-        when (currentTriggerConfig) {
-            is TriggerConfig.Manual -> {
-                GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(16.dp),
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Text(
-                            "This workflow runs manually from the widget or list.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = TextSecondary
-                        )
-                    }
-                }
-            }
-            is TriggerConfig.Time -> {
-                GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        TimePicker(state = timePickerState)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        val modes = listOf("One-time", "Weekdays", "Weekends", "Daily", "Custom")
-                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            modes.forEachIndexed { i, label ->
-                                FilterChip(
-                                    selected = repeatMode == i,
-                                    onClick = { repeatMode = i },
-                                    label = { Text(label, style = MaterialTheme.typography.labelSmall) }
-                                )
-                            }
-                        }
-                        if (repeatMode == 4) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            val dayLabels = listOf("S", "M", "T", "W", "T", "F", "S")
-                            val dayConstants = listOf(1, 2, 3, 4, 5, 6, 7)
-                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                dayConstants.forEachIndexed { idx, day ->
-                                    FilterChip(
-                                        selected = day in selectedDays,
-                                        onClick = {
-                                            selectedDays = if (day in selectedDays) {
-                                                selectedDays - day
-                                            } else {
-                                                selectedDays + day
-                                            }
-                                        },
-                                        label = { Text(dayLabels[idx], style = MaterialTheme.typography.labelSmall) }
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            is TriggerConfig.Battery -> {
-                GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text("Battery level: $batteryLevel%", style = MaterialTheme.typography.bodyMedium)
-                        Slider(
-                            value = batteryLevel.toFloat(),
-                            onValueChange = { batteryLevel = it.toInt() },
-                            valueRange = 5f..100f,
-                            steps = 18
-                        )
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            listOf(BatteryCondition.BELOW to "Below", BatteryCondition.ABOVE to "Above").forEach { (cond, label) ->
-                                FilterChip(
-                                    selected = batteryCondition == cond,
-                                    onClick = { batteryCondition = cond },
-                                    label = { Text(label) }
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-            is TriggerConfig.Charger -> {
-                GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text("Connection type:", style = MaterialTheme.typography.bodyMedium)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            CHARGER_TYPES.forEachIndexed { idx, label ->
-                                FilterChip(
-                                    selected = chargerTypeIndex == idx,
-                                    onClick = { chargerTypeIndex = idx },
-                                    label = { Text(label) }
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-            is TriggerConfig.WiFi -> {
-                OutlinedTextField(
-                    value = wifiSsid,
-                    onValueChange = { wifiSsid = it },
-                    label = { Text("SSID (leave blank for any)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-            }
-            is TriggerConfig.Bluetooth -> {
-                OutlinedTextField(
-                    value = bluetoothAddress,
-                    onValueChange = { bluetoothAddress = it },
-                    label = { Text("Device address (leave blank for any)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-            }
-            is TriggerConfig.AirplaneMode -> {
-                GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("Trigger when airplane mode is ON")
-                        Switch(checked = airplaneEnabled, onCheckedChange = { airplaneEnabled = it })
-                    }
-                }
-            }
-            is TriggerConfig.DoNotDisturb -> {
-                GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text("Do Not Disturb trigger", style = MaterialTheme.typography.bodyMedium)
-                        Text("Fires on any DND interruption filter change.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
-                    }
-                }
-            }
-            is TriggerConfig.Geofence -> {
-                GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text("Geofence trigger", style = MaterialTheme.typography.bodyMedium)
-
-                        // Name field
-                        OutlinedTextField(
-                            value = geofenceName,
-                            onValueChange = { geofenceName = it },
-                            label = { Text("Location name (optional)") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true
-                        )
-
-                        // Lat/Lon text fields
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedTextField(
-                                value = if (geofenceLatitude == 0.0) "" else geofenceLatitude.toString(),
-                                onValueChange = { geofenceLatitude = it.toDoubleOrNull() ?: 0.0 },
-                                label = { Text("Latitude") },
-                                modifier = Modifier.weight(1f),
-                                singleLine = true
-                            )
-                            OutlinedTextField(
-                                value = if (geofenceLongitude == 0.0) "" else geofenceLongitude.toString(),
-                                onValueChange = { geofenceLongitude = it.toDoubleOrNull() ?: 0.0 },
-                                label = { Text("Longitude") },
-                                modifier = Modifier.weight(1f),
-                                singleLine = true
-                            )
-                        }
-
-                        // Map picker (tap to set)
-                        OsmMapPicker(
-                            latitude = geofenceLatitude,
-                            longitude = geofenceLongitude,
-                            radiusMeters = geofenceRadiusMeters,
-                            onLocationSelected = { lat, lng ->
-                                geofenceLatitude = lat
-                                geofenceLongitude = lng
-                            }
-                        )
-
-                        Text("Radius: ${geofenceRadiusMeters.toInt()} m", style = MaterialTheme.typography.bodyMedium)
-                        Slider(
-                            value = geofenceRadiusMeters,
-                            onValueChange = { geofenceRadiusMeters = it },
-                            valueRange = 50f..2000f,
-                        )
-                        Text("Trigger when:", style = MaterialTheme.typography.bodyMedium)
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            listOf(
-                                GeofenceTransition.ENTER to "Arriving",
-                                GeofenceTransition.EXIT to "Leaving",
-                                GeofenceTransition.DWELL to "Staying",
-                                GeofenceTransition.ENTER_EXIT to "Either"
-                            ).forEach { (type, label) ->
-                                FilterChip(
-                                    selected = geofenceTransitionType == type,
-                                    onClick = { geofenceTransitionType = type },
-                                    label = { Text(label) }
-                                )
-                            }
-                        }
-                        if (geofenceTransitionType == GeofenceTransition.DWELL) {
-                            Text("Dwell delay: ${geofenceDwellDelay}s", style = MaterialTheme.typography.bodyMedium)
-                            Slider(
-                                value = geofenceDwellDelay.toFloat(),
-                                onValueChange = { geofenceDwellDelay = it.toInt() },
-                                valueRange = 0f..300f,
-                                steps = 29,
-                            )
-                        }
-                    }
-                }
-            }
-            is TriggerConfig.AlarmStopped -> {
-                GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Alarm Stopped", style = MaterialTheme.typography.bodyMedium)
-                        Text(
-                            "Fires when a IrisApp alarm is dismissed or cancelled by the user.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = TextSecondary
-                        )
-                        OutlinedTextField(
-                            value = alarmStoppedType,
-                            onValueChange = { alarmStoppedType = it },
-                            label = { Text("Alarm type filter (optional)") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            placeholder = { Text("e.g. default, reminder, timer") }
-                        )
-                    }
-                }
-            }
-            is TriggerConfig.AppOpened, is TriggerConfig.AppClosed -> {
-                GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text(
-                            if (currentTriggerConfig is TriggerConfig.AppOpened) "App Opened" else "App Closed",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        AppPatternEditor(
-                            patterns = appTriggerPatterns,
-                            onPatternsChange = { appTriggerPatterns = it }
-                        )
-                        Text("Trigger on:", style = MaterialTheme.typography.bodySmall)
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            FilterChip(
-                                selected = appTriggerOnOpen,
-                                onClick = { appTriggerOnOpen = !appTriggerOnOpen },
-                                label = { Text("Open") }
-                            )
-                            FilterChip(
-                                selected = appTriggerOnClose,
-                                onClick = { appTriggerOnClose = !appTriggerOnClose },
-                                label = { Text("Close") }
-                            )
-                        }
-                    }
-                }
-            }
-            is TriggerConfig.SmsReceived -> {
-                GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("SMS Received", style = MaterialTheme.typography.bodyMedium)
-                        Text(
-                            "Fires when an SMS matching the patterns is received. Requires notification access.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = TextSecondary
-                        )
-                        OutlinedTextField(
-                            value = smsSenderPattern,
-                            onValueChange = { smsSenderPattern = it },
-                            label = { Text("Sender pattern (optional)") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            placeholder = { Text("e.g. +1 or ABC") }
-                        )
-                        OutlinedTextField(
-                            value = smsBodyPattern,
-                            onValueChange = { smsBodyPattern = it },
-                            label = { Text("Body pattern (optional)") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            placeholder = { Text("e.g. OTP or verification") }
-                        )
-                    }
-                }
-            }
-            is TriggerConfig.NotificationListenerConfig -> {
-                GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("App Notification", style = MaterialTheme.typography.bodyMedium)
-                        Text(
-                            "Fires on notifications from specific apps. Requires notification access.",
-                            style = MaterialTheme.typography.bodySmall,
-color = TextSecondary,
-                        )
-                        OutlinedTextField(
-                            value = notifAppPatterns.joinToString(", "),
-                            onValueChange = {
-                                notifAppPatterns = it.split(",").map { s -> s.trim() }.filter { s -> s.isNotEmpty() }
-                            },
-                            label = { Text("App package patterns (comma-separated)") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            placeholder = { Text("e.g. com.whatsapp, org.telegram") }
-                        )
-                        OutlinedTextField(
-                            value = notifSenderPattern,
-                            onValueChange = { notifSenderPattern = it },
-                            label = { Text("Sender pattern (optional)") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true
-                        )
-                        OutlinedTextField(
-                            value = notifBodyPattern,
-                            onValueChange = { notifBodyPattern = it },
-                            label = { Text("Body pattern (optional)") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true
-                        )
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("Also on dismiss")
-                            Switch(
-                                checked = notifTriggerOnDismiss,
-                                onCheckedChange = { notifTriggerOnDismiss = it }
-                            )
-                        }
-                    }
-                }
-            }
-            is TriggerConfig.EmailReceived -> {
-                GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Email Received", style = MaterialTheme.typography.bodyMedium)
-                        Text(
-                            "Fires on email notifications. Requires notification access.",
-                            style = MaterialTheme.typography.bodySmall,
-color = TextSecondary,
-                        )
-                        OutlinedTextField(
-                            value = emailSenderPattern,
-                            onValueChange = { emailSenderPattern = it },
-                            label = { Text("From / sender pattern (optional)") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            placeholder = { Text("e.g. @company.com") }
-                        )
-                        OutlinedTextField(
-                            value = emailSubjectPattern,
-                            onValueChange = { emailSubjectPattern = it },
-                            label = { Text("Subject pattern (optional)") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            placeholder = { Text("e.g. Invoice or Urgent") }
-                        )
-                        OutlinedTextField(
-                            value = emailAppPackage,
-                            onValueChange = { emailAppPackage = it },
-                            label = { Text("Email app package") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true
-                        )
-                    }
-                }
-            }
-            is TriggerConfig.SleepProxy -> {
-                GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text("Sleep Proxy", style = MaterialTheme.typography.bodyMedium)
-                        Text(
-                            "Fires when bedtime conditions are met (DND active, charger disconnected).",
-                            style = MaterialTheme.typography.bodySmall,
-color = TextSecondary,
-                        )
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedTextField(
-                                value = String.format("%02d:%02d", sleepStartHour, sleepStartMinute),
-                                onValueChange = {
-                                    val parts = it.split(":")
-                                    sleepStartHour = parts.getOrNull(0)?.toIntOrNull()?.coerceIn(0, 23) ?: sleepStartHour
-                                    sleepStartMinute = parts.getOrNull(1)?.toIntOrNull()?.coerceIn(0, 59) ?: sleepStartMinute
-                                },
-                                label = { Text("Start") },
-                                modifier = Modifier.weight(1f),
-                                singleLine = true
-                            )
-                            OutlinedTextField(
-                                value = String.format("%02d:%02d", sleepEndHour, sleepEndMinute),
-                                onValueChange = {
-                                    val parts = it.split(":")
-                                    sleepEndHour = parts.getOrNull(0)?.toIntOrNull()?.coerceIn(0, 23) ?: sleepEndHour
-                                    sleepEndMinute = parts.getOrNull(1)?.toIntOrNull()?.coerceIn(0, 59) ?: sleepEndMinute
-                                },
-                                label = { Text("End") },
-                                modifier = Modifier.weight(1f),
-                                singleLine = true
-                            )
-                        }
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("Require charger disconnected")
-                            Switch(
-                                checked = sleepRequireChargerDisconnected,
-                                onCheckedChange = { sleepRequireChargerDisconnected = it }
-                            )
-                        }
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("Require DND active")
-                            Switch(
-                                checked = sleepRequireDndActive,
-                                onCheckedChange = { sleepRequireDndActive = it }
-                            )
-                        }
-                    }
-                }
-            }
-            is TriggerConfig.Nfc -> {
-                GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("NFC Tag", style = MaterialTheme.typography.bodyMedium)
-                        Text(
-                            "Fires when a specific NFC tag is scanned. Requires NFC enabled.",
-                            style = MaterialTheme.typography.bodySmall,
-color = TextSecondary,
-                        )
-                        OutlinedTextField(
-                            value = nfcTagId,
-                            onValueChange = { nfcTagId = it },
-                            label = { Text("Tag ID (leave blank for any)") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true
-                        )
-                    }
-                }
-            }
-            is TriggerConfig.ShareSheet -> {
-                GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Share Sheet", style = MaterialTheme.typography.bodyMedium)
-                        Text(
-                            "Fires when content is shared to IrisApp from any app.",
-                            style = MaterialTheme.typography.bodySmall,
-color = TextSecondary,
-                        )
-                        val stateLabel = when (shareSheetState) {
-                            SetupState.Ready -> "Ready"
-                            SetupState.NeedsSetup -> "Needs setup"
-                            SetupState.Unsupported -> "Unsupported"
-                        }
-                        Text("Status: $stateLabel", style = MaterialTheme.typography.bodySmall)
-                    }
-                }
-            }
-            is TriggerConfig.Voice -> {
-                GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Voice Intent", style = MaterialTheme.typography.bodyMedium)
-                        Text(
-                            "Fires when the user speaks a trigger phrase and the Gemini model identifies a matching workflow.",
-                            style = MaterialTheme.typography.bodySmall,
-color = TextSecondary,
-                        )
-                        Text(
-                            "Use the mic button on the main screen to train and trigger voice workflows.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = CyanAccent
-                        )
-                    }
-                }
-            }
-            is TriggerConfig.SoundEvent -> {
-                var expanded by remember { mutableStateOf(false) }
-                var searchQuery by remember { mutableStateOf("") }
-                val allSounds = remember { YamnetClassifier.AUDIOSET_CLASSES.toList() }
-                val filtered = remember(searchQuery) {
-                    if (searchQuery.isBlank()) allSounds
-                    else allSounds.filter { it.contains(searchQuery, ignoreCase = true) }
-                }
-
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = { expanded = !expanded }
-                ) {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text("Sound Event", style = MaterialTheme.typography.bodyMedium)
-                                if (soundEventClasses.isEmpty()) {
-                                    Text(
-                                        "No sound classes configured",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = Color(0xFFFFB74D)
-                                    )
-                                } else {
-                                    Text(
-                                        "${soundEventClasses.size} sound${if (soundEventClasses.size != 1) "s" else ""} configured",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = CyanAccent
-                                    )
-                                }
-                            }
-                            Icon(
-                                imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                                contentDescription = if (expanded) "Collapse" else "Expand",
-                                tint = TextSecondary,
-                            )
-                        }
-
-                        if (expanded) {
-                            Spacer(modifier = Modifier.height(4.dp))
-                            OutlinedTextField(
-                                value = searchQuery,
-                                onValueChange = { searchQuery = it },
-                                modifier = Modifier.fillMaxWidth(),
-                                placeholder = { Text("Search sounds…") },
-                                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                                trailingIcon = {
-                                    if (searchQuery.isNotEmpty()) {
-                                        IconButton(onClick = { searchQuery = "" }) {
-                                            Icon(Icons.Default.Clear, contentDescription = "Clear search")
-                                        }
-                                    }
-                                },
-                                singleLine = true
-                            )
-                            HorizontalDivider()
-                            LazyColumn(
-                                modifier = Modifier.height(200.dp)
-                            ) {
-                                items(filtered.take(50)) { sound ->
-                                    val checked = sound in soundEventClasses
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable {
-                                                soundEventClasses = if (checked) {
-                                                    soundEventClasses - sound
-                                                } else {
-                                                    soundEventClasses + sound
-                                                }
-                                            }
-                                            .padding(vertical = 6.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Checkbox(
-                                            checked = checked,
-                                            onCheckedChange = { selected ->
-                                                soundEventClasses = if (selected) {
-                                                    soundEventClasses + sound
-                                                } else {
-                                                    soundEventClasses - sound
-                                                }
-                                            }
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            text = sound,
-                                            style = MaterialTheme.typography.bodySmall
-                                        )
-                                    }
-                                }
-                                if (filtered.size > 50) {
-                                    item {
-                                        Text(
-                                            "Showing first 50 results",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = TextSecondary,
-                                            modifier = Modifier.padding(vertical = 8.dp)
-                                        )
-                                    }
-                                }
-                            }
-                            if (soundEventClasses.isNotEmpty()) {
-                                TextButton(
-                                    onClick = { soundEventClasses = emptyList() },
-                                    modifier = Modifier.align(Alignment.End)
-                                ) {
-                                    Text("Clear all")
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        // ── Trigger Section ─────────────────────────────────────────────────────
+        TriggerSection(state.triggerState)
 
         HorizontalDivider()
 
-        // ── Actions ───────────────────────────────────────────────────────
-        Text("Actions", style = MaterialTheme.typography.titleMedium)
+        // ── Actions Section ─────────────────────────────────────────────────────
+        ActionsSection(state)
 
-        Text(
-            text = "${steps.size} step${if (steps.size != 1) "s" else ""}",
-            style = MaterialTheme.typography.labelMedium,
-            color = TextSecondary
-        )
-
-        steps.forEachIndexed { index, step ->
-            val spec = ActionSpecRegistry.find(step.id)
-            val stepValid = isStepValid(step)
-            ActionStepCard(
-                step = step,
-                stepNumber = index + 1,
-                label = spec?.label ?: step.id,
-                isValid = spec != null && stepValid,
-                onEdit = { editingStepIndex = index },
-                onDelete = {
-                    if (steps.size > 1) {
-                        steps = steps.toMutableList().apply { removeAt(index) }
-                        if (editingStepIndex == index) editingStepIndex = -1
-                    }
-                }
-            )
-        }
-
-        GradientOutlinedButton(
-            text = "+ Add Action",
-            onClick = {
-                steps = steps + WorkflowStep(id = "browser.open_url", params = buildJsonObject { put("url", "") })
-            },
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // ── Save / Cancel ─────────────────────────────────────────────────
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            GradientOutlinedButton(
-                text = "Cancel",
-                onClick = onCancel,
-                modifier = Modifier.weight(1f)
-            )
-            GradientButton(
-                text = "Save",
-                onClick = {
-                    val trigger = buildTrigger(
-                        triggerType = "Trigger" to currentTriggerConfig,
-                        timeHour = timePickerState.hour,
-                        timeMinute = timePickerState.minute,
-                        repeatMode = repeatMode,
-                        selectedDays = selectedDays,
-                        batteryLevel = batteryLevel,
-                        batteryCondition = batteryCondition,
-                        chargerTypeIndex = chargerTypeIndex,
-                        wifiSsid = wifiSsid.ifBlank { null },
-                        bluetoothAddress = bluetoothAddress.ifBlank { null },
-                        airplaneEnabled = airplaneEnabled,
-                        geofenceLatitude = geofenceLatitude,
-                        geofenceLongitude = geofenceLongitude,
-                        geofenceRadiusMeters = geofenceRadiusMeters,
-                        geofenceTransitionType = geofenceTransitionType,
-                        geofenceName = geofenceName,
-                        geofenceDwellDelay = geofenceDwellDelay,
-                        alarmStoppedType = alarmStoppedType,
-                        appTriggerPatterns = appTriggerPatterns,
-                        appTriggerOnOpen = appTriggerOnOpen,
-                        appTriggerOnClose = appTriggerOnClose,
-                        smsSenderPattern = smsSenderPattern,
-                        smsBodyPattern = smsBodyPattern,
-                        notifAppPatterns = notifAppPatterns,
-                        notifSenderPattern = notifSenderPattern,
-                        notifBodyPattern = notifBodyPattern,
-                        notifTriggerOnDismiss = notifTriggerOnDismiss,
-                        emailSenderPattern = emailSenderPattern,
-                        emailSubjectPattern = emailSubjectPattern,
-                        emailAppPackage = emailAppPackage,
-                        sleepStartHour = sleepStartHour,
-                        sleepStartMinute = sleepStartMinute,
-                        sleepEndHour = sleepEndHour,
-                        sleepEndMinute = sleepEndMinute,
-                        sleepRequireChargerDisconnected = sleepRequireChargerDisconnected,
-                        sleepRequireDndActive = sleepRequireDndActive,
-                        nfcTagId = nfcTagId,
-                        shareSheetState = shareSheetState,
-                        soundEventClasses = soundEventClasses
-                    )
-                    onSave(
-                        PlannedWorkflow(
-                            name = name.ifBlank { "Untitled" },
-                            summary = summary,
-                            trigger = trigger,
-                            actions = steps
-                        )
-                    )
-                },
-                modifier = Modifier.weight(1f),
-                enabled = name.isNotBlank() && steps.isNotEmpty()
-            )
-        }
+        // ── Bottom Buttons ──────────────────────────────────────────────────────
+        EditorBottomButtons(state, onSave, onCancel)
 
         Spacer(modifier = Modifier.height(32.dp))
     }
 
     // ── Action editor dialog ─────────────────────────────────────────────
-    if (editingStepIndex >= 0) {
+    if (state.editingStepIndex >= 0) {
         ActionEditDialog(
-            step = steps[editingStepIndex],
+            step = state.steps[state.editingStepIndex],
             onSave = { updated ->
-                steps = steps.toMutableList().apply { set(editingStepIndex, updated) }
-                editingStepIndex = -1
+                state.steps = state.steps.toMutableList().apply { set(state.editingStepIndex, updated) }
+                state.editingStepIndex = -1
             },
-            onDismiss = { editingStepIndex = -1 }
+            onDismiss = { state.editingStepIndex = -1 }
+        )
+    }
+}
+
+@Composable
+private fun EditorTopBar(
+    state: ManualWorkflowEditorState,
+    onSave: (PlannedWorkflow) -> Unit,
+    onCancel: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(onClick = onCancel) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Back",
+                modifier = Modifier
+                    .size(28.dp)
+                    .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
+                    .drawWithCache {
+                        val brush = Brush.linearGradient(
+                            colors = listOf(CyanVioletStart, CyanVioletEnd),
+                            start = Offset.Zero,
+                            end = Offset(size.width, size.height)
+                        )
+                        onDrawWithContent {
+                            drawContent()
+                            drawRect(
+                                brush = brush,
+                                blendMode = BlendMode.SrcIn
+                            )
+                        }
+                    }
+            )
+        }
+        GradientButton(
+            text = "Save",
+            onClick = { onSave(state.buildWorkflow()) },
+            modifier = Modifier.height(36.dp),
+            enabled = state.name.isNotBlank() && state.steps.isNotEmpty() && state.steps.all { isStepValid(it) },
+            fillWidth = false
+        )
+    }
+}
+
+@Composable
+private fun BasicInfoFields(state: ManualWorkflowEditorState) {
+    OutlinedTextField(
+        value = state.name,
+        onValueChange = { state.name = it },
+        label = { Text("Workflow name") },
+        modifier = Modifier.fillMaxWidth(),
+        singleLine = true,
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = CyanAccent,
+            unfocusedBorderColor = GlassBorder,
+            focusedLabelColor = CyanAccent,
+            unfocusedLabelColor = TextSecondary,
+            cursorColor = CyanAccent,
+            focusedTextColor = TextPrimary,
+            unfocusedTextColor = TextPrimary
+        )
+    )
+
+    OutlinedTextField(
+        value = state.summary,
+        onValueChange = { state.summary = it },
+        label = { Text("Summary (optional)") },
+        modifier = Modifier.fillMaxWidth(),
+        minLines = 2,
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = CyanAccent,
+            unfocusedBorderColor = GlassBorder,
+            focusedLabelColor = CyanAccent,
+            unfocusedLabelColor = TextSecondary,
+            cursorColor = CyanAccent,
+            focusedTextColor = TextPrimary,
+            unfocusedTextColor = TextPrimary
+        )
+    )
+}
+
+@Composable
+private fun TriggerSection(state: TriggerEditorState) {
+    Text("Trigger", style = MaterialTheme.typography.titleMedium)
+
+    TriggerTypeSelector(state)
+
+    TriggerConfigSection(state)
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TriggerTypeSelector(state: TriggerEditorState) {
+    var triggerSearchQuery by remember { mutableStateOf("") }
+    val filteredCategories = remember(triggerSearchQuery) {
+        if (triggerSearchQuery.isBlank()) {
+            TRIGGER_CATEGORIES
+        } else {
+            TRIGGER_CATEGORIES.mapValues { (cat, items) ->
+                items.filter { item ->
+                    item.label.contains(triggerSearchQuery, ignoreCase = true) ||
+                            cat.label.contains(triggerSearchQuery, ignoreCase = true)
+                }
+            }.filter { (_, items) -> items.isNotEmpty() }
+        }
+    }
+
+    OutlinedTextField(
+        value = triggerSearchQuery,
+        onValueChange = { triggerSearchQuery = it },
+        modifier = Modifier.fillMaxWidth(),
+        placeholder = { Text("Search triggers...", color = TextSecondary) },
+        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = TextSecondary) },
+        trailingIcon = {
+            if (triggerSearchQuery.isNotEmpty()) {
+                IconButton(onClick = { triggerSearchQuery = "" }) {
+                    Icon(Icons.Default.Clear, contentDescription = "Clear", tint = TextSecondary)
+                }
+            }
+        },
+        singleLine = true,
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = CyanAccent,
+            unfocusedBorderColor = GlassBorder,
+            focusedLabelColor = CyanAccent,
+            unfocusedLabelColor = TextSecondary,
+            cursorColor = CyanAccent,
+            focusedTextColor = TextPrimary,
+            unfocusedTextColor = TextPrimary
+        )
+    )
+
+    var selectedCategory by remember { mutableStateOf(TriggerCategory.MANUAL) }
+
+    LaunchedEffect(state.selectedTriggerIndex) {
+        if (state.selectedTriggerIndex in ALL_TRIGGERS.indices) {
+            selectedCategory = ALL_TRIGGERS[state.selectedTriggerIndex].category
+        }
+    }
+
+    Column {
+        filteredCategories.forEach { (category, items) ->
+            val isExpanded = selectedCategory == category
+            val hasSelectedItem = items.any { item -> ALL_TRIGGERS.indexOf(item) == state.selectedTriggerIndex }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(
+                        if (isExpanded) category.color.copy(alpha = 0.12f)
+                        else if (hasSelectedItem) category.color.copy(alpha = 0.07f)
+                        else GlassSurface
+                    )
+                    .clickable {
+                        selectedCategory = if (isExpanded) selectedCategory else category
+                    }
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = category.icon,
+                    contentDescription = null,
+                    tint = if (isExpanded || hasSelectedItem) category.color else TextSecondary,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = category.label,
+                    style = MaterialTheme.typography.labelLarge.copy(
+                        color = if (isExpanded || hasSelectedItem) category.color else TextSecondary,
+                        fontWeight = if (isExpanded) FontWeight(600) else FontWeight(400)
+                    )
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                if (hasSelectedItem && !isExpanded) {
+                    val selectedLabel = ALL_TRIGGERS.getOrNull(state.selectedTriggerIndex)?.label ?: ""
+                    Text(
+                        text = selectedLabel,
+                        style = MaterialTheme.typography.labelSmall.copy(color = TextSecondary)
+                    )
+                }
+                Icon(
+                    imageVector = Icons.Default.ExpandMore,
+                    contentDescription = if (isExpanded) "Collapse" else "Expand",
+                    tint = TextSecondary,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+
+            AnimatedVisibility(
+                visible = isExpanded,
+                enter = expandVertically(animationSpec = androidx.compose.animation.core.spring()),
+                exit = shrinkVertically(animationSpec = androidx.compose.animation.core.spring())
+            ) {
+                Column(modifier = Modifier.padding(start = 16.dp, top = 4.dp, bottom = 8.dp)) {
+                    items.forEach { item ->
+                        val flatIndex = ALL_TRIGGERS.indexOf(item)
+                        val isSelected = state.selectedTriggerIndex == flatIndex
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(
+                                    if (isSelected) item.category.color.copy(alpha = 0.15f)
+                                    else Color.Transparent
+                                )
+                                .clickable {
+                                    state.selectedTriggerIndex = flatIndex
+                                    selectedCategory = item.category
+                                }
+                                .padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = isSelected,
+                                onClick = {
+                                    state.selectedTriggerIndex = flatIndex
+                                    selectedCategory = item.category
+                                },
+                                colors = RadioButtonDefaults.colors(
+                                    selectedColor = item.category.color,
+                                    unselectedColor = TextSecondary
+                                )
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Icon(
+                                imageVector = item.icon,
+                                contentDescription = null,
+                                tint = if (isSelected) item.category.color else TextSecondary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = item.label,
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    color = if (isSelected) TextPrimary else TextSecondary
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+        }
+    }
+}
+
+@Composable
+private fun TriggerConfigSection(state: TriggerEditorState) {
+    val currentItem = ALL_TRIGGERS.getOrNull(state.selectedTriggerIndex)
+        ?: return ManualTriggerInfo()
+
+    when (currentItem.config) {
+        is TriggerConfig.Manual -> ManualTriggerInfo()
+        is TriggerConfig.Time -> TimeTriggerConfig(state)
+        is TriggerConfig.Battery -> BatteryTriggerConfig(state)
+        is TriggerConfig.Charger -> ChargerTriggerConfig(state)
+        is TriggerConfig.WiFi -> WifiTriggerConfig(state)
+        is TriggerConfig.Bluetooth -> BluetoothTriggerConfig(state)
+        is TriggerConfig.AirplaneMode -> AirplaneModeTriggerConfig(state)
+        is TriggerConfig.DoNotDisturb -> DndTriggerInfo()
+        is TriggerConfig.Geofence -> GeofenceTriggerConfig(state)
+        is TriggerConfig.AlarmStopped -> AlarmStoppedTriggerConfig(state)
+        is TriggerConfig.AppOpened, is TriggerConfig.AppClosed -> AppTriggerConfig(state, currentItem.config)
+        is TriggerConfig.SmsReceived -> SmsTriggerConfig(state)
+        is TriggerConfig.NotificationListenerConfig -> NotificationTriggerConfig(state)
+        is TriggerConfig.EmailReceived -> EmailTriggerConfig(state)
+        is TriggerConfig.SleepProxy -> SleepProxyTriggerConfig(state)
+        is TriggerConfig.Nfc -> NfcTriggerConfig(state)
+        is TriggerConfig.ShareSheet -> ShareSheetTriggerInfo(state)
+        is TriggerConfig.Voice -> VoiceTriggerInfo()
+        is TriggerConfig.SoundEvent -> SoundEventTriggerConfig(state)
+        else -> ManualTriggerInfo()
+    }
+}
+
+@Composable
+private fun ManualTriggerInfo() {
+    GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Text(
+                "This workflow runs manually from the widget or list.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextSecondary
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TimeTriggerConfig(state: TriggerEditorState) {
+    val timePickerState = rememberTimePickerState(
+        initialHour = state.timeHour,
+        initialMinute = state.timeMinute,
+        is24Hour = true
+    )
+
+    LaunchedEffect(timePickerState.hour, timePickerState.minute) {
+        state.timeHour = timePickerState.hour
+        state.timeMinute = timePickerState.minute
+    }
+
+    GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            TimePicker(state = timePickerState)
+            Spacer(modifier = Modifier.height(8.dp))
+            val modes = listOf("One-time", "Weekdays", "Weekends", "Daily", "Custom")
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                modes.forEachIndexed { i, label ->
+                    FilterChip(
+                        selected = state.repeatMode == i,
+                        onClick = { state.repeatMode = i },
+                        label = { Text(label, style = MaterialTheme.typography.labelSmall) }
+                    )
+                }
+            }
+            if (state.repeatMode == 4) {
+                Spacer(modifier = Modifier.height(8.dp))
+                val dayLabels = listOf("S", "M", "T", "W", "T", "F", "S")
+                val dayConstants = listOf(1, 2, 3, 4, 5, 6, 7)
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    dayConstants.forEachIndexed { idx, day ->
+                        FilterChip(
+                            selected = day in state.selectedDays,
+                            onClick = {
+                                state.selectedDays = if (day in state.selectedDays) {
+                                    state.selectedDays - day
+                                } else {
+                                    state.selectedDays + day
+                                }
+                            },
+                            label = { Text(dayLabels[idx], style = MaterialTheme.typography.labelSmall) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BatteryTriggerConfig(state: TriggerEditorState) {
+    GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("Battery level: ${state.batteryLevel}%", style = MaterialTheme.typography.bodyMedium)
+            Slider(
+                value = state.batteryLevel.toFloat(),
+                onValueChange = { state.batteryLevel = it.toInt() },
+                valueRange = 5f..100f,
+                steps = 18
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(BatteryCondition.BELOW to "Below", BatteryCondition.ABOVE to "Above").forEach { (cond, label) ->
+                    FilterChip(
+                        selected = state.batteryCondition == cond,
+                        onClick = { state.batteryCondition = cond },
+                        label = { Text(label) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChargerTriggerConfig(state: TriggerEditorState) {
+    GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text("Connection type:", style = MaterialTheme.typography.bodyMedium)
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                CHARGER_TYPES.forEachIndexed { idx, label ->
+                    FilterChip(
+                        selected = state.chargerTypeIndex == idx,
+                        onClick = { state.chargerTypeIndex = idx },
+                        label = { Text(label) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WifiTriggerConfig(state: TriggerEditorState) {
+    OutlinedTextField(
+        value = state.wifiSsid,
+        onValueChange = { state.wifiSsid = it },
+        label = { Text("SSID (leave blank for any)") },
+        modifier = Modifier.fillMaxWidth(),
+        singleLine = true
+    )
+}
+
+@Composable
+private fun BluetoothTriggerConfig(state: TriggerEditorState) {
+    OutlinedTextField(
+        value = state.bluetoothAddress,
+        onValueChange = { state.bluetoothAddress = it },
+        label = { Text("Device address (leave blank for any)") },
+        modifier = Modifier.fillMaxWidth(),
+        singleLine = true
+    )
+}
+
+@Composable
+private fun AirplaneModeTriggerConfig(state: TriggerEditorState) {
+    GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Trigger when airplane mode is ON")
+            Switch(checked = state.airplaneEnabled, onCheckedChange = { state.airplaneEnabled = it })
+        }
+    }
+}
+
+@Composable
+private fun DndTriggerInfo() {
+    GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text("Do Not Disturb trigger", style = MaterialTheme.typography.bodyMedium)
+            Text("Fires on any DND interruption filter change.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+        }
+    }
+}
+
+@Composable
+private fun GeofenceTriggerConfig(state: TriggerEditorState) {
+    GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("Geofence trigger", style = MaterialTheme.typography.bodyMedium)
+
+            OutlinedTextField(
+                value = state.geofenceName,
+                onValueChange = { state.geofenceName = it },
+                label = { Text("Location name (optional)") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = if (state.geofenceLatitude == 0.0) "" else state.geofenceLatitude.toString(),
+                    onValueChange = { state.geofenceLatitude = it.toDoubleOrNull() ?: 0.0 },
+                    label = { Text("Latitude") },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = if (state.geofenceLongitude == 0.0) "" else state.geofenceLongitude.toString(),
+                    onValueChange = { state.geofenceLongitude = it.toDoubleOrNull() ?: 0.0 },
+                    label = { Text("Longitude") },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true
+                )
+            }
+
+            OsmMapPicker(
+                latitude = state.geofenceLatitude,
+                longitude = state.geofenceLongitude,
+                radiusMeters = state.geofenceRadiusMeters,
+                onLocationSelected = { lat, lng ->
+                    state.geofenceLatitude = lat
+                    state.geofenceLongitude = lng
+                }
+            )
+
+            Text("Radius: ${state.geofenceRadiusMeters.toInt()} m", style = MaterialTheme.typography.bodyMedium)
+            Slider(
+                value = state.geofenceRadiusMeters,
+                onValueChange = { state.geofenceRadiusMeters = it },
+                valueRange = 50f..2000f,
+            )
+            Text("Trigger when:", style = MaterialTheme.typography.bodyMedium)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(
+                    GeofenceTransition.ENTER to "Arriving",
+                    GeofenceTransition.EXIT to "Leaving",
+                    GeofenceTransition.DWELL to "Staying",
+                    GeofenceTransition.ENTER_EXIT to "Either"
+                ).forEach { (type, label) ->
+                    FilterChip(
+                        selected = state.geofenceTransitionType == type,
+                        onClick = { state.geofenceTransitionType = type },
+                        label = { Text(label) }
+                    )
+                }
+            }
+            if (state.geofenceTransitionType == GeofenceTransition.DWELL) {
+                Text("Dwell delay: ${state.geofenceDwellDelay}s", style = MaterialTheme.typography.bodyMedium)
+                Slider(
+                    value = state.geofenceDwellDelay.toFloat(),
+                    onValueChange = { state.geofenceDwellDelay = it.toInt() },
+                    valueRange = 0f..300f,
+                    steps = 29,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AlarmStoppedTriggerConfig(state: TriggerEditorState) {
+    GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Alarm Stopped", style = MaterialTheme.typography.bodyMedium)
+            Text(
+                "Fires when a IrisApp alarm is dismissed or cancelled by the user.",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary
+            )
+            OutlinedTextField(
+                value = state.alarmStoppedType,
+                onValueChange = { state.alarmStoppedType = it },
+                label = { Text("Alarm type filter (optional)") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                placeholder = { Text("e.g. default, reminder, timer") }
+            )
+        }
+    }
+}
+
+@Composable
+private fun AppTriggerConfig(state: TriggerEditorState, config: TriggerConfig) {
+    GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(
+                if (config is TriggerConfig.AppOpened) "App Opened" else "App Closed",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            AppPatternEditor(
+                patterns = state.appTriggerPatterns,
+                onPatternsChange = { state.appTriggerPatterns = it }
+            )
+            Text("Trigger on:", style = MaterialTheme.typography.bodySmall)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = state.appTriggerOnOpen,
+                    onClick = { state.appTriggerOnOpen = !state.appTriggerOnOpen },
+                    label = { Text("Open") }
+                )
+                FilterChip(
+                    selected = state.appTriggerOnClose,
+                    onClick = { state.appTriggerOnClose = !state.appTriggerOnClose },
+                    label = { Text("Close") }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SmsTriggerConfig(state: TriggerEditorState) {
+    GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("SMS Received", style = MaterialTheme.typography.bodyMedium)
+            Text(
+                "Fires when an SMS matching the patterns is received. Requires notification access.",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary
+            )
+            OutlinedTextField(
+                value = state.smsSenderPattern,
+                onValueChange = { state.smsSenderPattern = it },
+                label = { Text("Sender pattern (optional)") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                placeholder = { Text("e.g. +1 or ABC") }
+            )
+            OutlinedTextField(
+                value = state.smsBodyPattern,
+                onValueChange = { state.smsBodyPattern = it },
+                label = { Text("Body pattern (optional)") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                placeholder = { Text("e.g. OTP or verification") }
+            )
+        }
+    }
+}
+
+@Composable
+private fun NotificationTriggerConfig(state: TriggerEditorState) {
+    GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("App Notification", style = MaterialTheme.typography.bodyMedium)
+            Text(
+                "Fires on notifications from specific apps. Requires notification access.",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary,
+            )
+            OutlinedTextField(
+                value = state.notifAppPatterns.joinToString(", "),
+                onValueChange = {
+                    state.notifAppPatterns = it.split(",").map { s -> s.trim() }.filter { s -> s.isNotEmpty() }
+                },
+                label = { Text("App package patterns (comma-separated)") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                placeholder = { Text("e.g. com.whatsapp, org.telegram") }
+            )
+            OutlinedTextField(
+                value = state.notifSenderPattern,
+                onValueChange = { state.notifSenderPattern = it },
+                label = { Text("Sender pattern (optional)") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+            OutlinedTextField(
+                value = state.notifBodyPattern,
+                onValueChange = { state.notifBodyPattern = it },
+                label = { Text("Body pattern (optional)") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Also on dismiss")
+                Switch(
+                    checked = state.notifTriggerOnDismiss,
+                    onCheckedChange = { state.notifTriggerOnDismiss = it }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmailTriggerConfig(state: TriggerEditorState) {
+    GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Email Received", style = MaterialTheme.typography.bodyMedium)
+            Text(
+                "Fires on email notifications. Requires notification access.",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary,
+            )
+            OutlinedTextField(
+                value = state.emailSenderPattern,
+                onValueChange = { state.emailSenderPattern = it },
+                label = { Text("From / sender pattern (optional)") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                placeholder = { Text("e.g. @company.com") }
+            )
+            OutlinedTextField(
+                value = state.emailSubjectPattern,
+                onValueChange = { state.emailSubjectPattern = it },
+                label = { Text("Subject pattern (optional)") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                placeholder = { Text("e.g. Invoice or Urgent") }
+            )
+            OutlinedTextField(
+                value = state.emailAppPackage,
+                onValueChange = { state.emailAppPackage = it },
+                label = { Text("Email app package") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+        }
+    }
+}
+
+@Composable
+private fun SleepProxyTriggerConfig(state: TriggerEditorState) {
+    GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("Sleep Proxy", style = MaterialTheme.typography.bodyMedium)
+            Text(
+                "Fires when bedtime conditions are met (DND active, charger disconnected).",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = String.format("%02d:%02d", state.sleepStartHour, state.sleepStartMinute),
+                    onValueChange = {
+                        val parts = it.split(":")
+                        state.sleepStartHour = parts.getOrNull(0)?.toIntOrNull()?.coerceIn(0, 23) ?: state.sleepStartHour
+                        state.sleepStartMinute = parts.getOrNull(1)?.toIntOrNull()?.coerceIn(0, 59) ?: state.sleepStartMinute
+                    },
+                    label = { Text("Start") },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = String.format("%02d:%02d", state.sleepEndHour, state.sleepEndMinute),
+                    onValueChange = {
+                        val parts = it.split(":")
+                        state.sleepEndHour = parts.getOrNull(0)?.toIntOrNull()?.coerceIn(0, 23) ?: state.sleepEndHour
+                        state.sleepEndMinute = parts.getOrNull(1)?.toIntOrNull()?.coerceIn(0, 59) ?: state.sleepEndMinute
+                    },
+                    label = { Text("End") },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Require charger disconnected")
+                Switch(
+                    checked = state.sleepRequireChargerDisconnected,
+                    onCheckedChange = { state.sleepRequireChargerDisconnected = it }
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Require DND active")
+                Switch(
+                    checked = state.sleepRequireDndActive,
+                    onCheckedChange = { state.sleepRequireDndActive = it }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun NfcTriggerConfig(state: TriggerEditorState) {
+    GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("NFC Tag", style = MaterialTheme.typography.bodyMedium)
+            Text(
+                "Fires when a specific NFC tag is scanned. Requires NFC enabled.",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary,
+            )
+            OutlinedTextField(
+                value = state.nfcTagId,
+                onValueChange = { state.nfcTagId = it },
+                label = { Text("Tag ID (leave blank for any)") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+        }
+    }
+}
+
+@Composable
+private fun ShareSheetTriggerInfo(state: TriggerEditorState) {
+    GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Share Sheet", style = MaterialTheme.typography.bodyMedium)
+            Text(
+                "Fires when content is shared to IrisApp from any app.",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary,
+            )
+            val stateLabel = when (state.shareSheetState) {
+                SetupState.Ready -> "Ready"
+                SetupState.NeedsSetup -> "Needs setup"
+                SetupState.Unsupported -> "Unsupported"
+            }
+            Text("Status: $stateLabel", style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
+@Composable
+private fun VoiceTriggerInfo() {
+    GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Voice Intent", style = MaterialTheme.typography.bodyMedium)
+            Text(
+                "Fires when the user speaks a trigger phrase and the Gemini model identifies a matching workflow.",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary,
+            )
+            Text(
+                "Use the mic button on the main screen to train and trigger voice workflows.",
+                style = MaterialTheme.typography.bodySmall,
+                color = CyanAccent
+            )
+        }
+    }
+}
+
+@Composable
+private fun SoundEventTriggerConfig(state: TriggerEditorState) {
+    var expanded by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    val allSounds = remember { YamnetClassifier.AUDIOSET_CLASSES.toList() }
+    val filtered = remember(searchQuery) {
+        if (searchQuery.isBlank()) allSounds
+        else allSounds.filter { it.contains(searchQuery, ignoreCase = true) }
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = { expanded = !expanded }
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Sound Event", style = MaterialTheme.typography.bodyMedium)
+                    if (state.soundEventClasses.isEmpty()) {
+                        Text(
+                            "No sound classes configured",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFFFFB74D)
+                        )
+                    } else {
+                        Text(
+                            "${state.soundEventClasses.size} sound${if (state.soundEventClasses.size != 1) "s" else ""} configured",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = CyanAccent
+                        )
+                    }
+                }
+                Icon(
+                    imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = if (expanded) "Collapse" else "Expand",
+                    tint = TextSecondary,
+                )
+            }
+
+            if (expanded) {
+                Spacer(modifier = Modifier.height(4.dp))
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("Search sounds…") },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(Icons.Default.Clear, contentDescription = "Clear search")
+                            }
+                        }
+                    },
+                    singleLine = true
+                )
+                HorizontalDivider()
+                LazyColumn(
+                    modifier = Modifier.height(200.dp)
+                ) {
+                    items(filtered.take(50)) { sound ->
+                        val checked = sound in state.soundEventClasses
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    state.soundEventClasses = if (checked) {
+                                        state.soundEventClasses - sound
+                                    } else {
+                                        state.soundEventClasses + sound
+                                    }
+                                }
+                                .padding(vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Checkbox(
+                                checked = checked,
+                                onCheckedChange = { selected ->
+                                    state.soundEventClasses = if (selected) {
+                                        state.soundEventClasses + sound
+                                    } else {
+                                        state.soundEventClasses - sound
+                                    }
+                                }
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = sound,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+                    if (filtered.size > 50) {
+                        item {
+                            Text(
+                                "Showing first 50 results",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TextSecondary,
+                                modifier = Modifier.padding(vertical = 8.dp)
+                            )
+                        }
+                    }
+                }
+                if (state.soundEventClasses.isNotEmpty()) {
+                    TextButton(
+                        onClick = { state.soundEventClasses = emptyList() },
+                        modifier = Modifier.align(Alignment.End)
+                    ) {
+                        Text("Clear all")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ActionsSection(state: ManualWorkflowEditorState) {
+    Text("Actions", style = MaterialTheme.typography.titleMedium)
+
+    Text(
+        text = "${state.steps.size} step${if (state.steps.size != 1) "s" else ""}",
+        style = MaterialTheme.typography.labelMedium,
+        color = TextSecondary
+    )
+
+    state.steps.forEachIndexed { index, step ->
+        val spec = ActionSpecRegistry.find(step.id)
+        val stepValid = isStepValid(step)
+        ActionStepCard(
+            step = step,
+            stepNumber = index + 1,
+            label = spec?.label ?: step.id,
+            isValid = spec != null && stepValid,
+            onEdit = { state.editingStepIndex = index },
+            onDelete = {
+                if (state.steps.size > 1) {
+                    state.steps = state.steps.toMutableList().apply { removeAt(index) }
+                    if (state.editingStepIndex == index) state.editingStepIndex = -1
+                }
+            }
+        )
+    }
+
+    GradientOutlinedButton(
+        text = "+ Add Action",
+        onClick = {
+            state.steps = state.steps + WorkflowStep(id = "browser.open_url", params = buildJsonObject { put("url", "") })
+        },
+        modifier = Modifier.fillMaxWidth()
+    )
+}
+
+@Composable
+private fun EditorBottomButtons(
+    state: ManualWorkflowEditorState,
+    onSave: (PlannedWorkflow) -> Unit,
+    onCancel: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        GradientButton(
+            text = "Cancel",
+            onClick = onCancel,
+            modifier = Modifier.weight(1f)
+        )
+        GradientButton(
+            text = "Save",
+            onClick = { onSave(state.buildWorkflow()) },
+            modifier = Modifier.weight(1f),
+            enabled = state.name.isNotBlank() && state.steps.isNotEmpty() && state.steps.all { isStepValid(it) }
         )
     }
 }
@@ -1486,7 +1456,7 @@ private fun ActionStepCard(
                             step.params.toString(),
                             style = MaterialTheme.typography.bodySmall,
                             fontFamily = FontFamily.Monospace,
-color = TextSecondary,
+                            color = TextSecondary,
                         )
                     }
                 }
@@ -1771,114 +1741,6 @@ private fun validateStep(step: WorkflowStep): List<ActionValidationError> {
 
 /** True if the step has no validation errors. */
 private fun isStepValid(step: WorkflowStep): Boolean = validateStep(step).isEmpty()
-
-private fun buildTrigger(
-    triggerType: Pair<String, TriggerConfig>,
-    timeHour: Int,
-    timeMinute: Int,
-    repeatMode: Int,
-    selectedDays: Set<Int>,
-    batteryLevel: Int,
-    batteryCondition: BatteryCondition,
-    chargerTypeIndex: Int,
-    wifiSsid: String?,
-    bluetoothAddress: String?,
-    airplaneEnabled: Boolean,
-    geofenceLatitude: Double,
-    geofenceLongitude: Double,
-    geofenceRadiusMeters: Float,
-    geofenceTransitionType: GeofenceTransition,
-    geofenceName: String,
-    geofenceDwellDelay: Int,
-    alarmStoppedType: String,
-    appTriggerPatterns: List<String>,
-    appTriggerOnOpen: Boolean,
-    appTriggerOnClose: Boolean,
-    smsSenderPattern: String,
-    smsBodyPattern: String,
-    notifAppPatterns: List<String>,
-    notifSenderPattern: String,
-    notifBodyPattern: String,
-    notifTriggerOnDismiss: Boolean,
-    emailSenderPattern: String,
-    emailSubjectPattern: String,
-    emailAppPackage: String,
-    sleepStartHour: Int,
-    sleepStartMinute: Int,
-    sleepEndHour: Int,
-    sleepEndMinute: Int,
-    sleepRequireChargerDisconnected: Boolean,
-    sleepRequireDndActive: Boolean,
-    nfcTagId: String,
-    shareSheetState: SetupState,
-    soundEventClasses: List<String>
-): TriggerConfig {
-    return when (triggerType.second) {
-        is TriggerConfig.Manual -> TriggerConfig.Manual
-        is TriggerConfig.Time -> {
-            val days = when (repeatMode) {
-                0 -> emptyList()
-                1 -> listOf(2, 3, 4, 5, 6)
-                2 -> listOf(1, 7)
-                3 -> (1..7).toList()
-                else -> selectedDays.sorted()
-            }
-            TriggerConfig.Time(timeHour, timeMinute, days)
-        }
-        is TriggerConfig.Battery -> TriggerConfig.Battery(batteryLevel, batteryCondition)
-        is TriggerConfig.Charger -> TriggerConfig.Charger(
-            when (chargerTypeIndex) {
-                1 -> ChargerType.USB
-                2 -> ChargerType.AC
-                3 -> ChargerType.WIRELESS
-                else -> ChargerType.ANY
-            }
-        )
-        is TriggerConfig.WiFi -> TriggerConfig.WiFi(wifiSsid)
-        is TriggerConfig.Bluetooth -> TriggerConfig.Bluetooth(bluetoothAddress)
-        is TriggerConfig.AirplaneMode -> TriggerConfig.AirplaneMode(airplaneEnabled)
-        is TriggerConfig.DoNotDisturb -> TriggerConfig.DoNotDisturb(null)
-        is TriggerConfig.Geofence -> TriggerConfig.Geofence(
-            geofenceLatitude, geofenceLongitude, geofenceRadiusMeters,
-            geofenceTransitionType, geofenceDwellDelay,
-            geofenceName.ifBlank { null }
-        )
-        is TriggerConfig.AlarmStopped -> TriggerConfig.AlarmStopped(
-            alarmStoppedType.ifBlank { "default" }
-        )
-        is TriggerConfig.AppOpened -> TriggerConfig.AppOpened(
-            appTriggerPatterns, appTriggerOnOpen, appTriggerOnClose
-        )
-        is TriggerConfig.AppClosed -> TriggerConfig.AppClosed(
-            appTriggerPatterns, appTriggerOnOpen, appTriggerOnClose
-        )
-        is TriggerConfig.SmsReceived -> TriggerConfig.SmsReceived(
-            smsSenderPattern.ifBlank { null },
-            smsBodyPattern.ifBlank { null }
-        )
-        is TriggerConfig.NotificationListenerConfig -> TriggerConfig.NotificationListenerConfig(
-            notifAppPatterns,
-            notifSenderPattern.ifBlank { null },
-            notifBodyPattern.ifBlank { null },
-            notifTriggerOnDismiss
-        )
-        is TriggerConfig.EmailReceived -> TriggerConfig.EmailReceived(
-            emailSenderPattern.ifBlank { null },
-            emailSubjectPattern.ifBlank { null },
-            emailAppPackage
-        )
-        is TriggerConfig.SleepProxy -> TriggerConfig.SleepProxy(
-            sleepStartHour, sleepStartMinute,
-            sleepEndHour, sleepEndMinute,
-            sleepRequireChargerDisconnected, sleepRequireDndActive
-        )
-        is TriggerConfig.Nfc -> TriggerConfig.Nfc(nfcTagId.ifBlank { null })
-        is TriggerConfig.ShareSheet -> TriggerConfig.ShareSheet(shareSheetState)
-        is TriggerConfig.Voice -> TriggerConfig.Voice
-        is TriggerConfig.SoundEvent -> TriggerConfig.SoundEvent(soundEventClasses)
-        else -> TriggerConfig.Manual
-    }
-}
 
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class, androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
