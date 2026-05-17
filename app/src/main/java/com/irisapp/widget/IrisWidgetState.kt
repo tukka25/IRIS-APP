@@ -26,11 +26,7 @@ data class IrisWidgetState(
     val activeWorkflowName: String? = null,
     val slmState: SlmProcessState = SlmProcessState.IDLE,
     val recentResults: List<Boolean> = listOf(true, true, false, true, true),
-    val suggestions: List<String> = listOf(
-        "Coffee & Note",
-        "Morning Routine",
-        "Summarize Inbox"
-    ),
+    val suggestions: List<String> = emptyList(),
     /** Live per-step execution log; cleared at the start of each new run. */
     val stepLogs: List<StepLog> = emptyList(),
     /** Name of the step currently executing, null when between steps or idle. */

@@ -210,7 +210,7 @@ private fun StepLogRow(log: StepLog) {
                 text = log.stepName,
                 style = TextStyle(fontWeight = FontWeight.Medium, fontSize = 10.sp, color = ColorProvider(TextPrimary)),
                 maxLines = 1,
-                modifier = GlanceModifier.defaultWeight()
+                modifier = GlanceModifier.width(0.dp)
             )
             Spacer(modifier = GlanceModifier.width(4.dp))
             // Wall-clock time of completion + duration

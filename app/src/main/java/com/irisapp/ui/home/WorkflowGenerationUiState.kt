@@ -138,12 +138,27 @@ data class WorkflowGenerationUiState(
     val soundEventTriggerSetupWorkflow: PlannedWorkflow? = null,
 
     // ── Navigation tabs ────────────────────────────────────────────────
-    val selectedTab: Int = 0  // 0 = Generate, 1 = Workflows, 2 = Editor
+    val selectedTab: Int = 0,  // 0 = Generate, 1 = Workflows, 2 = Editor
+
+    // ── Model Manager state ─────────────────────────────────────────────
+    val showModelManager: Boolean = false,
+    val availableModels: List<ModelItemUiState> = emptyList()
 ) {
     val canGenerate: Boolean get() = isModelLoaded && isModelReady && !isBusy && prompt.isNotBlank()
     val hasWorkflow: Boolean get() = workflowPreview != null
     val isValid: Boolean get() = hasWorkflow && validationErrors.isEmpty()
 }
+
+data class ModelItemUiState(
+    val id: String,
+    val fileName: String,
+    val label: String,
+    val description: String,
+    val sizeLabel: String,
+    val downloadUrl: String,
+    val isDownloaded: Boolean,
+    val isActive: Boolean
+)
 
 enum class StageStatus { Pending, Running, Done }
 

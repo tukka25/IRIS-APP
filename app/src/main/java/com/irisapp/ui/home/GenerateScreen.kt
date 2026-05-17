@@ -48,10 +48,12 @@ import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -118,7 +120,29 @@ fun GenerateTabContent(
     state: WorkflowGenerationUiState
 ) {
     val isGenerating = state.isBusy
+    val configuration = LocalConfiguration.current
+    val density = LocalDensity.current
+    val screenHeightDp = configuration.screenHeightDp.dp
 
+    // Model manager sheet
+    if (state.showModelManager) {
+        ModelManagerSheet(
+            state = state,
+            onDismiss = { viewModel.toggleModelManager() },
+            onDownload = { viewModel.downloadModel(it) },
+            onSelect = { viewModel.selectModel(it) }
+        )
+    }
+
+    // Character translates from upper-center (idle) → dead-center (generating)
+    val charTranslateY by animateDpAsState(
+        targetValue = if (isGenerating) 0.dp else -(screenHeightDp * 0.19f),
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "char_y"
+    )
     val charScale by animateFloatAsState(
         targetValue = if (isGenerating) 1.48f else 1.0f,
         animationSpec = spring(
@@ -234,7 +258,15 @@ fun GenerateTabContent(
             exit = fadeOut(tween(250)) + slideOutVertically { it / 2 },
             modifier = Modifier.align(Alignment.BottomCenter)
         ) {
-            IdleBottomContent(viewModel = viewModel, state = state)
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(24.dp)
+            ) {
+                if (state.inferenceState is InferenceState.MissingModel && state.workflowPreview == null) {
+                    MissingModelCard(onOpenManager = { viewModel.toggleModelManager() })
+                }
+                IdleBottomContent(viewModel = viewModel, state = state)
+            }
         }
 
         // ── Layer 5: Generating status panel ──────────────────────────────
@@ -434,15 +466,18 @@ private fun ModelStatusPill(
 ) {
     val isLoading = state.inferenceState is InferenceState.Loading
     val isReady   = state.inferenceState is InferenceState.Ready
+    val downloadState = state.inferenceState as? InferenceState.Downloading
 
     val dotColor = when {
         isReady   -> GreenSuccess
         isLoading -> CyanAccent
+        downloadState != null -> VioletAccent
         else      -> TextSecondary.copy(alpha = 0.5f)
     }
     val label = when {
         isReady   -> "Online"
         isLoading -> "Loading"
+        downloadState != null -> "Downloading ${"%.2f".format(downloadState.progress * 100f)}%"
         state.inferenceState is InferenceState.MissingModel -> "No Model"
         else      -> "Offline"
     }
@@ -459,7 +494,7 @@ private fun ModelStatusPill(
             .clip(RoundedCornerShape(20.dp))
             .background(Color(0xFF080810).copy(alpha = 0.90f))
             .border(0.5.dp, GlassBorder, RoundedCornerShape(20.dp))
-            .clickable { if (state.isModelLoaded) viewModel.unloadModel() else viewModel.loadModel() }
+            .clickable { viewModel.toggleModelManager() }
             .padding(horizontal = 12.dp, vertical = 7.dp)
     ) {
         Row(
@@ -470,7 +505,7 @@ private fun ModelStatusPill(
                 modifier = Modifier
                     .size(7.dp)
                     .clip(CircleShape)
-                    .background(dotColor.copy(alpha = if (isLoading) dotAlpha else 1f))
+                    .background(dotColor.copy(alpha = if (isLoading || downloadState != null) dotAlpha else 1f))
             )
             Text(
                 text = label,
@@ -478,6 +513,210 @@ private fun ModelStatusPill(
                 fontWeight = SubtitleWeight,
                 letterSpacing = 0.3.sp,
                 color = TextPrimary
+            )
+        }
+    }
+}
+
+// ─── Model Manager Sheet ──────────────────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ModelManagerSheet(
+    state: WorkflowGenerationUiState,
+    onDismiss: () -> Unit,
+    onDownload: (String) -> Unit,
+    onSelect: (String) -> Unit
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = SurfaceDark,
+        contentColor = TextPrimary,
+        tonalElevation = 8.dp,
+        dragHandle = {
+            Box(
+                modifier = Modifier
+                    .padding(vertical = 12.dp)
+                    .size(width = 36.dp, height = 4.dp)
+                    .clip(CircleShape)
+                    .background(TextSecondary.copy(alpha = 0.3f))
+            )
+        }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 40.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Text(
+                text = "Model Management",
+                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold)
+            )
+            Text(
+                text = "IrisApp runs completely offline. Download a Gemma 4 model to get started.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextSecondary
+            )
+
+            state.availableModels.forEach { model ->
+                ModelItemRow(
+                    model = model,
+                    isBusy = state.isBusy,
+                    onDownload = { onDownload(model.id) },
+                    onSelect = { onSelect(model.id) },
+                    inferenceState = state.inferenceState
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ModelItemRow(
+    model: ModelItemUiState,
+    isBusy: Boolean,
+    onDownload: () -> Unit,
+    onSelect: () -> Unit,
+    inferenceState: InferenceState
+) {
+    val downloadState = inferenceState as? InferenceState.Downloading
+    val isThisDownloading = downloadState != null && downloadState.modelId == model.fileName
+    val isAnyDownloading = downloadState != null
+    
+    GlassmorphicCard(
+        modifier = Modifier.fillMaxWidth(),
+        glowColor = if (model.isActive) CyanAccent else if (isThisDownloading) VioletAccent else null
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = model.label,
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = if (model.isActive) CyanAccent else if (isThisDownloading) VioletAccent else TextPrimary
+                )
+                Text(
+                    text = model.description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary
+                )
+                
+                if (isThisDownloading && downloadState != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Downloading: ${"%.2f".format(downloadState.progress * 100f)}%",
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                        color = VioletAccent
+                    )
+                    Text(
+                        text = "${formatFileSize(downloadState.downloadedBytes)} / ${formatFileSize(downloadState.totalBytes)}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = TextSecondary
+                    )
+                    Text(
+                        text = "Speed: ${formatSpeed(downloadState.speedBytesPerSecond)} • ETA: ${formatDuration(downloadState.etaSeconds)}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = TextSecondary
+                    )
+                } else {
+                    Text(
+                        text = model.sizeLabel,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = VioletAccent,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
+            }
+
+            if (model.isDownloaded) {
+                GradientButton(
+                    text = if (model.isActive) "Active" else "Use",
+                    enabled = !isBusy && !model.isActive && !isAnyDownloading,
+                    onClick = onSelect
+                )
+            } else {
+                OutlinedButton(
+                    onClick = onDownload,
+                    enabled = !isBusy && !isAnyDownloading,
+                    border = BorderStroke(1.dp, if (!isBusy && !isAnyDownloading) CyanAccent.copy(alpha = 0.5f) else TextSecondary.copy(alpha = 0.2f)),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = CyanAccent)
+                ) {
+                    Text(if (isThisDownloading) "Wait..." else "Download")
+                }
+            }
+        }
+    }
+}
+
+private fun formatFileSize(size: Long): String {
+    if (size <= 0) return "0 B"
+    val units = listOf("B", "KB", "MB", "GB", "TB")
+    val digitGroups = (Math.log10(size.toDouble()) / Math.log10(1024.0)).toInt()
+    return "%.2f %s".format(size / Math.pow(1024.0, digitGroups.toDouble()), units[digitGroups])
+}
+
+private fun formatSpeed(bytesPerSecond: Long): String {
+    if (bytesPerSecond <= 0) return "0 B/s"
+    val units = listOf("B/s", "KB/s", "MB/s", "GB/s")
+    val digitGroups = (Math.log10(bytesPerSecond.toDouble()) / Math.log10(1024.0)).toInt()
+    return "%.1f %s".format(bytesPerSecond / Math.pow(1024.0, digitGroups.toDouble()), units[digitGroups])
+}
+
+private fun formatDuration(seconds: Long): String {
+    if (seconds <= 0) return "calculating..."
+    val h = seconds / 3600
+    val m = (seconds % 3600) / 60
+    val s = seconds % 60
+    return when {
+        h > 0 -> "${h}h ${m}m"
+        m > 0 -> "${m}m ${s}s"
+        else -> "${s}s"
+    }
+}
+
+@Composable
+private fun MissingModelCard(
+    onOpenManager: () -> Unit
+) {
+    GlassmorphicCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp),
+        glowColor = VioletAccent
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Psychology,
+                contentDescription = null,
+                tint = VioletAccent,
+                modifier = Modifier.size(40.dp)
+            )
+            Text(
+                text = "Intelligence Required",
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                textAlign = TextAlign.Center
+            )
+            Text(
+                text = "IrisApp needs a Gemma 4 model to understand your requests. Download one to enable AI generation.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextSecondary,
+                textAlign = TextAlign.Center
+            )
+            GradientButton(
+                text = "Setup Model",
+                onClick = onOpenManager,
+                modifier = Modifier.fillMaxWidth()
             )
         }
     }

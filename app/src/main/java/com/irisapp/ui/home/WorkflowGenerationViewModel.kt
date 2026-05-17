@@ -73,9 +73,14 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
     init {
         viewModelScope.launch {
             InferenceManager.inferenceState.collect { state ->
-                val isLoaded = state !is InferenceState.Idle
-                _uiState.update { it.copy(inferenceState = state, isModelReady = state is InferenceState.Ready, isModelLoaded = isLoaded) }
+                val isLoaded = state !is InferenceState.Idle && state !is InferenceState.MissingModel
+                _uiState.update { it.copy(
+                    inferenceState = state,
+                    isModelReady = state is InferenceState.Ready,
+                    isModelLoaded = isLoaded
+                ) }
                 appendDebug("Model", state.toString())
+                refreshAvailableModels()
             }
         }
         // Model is NOT auto-loaded — user toggles it via the load switch
@@ -85,6 +90,49 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
             val saved = workflowRepo.loadAll()
             val (summaries, activity) = buildHistoryState(saved)
             _uiState.update { it.copy(savedWorkflows = saved, workflowSummaries = summaries, recentActivity = activity) }
+        }
+        refreshAvailableModels()
+    }
+
+    private fun refreshAvailableModels() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val locator = com.irisapp.platform.inference.litert.ModelFileLocator(getApplication())
+            val currentModel = InferenceManager.currentModelName
+
+            val items = com.irisapp.platform.inference.litert.ModelFileLocator.AVAILABLE_MODELS.map { meta ->
+                ModelItemUiState(
+                    id = meta.id,
+                    fileName = meta.fileName,
+                    label = meta.label,
+                    description = meta.description,
+                    sizeLabel = meta.sizeLabel,
+                    downloadUrl = meta.downloadUrl,
+                    isDownloaded = locator.modelExists(meta.fileName),
+                    isActive = meta.fileName == currentModel
+                )
+            }
+            _uiState.update { it.copy(availableModels = items) }
+        }
+    }
+
+    fun toggleModelManager() {
+        _uiState.update { it.copy(showModelManager = !it.showModelManager) }
+        if (_uiState.value.showModelManager) {
+            refreshAvailableModels()
+        }
+    }
+
+    fun downloadModel(modelId: String) {
+        val meta = com.irisapp.platform.inference.litert.ModelFileLocator.AVAILABLE_MODELS.find { it.id == modelId } ?: return
+        viewModelScope.launch {
+            InferenceManager.downloadAndInit(getApplication(), meta.fileName, meta.downloadUrl)
+        }
+    }
+
+    fun selectModel(modelId: String) {
+        val meta = com.irisapp.platform.inference.litert.ModelFileLocator.AVAILABLE_MODELS.find { it.id == modelId } ?: return
+        viewModelScope.launch {
+            InferenceManager.initialize(getApplication(), meta.fileName)
         }
     }
 
@@ -97,7 +145,7 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
     }
 
     fun unloadModel() {
-        InferenceManager.close()
+        viewModelScope.launch { InferenceManager.close() }
     }
 
     /**
@@ -933,6 +981,9 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
 
     fun deleteWorkflow(name: String) {
         viewModelScope.launch(Dispatchers.IO) {
+            // Unregister trigger first so stale alarms/geofences/receivers don't fire
+            // after the workflow JSON is gone.
+            TriggerRegistry.unregister(name)
             workflowRepo.delete(name)
             val updated = workflowRepo.loadAll()
             _uiState.update { it.copy(savedWorkflows = updated) }
