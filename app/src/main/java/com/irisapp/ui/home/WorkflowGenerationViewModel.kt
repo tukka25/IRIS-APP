@@ -72,6 +72,9 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
     }
 
     init {
+        // Fetch models immediately
+        refreshAvailableModels()
+
         viewModelScope.launch {
             InferenceManager.inferenceState.collect { state ->
                 val isLoaded = state !is InferenceState.Idle && state !is InferenceState.MissingModel
@@ -95,7 +98,8 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
         refreshAvailableModels()
     }
 
-    private fun refreshAvailableModels() {
+    fun refreshAvailableModels() {
+        _uiState.update { it.copy(isLoadingModels = true) }
         viewModelScope.launch(Dispatchers.IO) {
             val locator = com.irisapp.platform.inference.litert.ModelFileLocator(getApplication())
             val currentModel = InferenceManager.currentModelName
@@ -112,7 +116,9 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
                     isActive = meta.fileName == currentModel
                 )
             }
-            _uiState.update { it.copy(availableModels = items) }
+            withContext(Dispatchers.Main) {
+                _uiState.update { it.copy(availableModels = items, isLoadingModels = false) }
+            }
         }
     }
 
@@ -635,7 +641,11 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
         val workflow = uiState.value.savedWorkflows.find { it.name == workflowId }
         if (workflow != null) {
             _uiState.update {
-                it.copy(nfcScanConfirmation = NfcScanConfirmation(workflowId, workflow.name))
+                it.copy(nfcScanConfirmation = NfcScanConfirmation(workflowId, workflow.name), nfcScanError = null)
+            }
+        } else {
+            _uiState.update {
+                it.copy(nfcScanConfirmation = null, nfcScanError = "Workflow '$workflowId' not found. It may have been deleted.")
             }
         }
     }
@@ -656,7 +666,7 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
      * User dismissed the NFC scan confirmation.
      */
     fun dismissNfcScan() {
-        _uiState.update { it.copy(nfcScanConfirmation = null) }
+        _uiState.update { it.copy(nfcScanConfirmation = null, nfcScanError = null) }
     }
 
     /** Show the NFC tag setup screen for a given workflow. */

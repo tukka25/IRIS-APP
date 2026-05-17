@@ -145,7 +145,7 @@ Deliverable: tapping Run Now visibly executes at least two cross-app steps on th
 ## Milestone 7: NFC Trigger
 
 - [ ] P1 Add `android.permission.NFC`.
-- [ ] P1 Add deep link route: `gemmaworkflow://run/{workflowId}`.
+- [ ] P1 Add deep link route: `iris://run/{workflowId}`.
 - [ ] P1 Add manifest intent filter for the deep link.
 - [ ] P1 Create `NfcTriggerWriter`.
 - [ ] P1 Write NDEF deep link to an NFC tag.

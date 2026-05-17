@@ -17,12 +17,19 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.material.icons.filled.Psychology
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -115,7 +122,6 @@ import kotlin.math.PI
 import kotlin.math.sin
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -397,6 +403,9 @@ class MainActivity : ComponentActivity() {
                         is DeepLink.NfcScan -> {
                             // Already handled via NFC trigger flow; no action needed here.
                         }
+                        is DeepLink.WriteComplete -> {
+                            // Write completion is handled in NfcSetupScreen; no action needed here.
+                        }
                     }
                 }
             }
@@ -569,7 +578,8 @@ private fun WorkflowGenerationScreen(
                             onBack = { }
                         )
                     }
-                    3 -> HistoryTabContent(viewModel = viewModel)
+                    3 -> ModelTabContent(viewModel = viewModel, state = state)
+                    4 -> HistoryTabContent(viewModel = viewModel)
                 }
             }
             BottomNavGlow(
@@ -593,33 +603,199 @@ private fun WorkflowGenerationScreen(
 
 
 @Composable
-private fun MarketplaceComingSoon() {
+private fun ModelTabContent(
+    viewModel: WorkflowGenerationViewModel,
+    state: WorkflowGenerationUiState
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text(
-            text = "🛒",
-            style = MaterialTheme.typography.displayLarge
-        )
         Spacer(modifier = Modifier.height(16.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                "Model Management",
+                style = MaterialTheme.typography.headlineMedium.copy(
+                    fontWeight = FontWeight(700),
+                    fontSize = 28.sp,
+                    color = TextPrimary
+                ),
+                modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
+            )
+            if (state.isLoadingModels) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    color = CyanAccent,
+                    strokeWidth = 2.dp
+                )
+            } else {
+                IconButton(onClick = { viewModel.refreshAvailableModels() }) {
+                    Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = TextSecondary)
+                }
+            }
+        }
+
         Text(
-            text = "Coming Soon",
-            style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight(700)),
-            color = TextPrimary
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = "The marketplace will let you discover and share workflow templates.",
+            text = "IrisApp runs locally using Gemma 4 models. Download and select a model to enable offline AI generation.",
             style = MaterialTheme.typography.bodyMedium,
             color = TextSecondary,
-            modifier = Modifier.padding(horizontal = 32.dp)
+            modifier = Modifier.padding(bottom = 8.dp)
         )
+
+        if (state.availableModels.isEmpty() && !state.isLoadingModels) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 48.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "No models available. Check your internet connection.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = TextSecondary.copy(alpha = 0.5f)
+                )
+            }
+        }
+
+        state.availableModels.forEach { model ->
+            ModelItemRowCompact(
+                model = model,
+                isBusy = state.isBusy,
+                onDownload = { viewModel.downloadModel(model.id) },
+                onSelect = { viewModel.selectModel(model.id) },
+                inferenceState = state.inferenceState
+            )
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
     }
+}
+
+@Composable
+private fun ModelItemRowCompact(
+    model: com.irisapp.ui.home.ModelItemUiState,
+    isBusy: Boolean,
+    onDownload: () -> Unit,
+    onSelect: () -> Unit,
+    inferenceState: InferenceState
+) {
+    val downloadState = inferenceState as? InferenceState.Downloading
+    val isThisDownloading = downloadState != null && downloadState.modelId == model.fileName
+    val isAnyDownloading = downloadState != null
+    val isLoading = inferenceState is InferenceState.Loading
+    val isReady = inferenceState is InferenceState.Ready
+
+    GlassmorphicCard(
+        modifier = Modifier.fillMaxWidth(),
+        glowColor = if (model.isActive && isReady) GreenSuccess else if (model.isActive) CyanAccent else if (isThisDownloading) VioletAccent else null
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = model.label,
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = if (model.isActive) CyanAccent else if (isThisDownloading) VioletAccent else TextPrimary
+                        )
+                        if (model.isActive) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(if (isReady) GreenSuccess.copy(alpha = 0.2f) else CyanAccent.copy(alpha = 0.2f))
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = if (isReady) "ACTIVE" else "LOADING",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black),
+                                    color = if (isReady) GreenSuccess else CyanAccent,
+                                    fontSize = 9.sp
+                                )
+                            }
+                        }
+                    }
+                    Text(
+                        text = model.description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary
+                    )
+                }
+
+                if (model.isDownloaded) {
+                    GradientButton(
+                        text = if (model.isActive) "Selected" else "Use",
+                        enabled = !isBusy && !model.isActive && !isAnyDownloading && !isLoading,
+                        onClick = onSelect,
+                        fillWidth = false,
+                        modifier = Modifier.width(90.dp)
+                    )
+                } else {
+                    OutlinedButton(
+                        onClick = onDownload,
+                        enabled = !isBusy && !isAnyDownloading && !isLoading,
+                        border = BorderStroke(1.dp, if (!isBusy && !isAnyDownloading && !isLoading) CyanAccent.copy(alpha = 0.5f) else TextSecondary.copy(alpha = 0.2f)),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = CyanAccent),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                        modifier = Modifier.height(36.dp)
+                    ) {
+                        Text(if (isThisDownloading) "Wait..." else "Download", fontSize = 12.sp)
+                    }
+                }
+            }
+
+            if (isThisDownloading && downloadState != null) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    LinearProgressIndicator(
+                        progress = { downloadState.progress },
+                        modifier = Modifier.fillMaxWidth().height(4.dp).clip(CircleShape),
+                        color = VioletAccent,
+                        trackColor = GlassBorder
+                    )
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(
+                            text = "Downloading: ${"%.1f".format(downloadState.progress * 100f)}%",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            color = VioletAccent
+                        )
+                        Text(
+                            text = "${formatFileSize(downloadState.downloadedBytes)} / ${formatFileSize(downloadState.totalBytes)}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = TextSecondary
+                        )
+                    }
+                }
+            } else {
+                Text(
+                    text = if (model.isDownloaded) "Downloaded • ${model.sizeLabel}" else "Available • ${model.sizeLabel}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (model.isDownloaded) GreenSuccess else VioletAccent
+                )
+            }
+        }
+    }
+}
+
+private fun formatFileSize(size: Long): String {
+    if (size <= 0) return "0 B"
+    val units = listOf("B", "KB", "MB", "GB", "TB")
+    val digitGroups = (Math.log10(size.toDouble()) / Math.log10(1024.0)).toInt()
+    return "%.2f %s".format(size / Math.pow(1024.0, digitGroups.toDouble()), units[digitGroups])
 }
 
 @Composable
@@ -1054,6 +1230,13 @@ private fun ConfirmationDialog(
     )
 }
 
+/** Describes a single permission with its human-readable label and grant instructions. */
+private data class PermissionItem(
+    val description: String,
+    val permission: String,
+    val instructions: String?
+)
+
 /**
  * Displays the step label and the list of permissions that need to be granted
  * before the step can execute. Calls [onGrant] if the user accepts, or [onDismiss]
@@ -1067,7 +1250,7 @@ private fun PermissionDialog(
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
 
-    // Human-readable permission descriptions for common Android runtime permissions.
+    // Human-readable permission descriptions and grant instructions.
     val permissionDescriptions = request.permissions.map { permission ->
         val description = when (permission) {
             Manifest.permission.READ_CONTACTS -> "Read contacts"
@@ -1081,19 +1264,69 @@ private fun PermissionDialog(
             Manifest.permission.WRITE_EXTERNAL_STORAGE -> "Write storage"
             Manifest.permission.ACCESS_FINE_LOCATION -> "Precise location"
             Manifest.permission.ACCESS_COARSE_LOCATION -> "Approximate location"
+            Manifest.permission.ACCESS_BACKGROUND_LOCATION -> "Background location"
             Manifest.permission.CAMERA -> "Camera"
             Manifest.permission.RECORD_AUDIO -> "Microphone"
             Manifest.permission.READ_PHONE_STATE -> "Phone state"
+            Manifest.permission.POST_NOTIFICATIONS -> "Post notifications"
+            Manifest.permission.READ_CALENDAR -> "Read calendar"
+            Manifest.permission.WRITE_CALENDAR -> "Write calendar"
+            Manifest.permission.BLUETOOTH_CONNECT -> "Bluetooth"
+            Manifest.permission.BLUETOOTH_SCAN -> "Bluetooth scan"
+            Manifest.permission.READ_MEDIA_AUDIO -> "Read audio files"
+            Manifest.permission.READ_MEDIA_IMAGES -> "Read images"
+            Manifest.permission.READ_MEDIA_VIDEO -> "Read videos"
             else -> permission.substringAfterLast(".")
         }
-        description to permission
+        val instructions = when (permission) {
+            Manifest.permission.ACCESS_BACKGROUND_LOCATION ->
+                "1. Tap 'All files' or 'Location > Allow all the time'\n" +
+                "2. Select 'Allow' to let Iris run workflows in the background"
+            Manifest.permission.POST_NOTIFICATIONS ->
+                "1. Tap 'Notifications'\n" +
+                "2. Select 'Allow' to receive workflow run status and alerts"
+            Manifest.permission.READ_MEDIA_AUDIO,
+            Manifest.permission.READ_MEDIA_IMAGES,
+            Manifest.permission.READ_MEDIA_VIDEO ->
+                "1. Tap 'Files and media'\n" +
+                "2. Select 'Allow access' to let Iris read your media files"
+            Manifest.permission.READ_CONTACTS,
+            Manifest.permission.WRITE_CONTACTS,
+            Manifest.permission.READ_CALL_LOG ->
+                "1. Tap 'Contacts and call log'\n" +
+                "2. Select 'Allow' to let Iris interact with your contacts"
+            Manifest.permission.READ_SMS,
+            Manifest.permission.SEND_SMS,
+            Manifest.permission.RECEIVE_SMS ->
+                "1. Tap 'SMS'\n" +
+                "2. Select 'Allow' to let Iris read and send SMS messages"
+            Manifest.permission.CAMERA ->
+                "1. Tap 'Camera'\n" +
+                "2. Select 'Allow' to let Iris use the camera"
+            Manifest.permission.RECORD_AUDIO ->
+                "1. Tap 'Microphone'\n" +
+                "2. Select 'Allow' to let Iris record audio"
+            Manifest.permission.READ_EXTERNAL_STORAGE,
+            Manifest.permission.WRITE_EXTERNAL_STORAGE ->
+                "1. Tap 'Files and media'\n" +
+                "2. Select 'Allow' to let Iris access storage"
+            Manifest.permission.READ_CALENDAR,
+            Manifest.permission.WRITE_CALENDAR ->
+                "1. Tap 'Calendar'\n" +
+                "2. Select 'Allow' to let Iris manage your calendar"
+            Manifest.permission.BLUETOOTH_CONNECT ->
+                "1. Tap 'Nearby devices'\n" +
+                "2. Select 'Allow' to let Iris control Bluetooth devices"
+            else -> null
+        }
+        PermissionItem(description, permission, instructions)
     }
 
     AlertDialog(
         onDismissRequest = { /* Force explicit action */ },
         title = { Text("Permission Required") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
                     "Action: ${request.stepLabel}",
                     style = MaterialTheme.typography.titleSmall,
@@ -1105,15 +1338,29 @@ private fun PermissionDialog(
                     shape = MaterialTheme.shapes.small,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column(modifier = Modifier.padding(8.dp)) {
-                        permissionDescriptions.forEach { (desc, _) ->
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(vertical = 2.dp)
-                            ) {
-                                Text("\uD83D\uDD12", style = MaterialTheme.typography.bodySmall) // lock emoji
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(desc, style = MaterialTheme.typography.bodySmall)
+                    Column(modifier = Modifier.padding(10.dp)) {
+                        permissionDescriptions.forEach { item ->
+                            Column(modifier = Modifier.padding(vertical = 4.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(vertical = 2.dp)
+                                ) {
+                                    Text("\uD83D\uDD12", style = MaterialTheme.typography.bodySmall)
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        item.description,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                                item.instructions?.let { instructions ->
+                                    Text(
+                                        instructions,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.outline,
+                                        modifier = Modifier.padding(start = 24.dp, top = 2.dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -1643,9 +1890,10 @@ private fun FloatingPillNavigationDock(
         Icons.Filled.AutoAwesome,
         Icons.Filled.AccountTree,
         Icons.Filled.Store,
+        Icons.Filled.Psychology,
         Icons.Filled.History
     )
-    val tabLabels = listOf("Generate", "Routines", "Marketplace", "History")
+    val tabLabels = listOf("Generate", "Routines", "Marketplace", "Models", "History")
     val tabCount  = tabIcons.size
 
     val indicatorFraction by animateFloatAsState(

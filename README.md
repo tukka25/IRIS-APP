@@ -66,7 +66,7 @@ WorkflowRunner   NFC / Time / Share Sheet
 |---|---|---|
 | **Manual** | Always available | Tap "Run Now" in workflow detail |
 | **Time** | TimeTriggerSetupScreen → schedule via AlarmManager | Notification → Confirm / Dismiss / Run Now |
-| **NFC** | NfcSetupScreen → write tag with `gemmaworkflow://workflow/{id}` | Scan tag → confirm → run |
+| **NFC** | NfcSetupScreen → write tag with `iris://workflow/{id}` | Scan tag → confirm → run |
 | **Share Sheet** | ShareSheetSetupScreen → enable for workflow | Share content → pick workflow → confirm → run |
 
 **Time trigger persistence:** `BootReceiver` reschedules all time triggers after device reboot. `IrisAppApp.onCreate()` reschedules on every cold start.
@@ -76,7 +76,7 @@ WorkflowRunner   NFC / Time / Share Sheet
 ## Source Tree
 
 ```
-app/src/main/java/com/gemmaworkflow/
+app/src/main/java/com/iris/
 ├── app/
 │   └── IrisAppApp.kt                    # Cold-start: reschedule time triggers
 ├── data/
@@ -124,7 +124,7 @@ app/src/main/java/com/gemmaworkflow/
 │   ├── inference/
 │   │   └── InferenceManager.kt              # Singleton model lifecycle
 │   ├── nfc/
-│   │   ├── DeepLinkRouter.kt                # gemmaworkflow:// routing + foreground NFC
+│   │   ├── DeepLinkRouter.kt                # iris:// routing + foreground NFC
 │   │   ├── NfcTriggerHandler.kt             # Background NFC scan receiver
 │   │   └── NfcTriggerWriter.kt              # NDEF tag writer
 │   └── share/

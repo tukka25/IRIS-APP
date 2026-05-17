@@ -36,6 +36,11 @@ class DeepLinkRouter {
         private val _deepLinkEvents = MutableSharedFlow<DeepLink>(extraBufferCapacity = 1)
         val deepLinkEvents: SharedFlow<DeepLink> = _deepLinkEvents.asSharedFlow()
 
+        // Write-mode flag: when true, foreground NFC scans write to the tag instead of running the workflow.
+        @Volatile
+        private var writeModeActive = false
+        private var writeModeWorkflowId: String? = null
+
         /**
          * Emit a [DeepLink] event. Callers that are not inside the DeepLinkRouter
          * companion object (e.g. [TimeTriggerConfirmationActivity]) use this instead
@@ -51,6 +56,42 @@ class DeepLinkRouter {
          */
         fun parseWorkflowId(uri: String): String? {
             return NfcTriggerWriter.parseWorkflowIdFromUri(uri)
+        }
+
+        /**
+         * Activate write mode. While active, foreground NFC tag scans will call
+         * [NfcTriggerWriter.writeTag] instead of emitting [DeepLink.NfcScan].
+         * [setWriteMode] must be called before enabling foreground dispatch in write mode.
+         *
+         * @param workflowId The workflow ID to write to the tag.
+         */
+        fun setWriteMode(workflowId: String) {
+            writeModeActive = true
+            writeModeWorkflowId = workflowId
+            Log.i(TAG, "Write mode activated for workflow: $workflowId")
+        }
+
+        /**
+         * Clear write mode. After this, foreground NFC tag scans emit [DeepLink.NfcScan] again.
+         */
+        fun clearWriteMode() {
+            writeModeActive = false
+            writeModeWorkflowId = null
+            Log.i(TAG, "Write mode cleared")
+        }
+
+        /** Returns true when write mode is currently active. */
+        fun isWriteModeActive(): Boolean = writeModeActive
+
+        /** Returns the workflow ID set for write mode, or null if not in write mode. */
+        fun writeModeWorkflowId(): String? = writeModeWorkflowId
+
+        /**
+         * Emit a [DeepLink.WriteComplete] event to notify listeners that the tag write
+         * operation completed (success or failure).
+         */
+        fun emitWriteComplete(workflowId: String, success: Boolean, message: String) {
+            _deepLinkEvents.tryEmit(DeepLink.WriteComplete(workflowId, success, message))
         }
 
         /**
@@ -141,4 +182,10 @@ sealed class DeepLink {
 
     /** Show workflow detail screen */
     data class ShowDetail(override val workflowId: String) : DeepLink()
+
+    /**
+     * NFC tag was successfully written with the workflow ID.
+     * Only emitted when the app is in write-tag mode ([setWriteMode]).
+     */
+    data class WriteComplete(override val workflowId: String, val success: Boolean, val message: String) : DeepLink()
 }

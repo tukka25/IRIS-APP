@@ -106,7 +106,15 @@ class NfcTriggerHandler : BroadcastReceiver() {
             return
         }
 
-        postConfirmationNotification(context, workflowId, workflow.name)
+        // App is dead — launch MainActivity so it wakes up and handles the NFC intent.
+        // This routes through the normal deep-link path when MainActivity.onNewIntent fires.
+        Log.i(TAG, "App is backgrounded — launching MainActivity for NFC scan")
+        val launchIntent = Intent(context, MainActivity::class.java).apply {
+            action = DeepLinkRouter.ACTION_RUN_WORKFLOW
+            putExtra(DeepLinkRouter.EXTRA_WORKFLOW_ID, workflowId)
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        context.startActivity(launchIntent)
     }
 
     private fun isAppInForeground(context: Context): Boolean {

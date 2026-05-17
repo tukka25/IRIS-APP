@@ -49,7 +49,7 @@ class LaunchAppApiExecutor(private val context: Context) {
             }
 
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-            context.startActivity(intent)
+            LaunchAppService.launch(context, packageName, className)
 
             val msg = if (className != null) "Launched $packageName/$className" else "Launched $packageName"
             Log.i(TAG, msg)

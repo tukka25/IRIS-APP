@@ -181,7 +181,7 @@ Real side effects should happen only in `WorkflowRunner` after the user presses 
 Add a new package:
 
 ```text
-app/src/main/java/com/gemmaworkflow/platform/tools/reto/
+app/src/main/java/com/iris/platform/tools/reto/
 ```
 
 Files:
@@ -202,7 +202,7 @@ RetoTrace.kt
 Add a domain-facing planner:
 
 ```text
-app/src/main/java/com/gemmaworkflow/domain/planner/RetoWorkflowPlanner.kt
+app/src/main/java/com/iris/domain/planner/RetoWorkflowPlanner.kt
 ```
 
 Keep existing classes initially:
