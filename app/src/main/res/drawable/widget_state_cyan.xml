@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SLM Monitor Bar — ANALYZING state. ElectricCyan (#00F2FE) iridescent border. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <!-- Slight cyan tint in fill to echo the border color -->
+    <solid android:color="#CC050D14" />
+    <!-- ElectricCyan at ~55% alpha — glowing without saturating the small space -->
+    <stroke android:width="1dp" android:color="#8C00F2FE" />
+    <corners android:radius="12dp" />
+</shape>

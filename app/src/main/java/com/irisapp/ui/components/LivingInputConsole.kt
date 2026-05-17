@@ -20,7 +20,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -54,8 +54,7 @@ fun LivingInputConsole(
     onValueChange: (String) -> Unit,
     modifier: Modifier = Modifier,
     isGenerating: Boolean = false,
-    onSendClick: () -> Unit = {},
-    sendEnabled: Boolean = false,
+    onMicClick: () -> Unit = {},
     placeholder: String = "What should IrisApp do?"
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -169,14 +168,14 @@ fun LivingInputConsole(
                     .padding(start = 10.dp)
                     .size(32.dp)
                     .clip(CircleShape)
-                    .background(if (sendEnabled) Brush.linearGradient(listOf(ElectricCyan, LiquidViolet)) else Brush.linearGradient(listOf(Color.DarkGray, Color.DarkGray)))
-                    .clickable(enabled = sendEnabled, onClick = onSendClick),
+                    .background(Brush.linearGradient(listOf(ElectricCyan, LiquidViolet)))
+                    .clickable(onClick = onMicClick),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    Icons.Default.Send,
-                    contentDescription = "Send",
-                    tint = if (sendEnabled) Color.Black else TextSecondary,
+                    Icons.Default.Mic,
+                    contentDescription = "Voice input",
+                    tint = Color.Black,
                     modifier = Modifier.size(16.dp)
                 )
             }

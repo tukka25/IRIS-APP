@@ -6,6 +6,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.irisapp.data.repository.ExecutionHistoryRepository
 import com.irisapp.data.repository.WorkflowRepository
+import com.irisapp.data.repository.WorkflowShareRepository
 import com.irisapp.data.seed.DemoWorkflowSeeder
 import com.irisapp.domain.catalog.ActionSpecRegistry
 import com.irisapp.domain.model.PlannedWorkflow
@@ -28,12 +29,14 @@ import com.irisapp.platform.trigger.BluetoothTriggerManager
 import com.irisapp.platform.trigger.ChargerTriggerManager
 import com.irisapp.platform.trigger.DndTriggerManager
 import com.irisapp.platform.trigger.WiFiTriggerManager
+import android.content.Intent
 import com.irisapp.platform.trigger.AirplaneModeTriggerManager
 import com.irisapp.platform.trigger.sound.SoundEventTriggerRegistry
 import com.irisapp.platform.location.GeofenceManager
 import com.irisapp.platform.inference.InferenceManager
 import com.irisapp.platform.inference.InferenceState
 import com.irisapp.platform.tools.reto.RetoTrace
+import com.irisapp.widget.IrisWidgetStateRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -951,6 +954,40 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
         _uiState.update { it.copy(sharedContent = content) }
     }
 
+    /** Called by MainActivity when the app receives an iris://import/{id} deep-link. */
+    fun setPendingImport(shareId: String) {
+        _uiState.update { it.copy(pendingImportShareId = shareId) }
+    }
+
+    /** Clears the pending import deep-link. */
+    fun clearPendingImport() {
+        _uiState.update { it.copy(pendingImportShareId = null) }
+    }
+
+    /**
+     * Imports the workflow from the pending share ID with a renamed name.
+     * Called after the user edits the name in the import confirmation screen.
+     */
+    fun confirmImport(renamedName: String) {
+        val shareId = _uiState.value.pendingImportShareId ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            val data = WorkflowShareRepository.fetch(shareId) ?: run {
+                _uiState.update { it.copy(pendingImportShareId = null) }
+                return@launch
+            }
+            val workflow = WorkflowJsonParser.parseFromExport(data, mapOf("name" to renamedName))
+            workflowRepo.save(workflow)
+            val updated = workflowRepo.loadAll()
+            _uiState.update {
+                it.copy(
+                    pendingImportShareId = null,
+                    savedWorkflows = updated,
+                    selectedWorkflowDetail = updated.find { w -> w.name == renamedName }
+                )
+            }
+        }
+    }
+
     /** Clears the pending shared content without running anything. */
     fun clearSharedContent() {
         _uiState.update { it.copy(sharedContent = null) }
@@ -974,6 +1011,63 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
                 selectedWorkflowDetail = workflow,
                 prompt = promptHint
             )
+        }
+    }
+
+    fun deleteWorkflow(name: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            // Unregister trigger first so stale alarms/geofences/receivers don't fire
+            // after the workflow JSON is gone.
+            TriggerRegistry.unregister(name)
+            workflowRepo.delete(name)
+            val updated = workflowRepo.loadAll()
+            _uiState.update { it.copy(savedWorkflows = updated) }
+        }
+    }
+
+    /**
+     * Shares a workflow by uploading it to Firebase RTDB and sending the import URI.
+     * The recipient receives a link that opens the import confirmation screen in Iris.
+     */
+    fun shareWorkflow(workflow: PlannedWorkflow) {
+        viewModelScope.launch {
+            // Serialize workflow to a map, then upload (fire-and-forget)
+            WorkflowShareRepository.upload(
+                WorkflowJsonParser.serializeForExport(workflow, "temp")
+            ) { shareId ->
+                if (shareId != null) {
+                    val uri = "https://iris-23288.web.app/import/$shareId"
+                    val intent = Intent(Intent.ACTION_SEND).apply {
+                        type = "text/uri-list"
+                        putExtra(Intent.EXTRA_TEXT, uri)
+                    }
+                    getApplication<Application>().startActivity(
+                        Intent.createChooser(intent, "Share Routine").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    )
+                } else {
+                    // Upload failed — fall back to plain text share
+                    val text = buildString {
+                        append(workflow.name)
+                        if (workflow.summary.isNotBlank()) append("\n${workflow.summary}")
+                        append("\n${workflow.actions.size} step${if (workflow.actions.size != 1) "s" else ""}")
+                    }
+                    val intent = Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(Intent.EXTRA_TEXT, text)
+                    }
+                    getApplication<Application>().startActivity(
+                        Intent.createChooser(intent, "Share Routine").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    )
+                }
+            }
+        }
+    }
+
+    fun addToWidgetSuggestions(workflowName: String) {
+        viewModelScope.launch {
+            val names = workflowRepo.listNames()
+            val prioritised = (listOf(workflowName) + names.filter { it != workflowName }).take(3)
+            IrisWidgetStateRepository.updateSuggestions(getApplication(), prioritised)
         }
     }
 

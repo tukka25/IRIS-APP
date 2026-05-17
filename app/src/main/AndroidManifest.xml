@@ -32,6 +32,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <!-- Foreground microphone service (Android 14+). -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <!-- SLM inference foreground service (Android 14+). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
     <!-- NFC: read and write NFC tags to trigger workflows. -->
     <uses-permission android:name="android.permission.NFC" />
@@ -155,6 +157,16 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!-- Deep-link: iris://import/{id} — shared workflow import -->
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="iris"
+                    android:host="import" />
+            </intent-filter>
+
             <!-- Deep-link: iris://workflow/{workflowId} — used by NFC tags -->
             <intent-filter android:autoVerify="false">
                 <action android:name="android.intent.action.VIEW" />
@@ -257,6 +269,12 @@
             android:name=".platform.trigger.sound.SoundEventTriggerService"
             android:exported="false"
             android:foregroundServiceType="microphone" />
+
+        <!-- Widget SLM execution: foreground service for LiteRT-LM inference pipeline. -->
+        <service
+            android:name=".widget.SlmExecutionService"
+            android:foregroundServiceType="dataSync"
+            android:exported="false" />
 
         <!-- Receives time trigger confirm/run intents from the notification action buttons. -->
         <activity

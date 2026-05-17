@@ -82,6 +82,12 @@ dependencies {
     // OpenStreetMap: in-page tap-to-set geofence map
     implementation("org.osmdroid:osmdroid-android:6.1.18")
 
+    // DataStore: per-widget persistent state backing for Glance
+    implementation("androidx.datastore:datastore-core:1.1.1")
+
+    // Lottie: animated icons
+    implementation("com.airbnb.android:lottie-compose:6.4.0")
+
     // Serialization: JSON workflow contracts
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 

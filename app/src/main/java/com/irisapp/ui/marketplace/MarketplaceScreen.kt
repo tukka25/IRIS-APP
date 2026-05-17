@@ -62,6 +62,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import com.airbnb.lottie.compose.LottieAnimation
+import com.airbnb.lottie.compose.LottieCompositionSpec
+import com.airbnb.lottie.compose.LottieConstants
+import com.airbnb.lottie.compose.animateLottieCompositionAsState
+import com.airbnb.lottie.compose.rememberLottieComposition
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -188,7 +193,7 @@ fun MarketplaceScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = "🛒  Marketplace",
+                        text = "Marketplace",
                         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                         color = TextPrimary
                     )
@@ -286,7 +291,21 @@ fun MarketplaceScreen(
                                 .padding(vertical = 48.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Text(text = "🛒", style = MaterialTheme.typography.displayLarge)
+                            val emptyIconComposition by rememberLottieComposition(
+                                LottieCompositionSpec.Asset("lottie_marketplace.json")
+                            )
+                            val emptyIconProgress by animateLottieCompositionAsState(
+                                emptyIconComposition, iterations = LottieConstants.IterateForever
+                            )
+                            if (emptyIconComposition != null) {
+                                LottieAnimation(
+                                    composition = emptyIconComposition,
+                                    progress = { emptyIconProgress },
+                                    modifier = Modifier.size(72.dp)
+                                )
+                            } else {
+                                Text(text = "🛒", style = MaterialTheme.typography.displayLarge)
+                            }
                             Spacer(modifier = Modifier.height(16.dp))
                             Text(
                                 text = "No workflows published yet",

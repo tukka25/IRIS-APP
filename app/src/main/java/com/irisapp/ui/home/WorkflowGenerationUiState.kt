@@ -142,7 +142,11 @@ data class WorkflowGenerationUiState(
 
     // ── Model Manager state ─────────────────────────────────────────────
     val showModelManager: Boolean = false,
-    val availableModels: List<ModelItemUiState> = emptyList()
+    val availableModels: List<ModelItemUiState> = emptyList(),
+
+    // ── Workflow import state ─────────────────────────────────────────────
+    /** Non-null when a workflow import deep-link was opened and is pending user confirmation. */
+    val pendingImportShareId: String? = null
 ) {
     val canGenerate: Boolean get() = isModelLoaded && isModelReady && !isBusy && prompt.isNotBlank()
     val hasWorkflow: Boolean get() = workflowPreview != null

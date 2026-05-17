@@ -1,79 +1,52 @@
 package com.irisapp.widget
 
 import android.content.Context
-import android.content.Intent
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
-import androidx.glance.LocalContext
+import androidx.glance.ImageProvider
+import androidx.glance.action.actionParametersOf
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetManager
-import androidx.glance.appwidget.action.actionStartActivity
+import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.provideContent
 import androidx.glance.background
+import androidx.glance.currentState
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Column
 import androidx.glance.layout.Row
+import androidx.glance.layout.Spacer
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
+import androidx.glance.layout.height
 import androidx.glance.layout.padding
+import androidx.glance.layout.width
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import com.irisapp.R
-import com.irisapp.data.repository.ExecutionHistoryRepository
-import com.irisapp.data.repository.WorkflowRepository
-import com.irisapp.domain.catalog.ActionSpecRegistry
-import com.irisapp.domain.model.TriggerConfig
-import com.irisapp.platform.nfc.DeepLinkRouter
-import com.irisapp.ui.MainActivity
 import com.irisapp.ui.theme.AmberWarning
-import com.irisapp.ui.theme.BackgroundDark
 import com.irisapp.ui.theme.CyanAccent
 import com.irisapp.ui.theme.GreenSuccess
 import com.irisapp.ui.theme.TextPrimary
 import com.irisapp.ui.theme.TextSecondary
-import com.irisapp.ui.theme.VioletAccent
-import java.io.File
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
-// ── Snapshot ──────────────────────────────────────────────────────────────────
-
-private data class WidgetSnapshot(
-    val workflowName: String,
-    val triggerDisplay: String,
-    val createdAtMillis: Long,
-    val actionLabels: List<String>,
-    val totalRuns: Int,
-    val successCount: Int,
-    val lastRunMillis: Long,
-    val lastRunResults: List<Pair<String, Boolean>>,
-    val recentHistory: List<Boolean>
-) {
-    val successRate: Int get() = if (totalRuns > 0) (successCount * 100) / totalRuns else 0
-}
-
-// ── Widget ────────────────────────────────────────────────────────────────────
+private val ObsidianDark = Color(0xFF050509.toInt())
 
 class WorkflowWidgetGlance : GlanceAppWidget() {
 
+    override val stateDefinition = WidgetStateDefinition
+
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
-        val workflowName = WidgetPreferences.getWorkflowName(context, appWidgetId)
-
-        val snapshot: WidgetSnapshot? = if (workflowName == null) null else {
-            withContext(Dispatchers.IO) { buildSnapshot(context, workflowName) }
-        }
-
-        provideContent {
-            if (snapshot == null) UnconfiguredContent() else DashboardContent(snapshot)
-        }
+        provideContent { MiniDashboard() }
     }
 
     companion object {
@@ -86,251 +59,237 @@ class WorkflowWidgetGlance : GlanceAppWidget() {
     }
 }
 
-private fun buildSnapshot(context: Context, workflowName: String): WidgetSnapshot {
-    val workflow = WorkflowRepository(context).get(workflowName)
-    val history = ExecutionHistoryRepository(context).forWorkflow(workflowName)
-
-    val createdAt = File(context.filesDir, "workflows/$workflowName.json")
-        .let { if (it.exists()) it.lastModified() else 0L }
-
-    val triggerDisplay = when (val t = workflow?.trigger) {
-        is TriggerConfig.Time -> {
-            val days = if (t.repeatDays.isEmpty()) context.getString(R.string.widget_trigger_daily)
-                       else t.repeatDays.joinToString("·") { dayAbbrev(it) }
-            "⏰ %02d:%02d %s".format(t.hour, t.minute, days)
-        }
-        is TriggerConfig.Nfc -> context.getString(R.string.widget_trigger_nfc)
-        is TriggerConfig.ShareSheet -> context.getString(R.string.widget_trigger_share_sheet)
-        is TriggerConfig.Manual, null -> context.getString(R.string.widget_trigger_manual)
-        is TriggerConfig.AlarmStopped -> context.getString(R.string.widget_trigger_alarm_stopped)
-        is TriggerConfig.AppOpened,
-        is TriggerConfig.AppClosed -> context.getString(R.string.widget_trigger_app)
-        is TriggerConfig.SmsReceived,
-        is TriggerConfig.NotificationListenerConfig,
-        is TriggerConfig.EmailReceived -> context.getString(R.string.widget_trigger_notification)
-        is TriggerConfig.SleepProxy -> context.getString(R.string.widget_trigger_sleep)
-        is TriggerConfig.Geofence -> context.getString(R.string.widget_trigger_geofence)
-        is TriggerConfig.Voice -> context.getString(R.string.widget_trigger_voice)
-        is TriggerConfig.SoundEvent -> context.getString(R.string.widget_trigger_sound_event)
-        is TriggerConfig.Battery,
-        is TriggerConfig.Charger,
-        is TriggerConfig.WiFi,
-        is TriggerConfig.Bluetooth,
-        is TriggerConfig.AirplaneMode,
-        is TriggerConfig.DoNotDisturb -> context.getString(R.string.widget_trigger_system)
-        else -> context.getString(R.string.widget_trigger_manual)
-    }
-
-    val actionLabels = workflow?.actions
-        ?.mapNotNull { step -> ActionSpecRegistry.find(step.id)?.label }
-        ?: emptyList()
-
-    val lastEntry = history.lastOrNull()
-    val lastRunResults = lastEntry?.results?.map { result ->
-        val label = ActionSpecRegistry.find(result.stepId)?.label ?: result.stepId
-        Pair(label, result.success)
-    } ?: emptyList()
-
-    return WidgetSnapshot(
-        workflowName = workflowName,
-        triggerDisplay = triggerDisplay,
-        createdAtMillis = createdAt,
-        actionLabels = actionLabels,
-        totalRuns = history.size,
-        successCount = history.count { it.allSuccess },
-        lastRunMillis = lastEntry?.timestampMillis ?: 0L,
-        lastRunResults = lastRunResults,
-        recentHistory = history.takeLast(5).map { it.allSuccess }
-    )
-}
-
-private fun dayAbbrev(dayOfWeek: Int): String = when (dayOfWeek) {
-    1 -> "Su"; 2 -> "Mo"; 3 -> "Tu"; 4 -> "We"
-    5 -> "Th"; 6 -> "Fr"; 7 -> "Sa"
-    else -> "$dayOfWeek"
-}
-
-// ── Composables ───────────────────────────────────────────────────────────────
-
 @Composable
-private fun UnconfiguredContent() {
-    val context = LocalContext.current
+private fun MiniDashboard() {
+    val state = currentState<IrisWidgetState>()
     Column(
         modifier = GlanceModifier
             .fillMaxSize()
-            .background(ColorProvider(BackgroundDark))
-            .padding(12.dp)
-    ) {
-        Text(
-            text = context.getString(R.string.app_name),
-            style = TextStyle(
-                fontWeight = FontWeight.Bold,
-                fontSize = 14.sp,
-                color = ColorProvider(TextPrimary)
-            )
-        )
-        Text(
-            text = context.getString(R.string.widget_unconfigured_instruction),
-            style = TextStyle(fontSize = 11.sp, color = ColorProvider(TextSecondary)),
-            modifier = GlanceModifier.padding(top = 4.dp)
-        )
-    }
-}
-
-@Composable
-private fun DashboardContent(s: WidgetSnapshot) {
-    val context = LocalContext.current
-    val tapAction = actionStartActivity(
-        Intent(context, MainActivity::class.java).apply {
-            action = DeepLinkRouter.ACTION_SHOW_WORKFLOW_DETAIL
-            putExtra(DeepLinkRouter.EXTRA_WORKFLOW_ID, s.workflowName)
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
-        }
-    )
-
-    Column(
-        modifier = GlanceModifier
-            .fillMaxSize()
-            .background(ColorProvider(BackgroundDark))
+            .background(ColorProvider(ObsidianDark))
             .padding(10.dp)
-            .clickable(tapAction)
     ) {
-
-        // ── Header: name ──────────────────────────────────────────────────────
-        Text(
-            text = s.workflowName,
-            style = TextStyle(
-                fontWeight = FontWeight.Bold,
-                fontSize = 14.sp,
-                color = ColorProvider(TextPrimary)
-            ),
-            maxLines = 1
-        )
-
-        // Trigger + created subtitle
-        val createdStr = if (s.createdAtMillis > 0L) {
-            "  ·  " + context.getString(
-                R.string.widget_created_ago,
-                formatRelativeTime(context, s.createdAtMillis)
-            )
-        } else ""
-        Text(
-            text = s.triggerDisplay + createdStr,
-            style = TextStyle(fontSize = 10.sp, color = ColorProvider(CyanAccent)),
-            modifier = GlanceModifier.padding(top = 1.dp),
-            maxLines = 1
-        )
-
-        // ── Stats bar ─────────────────────────────────────────────────────────
-        val successColor = when {
-            s.totalRuns == 0 -> TextSecondary
-            s.successRate >= 80 -> GreenSuccess
-            else -> AmberWarning
-        }
-        val statsText = buildString {
-            append(context.getString(R.string.widget_stats_runs, s.totalRuns))
-            if (s.totalRuns > 0) append("  ·  ${context.getString(R.string.widget_stats_success, s.successRate)}")
-            if (s.lastRunMillis > 0L) {
-                append("  ·  ${context.getString(R.string.widget_stats_last, formatRelativeTime(context, s.lastRunMillis))}")
-            }
-        }
-        Text(
-            text = statsText,
-            style = TextStyle(
-                fontWeight = FontWeight.Bold,
-                fontSize = 11.sp,
-                color = ColorProvider(successColor)
-            ),
-            modifier = GlanceModifier.padding(top = 6.dp),
-            maxLines = 1
-        )
-
-        // ── Defined actions ───────────────────────────────────────────────────
-        if (s.actionLabels.isNotEmpty()) {
+        // ── Header ────────────────────────────────────────────────────────────
+        Row(
+            modifier = GlanceModifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Vertical.CenterVertically
+        ) {
             Text(
-                text = s.actionLabels.joinToString("  ·  "),
-                style = TextStyle(fontSize = 10.sp, color = ColorProvider(TextSecondary)),
-                modifier = GlanceModifier.padding(top = 3.dp),
+                text = "IRIS",
+                style = TextStyle(fontWeight = FontWeight.Bold, fontSize = 14.sp, color = ColorProvider(CyanAccent))
+            )
+            Text(
+                text = if (state.activeWorkflowName != null && state.slmState != SlmProcessState.IDLE)
+                    "  ·  ${state.activeWorkflowName}"
+                else
+                    "  Mini Dashboard",
+                style = TextStyle(fontSize = 11.sp, color = ColorProvider(TextSecondary)),
                 maxLines = 1
             )
         }
 
-        // ── Last run detail ───────────────────────────────────────────────────
-        if (s.lastRunResults.isNotEmpty()) {
-            Text(
-                text = context.getString(
-                    R.string.widget_last_run_ago,
-                    formatRelativeTime(context, s.lastRunMillis)
-                ),
-                style = TextStyle(
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 10.sp,
-                    color = ColorProvider(TextPrimary)
-                ),
-                modifier = GlanceModifier.padding(top = 6.dp)
-            )
-            s.lastRunResults.take(3).forEach { (label, success) ->
-                Row(
-                    modifier = GlanceModifier.fillMaxWidth().padding(top = 2.dp),
-                    verticalAlignment = Alignment.Vertical.CenterVertically
-                ) {
-                    Text(
-                        text = if (success) "✓ " else "✗ ",
-                        style = TextStyle(
-                            fontSize = 10.sp,
-                            color = ColorProvider(if (success) GreenSuccess else AmberWarning)
-                        )
-                    )
-                    Text(
-                        text = label,
-                        style = TextStyle(fontSize = 10.sp, color = ColorProvider(TextSecondary)),
-                        maxLines = 1
-                    )
+        Spacer(modifier = GlanceModifier.height(6.dp))
+
+        // ── SLM Monitor Bar ───────────────────────────────────────────────────
+        SlmMonitorBar(state)
+
+        // ── Dynamic content based on state ────────────────────────────────────
+        when (state.slmState) {
+            SlmProcessState.IDLE -> {
+                if (state.suggestions.isNotEmpty()) {
+                    Spacer(modifier = GlanceModifier.height(8.dp))
+                    SuggestionCarousel(state.suggestions)
+                }
+                if (state.recentResults.isNotEmpty()) {
+                    Spacer(modifier = GlanceModifier.height(8.dp))
+                    HistoryStrip(state.recentResults)
                 }
             }
-        } else {
-            Text(
-                text = context.getString(R.string.widget_empty),
-                style = TextStyle(fontSize = 11.sp, color = ColorProvider(TextSecondary)),
-                modifier = GlanceModifier.padding(top = 6.dp)
-            )
-        }
 
-        // ── History strip: last 5 runs as colored dots ────────────────────────
-        if (s.recentHistory.isNotEmpty()) {
-            Row(
-                modifier = GlanceModifier.fillMaxWidth().padding(top = 6.dp),
-                verticalAlignment = Alignment.Vertical.CenterVertically
-            ) {
-                Text(
-                    text = context.getString(R.string.widget_history_label),
-                    style = TextStyle(fontSize = 10.sp, color = ColorProvider(TextSecondary))
-                )
-                s.recentHistory.forEach { ok ->
-                    Text(
-                        text = "● ",
-                        style = TextStyle(
-                            fontSize = 12.sp,
-                            color = ColorProvider(if (ok) GreenSuccess else AmberWarning)
-                        )
-                    )
+            SlmProcessState.ANALYZING, SlmProcessState.TOOL_CALL -> {
+                // Show live step progress
+                if (state.currentStep != null) {
+                    Spacer(modifier = GlanceModifier.height(5.dp))
+                    CurrentStepRow(state.currentStep)
+                }
+                if (state.stepLogs.isNotEmpty()) {
+                    Spacer(modifier = GlanceModifier.height(4.dp))
+                    StepLogsPanel(state.stepLogs)
+                }
+            }
+
+            SlmProcessState.SUCCESS, SlmProcessState.ERROR -> {
+                // Show completed run summary
+                if (state.stepLogs.isNotEmpty()) {
+                    Spacer(modifier = GlanceModifier.height(5.dp))
+                    StepLogsPanel(state.stepLogs)
+                }
+                if (state.recentResults.isNotEmpty()) {
+                    Spacer(modifier = GlanceModifier.height(6.dp))
+                    HistoryStrip(state.recentResults)
                 }
             }
         }
     }
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── SLM Monitor Bar ───────────────────────────────────────────────────────────
 
-private fun formatRelativeTime(context: Context, timestampMillis: Long): String {
-    val diffMs = System.currentTimeMillis() - timestampMillis
-    val mins = diffMs / 60_000
-    val hours = mins / 60
-    val days = hours / 24
-    return when {
-        mins < 1 -> context.getString(R.string.widget_time_just_now)
-        mins < 60 -> "${mins}m"
-        hours < 24 -> "${hours}h"
-        else -> "${days}d"
+@Composable
+private fun SlmMonitorBar(state: IrisWidgetState) {
+    val bgDrawable = when (state.slmState) {
+        SlmProcessState.IDLE      -> R.drawable.widget_state_idle
+        SlmProcessState.ANALYZING -> R.drawable.widget_state_cyan
+        SlmProcessState.TOOL_CALL -> R.drawable.widget_state_violet
+        SlmProcessState.SUCCESS   -> R.drawable.widget_state_success
+        SlmProcessState.ERROR     -> R.drawable.widget_state_error
     }
+    val dotColor = Color(state.slmState.colorHex.toInt())
+
+    Row(
+        modifier = GlanceModifier
+            .fillMaxWidth()
+            .background(ImageProvider(bgDrawable))
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.Vertical.CenterVertically
+    ) {
+        Text("●  ", style = TextStyle(fontSize = 11.sp, color = ColorProvider(dotColor)))
+        Text(
+            text = state.slmState.displayString,
+            style = TextStyle(fontSize = 11.sp, color = ColorProvider(TextPrimary)),
+            maxLines = 1
+        )
+    }
+}
+
+// ── Live step indicator ───────────────────────────────────────────────────────
+
+@Composable
+private fun CurrentStepRow(stepName: String) {
+    Row(
+        modifier = GlanceModifier
+            .fillMaxWidth()
+            .background(ImageProvider(R.drawable.widget_state_cyan))
+            .padding(horizontal = 10.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.Vertical.CenterVertically
+    ) {
+        Text("⋯  ", style = TextStyle(fontSize = 10.sp, color = ColorProvider(CyanAccent)))
+        Text(
+            text = stepName,
+            style = TextStyle(fontSize = 10.sp, color = ColorProvider(CyanAccent)),
+            maxLines = 1
+        )
+    }
+}
+
+// ── Step log panel ────────────────────────────────────────────────────────────
+
+@Composable
+private fun StepLogsPanel(logs: List<StepLog>) {
+    Column(modifier = GlanceModifier.fillMaxWidth()) {
+        logs.takeLast(5).forEach { log ->
+            StepLogRow(log)
+        }
+    }
+}
+
+@Composable
+private fun StepLogRow(log: StepLog) {
+    val iconColor = ColorProvider(if (log.success) GreenSuccess else AmberWarning)
+    val icon = if (log.success) "✓" else "✗"
+
+    Column(modifier = GlanceModifier.fillMaxWidth().padding(bottom = 3.dp)) {
+        Row(
+            modifier = GlanceModifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Vertical.CenterVertically
+        ) {
+            Text(
+                text = "$icon  ",
+                style = TextStyle(fontSize = 10.sp, color = iconColor)
+            )
+            Text(
+                text = log.stepName,
+                style = TextStyle(fontWeight = FontWeight.Medium, fontSize = 10.sp, color = ColorProvider(TextPrimary)),
+                maxLines = 1,
+                modifier = GlanceModifier.width(0.dp)
+            )
+            Spacer(modifier = GlanceModifier.width(4.dp))
+            // Wall-clock time of completion + duration
+            Text(
+                text = "${formatTime(log.timestampMs)}  ${formatDuration(log.durationMs)}",
+                style = TextStyle(fontSize = 9.sp, color = ColorProvider(TextSecondary))
+            )
+        }
+        if (log.output.isNotBlank()) {
+            Text(
+                text = "     → ${log.output}",
+                style = TextStyle(fontSize = 9.sp, color = ColorProvider(TextSecondary)),
+                maxLines = 1,
+                modifier = GlanceModifier.padding(bottom = 1.dp)
+            )
+        }
+    }
+}
+
+// ── Suggestion carousel ───────────────────────────────────────────────────────
+
+@Composable
+private fun SuggestionCarousel(suggestions: List<String>) {
+    Row(
+        modifier = GlanceModifier.fillMaxWidth(),
+        verticalAlignment = Alignment.Vertical.CenterVertically
+    ) {
+        suggestions.take(3).forEachIndexed { index, name ->
+            if (index > 0) Spacer(modifier = GlanceModifier.width(6.dp))
+            SuggestionPill(name)
+        }
+    }
+}
+
+@Composable
+private fun SuggestionPill(name: String) {
+    Text(
+        text = name,
+        style = TextStyle(fontSize = 9.sp, color = ColorProvider(TextPrimary)),
+        maxLines = 1,
+        modifier = GlanceModifier
+            .background(ImageProvider(R.drawable.glass_pill_background))
+            .padding(horizontal = 8.dp, vertical = 4.dp)
+            .clickable(
+                actionRunCallback<TriggerWorkflowAction>(
+                    actionParametersOf(TriggerWorkflowAction.KEY_WORKFLOW_NAME to name)
+                )
+            )
+    )
+}
+
+// ── History strip ─────────────────────────────────────────────────────────────
+
+@Composable
+private fun HistoryStrip(recentResults: List<Boolean>) {
+    Row(
+        modifier = GlanceModifier.fillMaxWidth(),
+        verticalAlignment = Alignment.Vertical.CenterVertically
+    ) {
+        Text("History  ", style = TextStyle(fontSize = 9.sp, color = ColorProvider(TextSecondary)))
+        recentResults.forEach { ok ->
+            Text(
+                text = "●",
+                style = TextStyle(fontSize = 12.sp, color = ColorProvider(if (ok) GreenSuccess else AmberWarning)),
+                modifier = GlanceModifier.padding(end = 3.dp)
+            )
+        }
+    }
+}
+
+// ── Formatting helpers ────────────────────────────────────────────────────────
+
+private val timeFmt = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+
+private fun formatTime(ms: Long): String =
+    if (ms > 0L) timeFmt.format(Date(ms)) else ""
+
+private fun formatDuration(ms: Long): String = when {
+    ms <= 0L  -> ""
+    ms < 1000 -> "${ms}ms"
+    else      -> "${"%.1f".format(ms / 1000.0)}s"
 }
