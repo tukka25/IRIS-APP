@@ -24,6 +24,7 @@
     <div class="nav__links">
       <a href="#features">Features</a>
       <a href="#benchmarks">Benchmarks</a>
+      <a href="#demo">Demo</a>
       <a href="#model">Model</a>
       <a href="#install">Install</a>
       <a href="https://github.com/tukka25/gemma4good_android" class="nav__cta" target="_blank" rel="noopener">GitHub</a>
@@ -310,6 +311,145 @@
     </div>
   </div>
 
+
+  <!-- Comparison table -->
+  <section class="comparison">
+    <div class="comparison__inner">
+      <div class="comparison__eyebrow">Why Iris</div>
+      <h2 class="comparison__headline">Built different. Runs on-device.</h2>
+      <p class="comparison__sub">
+        Tasker, MacroDroid, and IFTTT are powerful — but they require manual setup
+        or cloud dependencies. Iris uses a local LLM to understand what you mean
+        and builds the workflow for you.
+      </p>
+
+      <div class="comparison__table-wrap">
+        <table class="comparison__table">
+          <thead>
+            <tr>
+              <th>Feature</th>
+              <th class="col--iris">Iris</th>
+              <th>IFTTT</th>
+              <th>MacroDroid</th>
+              <th>Tasker</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Primary Focus</td>
+              <td class="col--iris">On-device AI + automation</td>
+              <td>Cloud &amp; web services</td>
+              <td>On-device Android settings</td>
+              <td>Deep system Android power</td>
+            </tr>
+            <tr>
+              <td>AI-powered workflow generation</td>
+              <td class="col--iris"><span class="yes">&#10003;</span> Gemma 4 2B locally</td>
+              <td><span class="no">&#10007;</span> Manual applet setup</td>
+              <td><span class="no">&#10007;</span> Manual macro building</td>
+              <td><span class="no">&#10007;</span> Manual task creation</td>
+            </tr>
+            <tr>
+              <td>Learning Curve</td>
+              <td class="col--iris">Extremely low — describe it in English</td>
+              <td>Low — visual applet builder</td>
+              <td>Low to moderate — intuitive UI</td>
+              <td>Extremely steep — logic-based, dense</td>
+            </tr>
+            <tr>
+              <td>Runs locally (no cloud)</td>
+              <td class="col--iris"><span class="yes">&#10003;</span> Full on-device inference</td>
+              <td><span class="no">&#10007;</span> Cloud required</td>
+              <td><span class="yes">&#10003;</span> Fully on-device</td>
+              <td><span class="yes">&#10003;</span> Fully on-device</td>
+            </tr>
+            <tr>
+              <td>NFC tag triggers</td>
+              <td class="col--iris"><span class="yes">&#10003;</span> Write + scan + execute</td>
+              <td><span class="no">&#10007;</span> Not supported</td>
+              <td><span class="yes">&#10003;</span> Supported</td>
+              <td><span class="yes">&#10003;</span> Supported</td>
+            </tr>
+            <tr>
+              <td>Voice / sound triggers</td>
+              <td class="col--iris"><span class="yes">&#10003;</span> Wake word + Yamnet</td>
+              <td><span class="partial">&#8732;</span> Google AI Edge + Assistant</td>
+              <td><span class="partial">&#8732;</span> Plugin required</td>
+              <td><span class="partial">&#8732;</span> AutoVoice plugin</td>
+            </tr>
+            <tr>
+              <td>Cross-app actions (SMS, calendar, maps)</td>
+              <td class="col--iris"><span class="yes">&#10003;</span> 20+ actions validated</td>
+              <td><span class="yes">&#10003;</span> Many web services</td>
+              <td><span class="yes">&#10003;</span> Android actions</td>
+              <td><span class="yes">&#10003;</span> Android actions</td>
+            </tr>
+            <tr>
+              <td>Home screen widget</td>
+              <td class="col--iris"><span class="yes">&#10003;</span> Glance widget</td>
+              <td><span class="no">&#10007;</span> No widget</td>
+              <td><span class="yes">&#10003;</span> Android widget</td>
+              <td><span class="yes">&#10003;</span> Tasker widget</td>
+            </tr>
+            <tr>
+              <td>Privacy — data stays on device</td>
+              <td class="col--iris"><span class="yes">&#10003;</span> Zero cloud calls</td>
+              <td><span class="no">&#10007;</span> Sends data to cloud</td>
+              <td><span class="yes">&#10003;</span> Fully local</td>
+              <td><span class="yes">&#10003;</span> Fully local</td>
+            </tr>
+            <tr>
+              <td>Requires root</td>
+              <td class="col--iris"><span class="no">&#10007;</span> No</td>
+              <td><span class="no">&#10007;</span> No</td>
+              <td><span class="no">&#10007;</span> No</td>
+              <td><span class="partial">&#8732;</span> Partially (advanced tricks)</td>
+            </tr>
+            <tr>
+              <td>Model context window</td>
+              <td class="col--iris"><span class="yes">&#10003;</span> 32K tokens</td>
+              <td>—</td>
+              <td>—</td>
+              <td>—</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="leaderboard__footnote" style="margin-top:20px;">
+        &#10003; = supported &nbsp; &#10007; = not supported &nbsp; &#8732; = partial / plugin required
+      </p>
+    </div>
+  </section>
+
+  <!-- Demo / Download section -->
+  <section id="demo" class="comparison">
+    <div class="comparison__inner">
+      <div class="comparison__eyebrow">Demo</div>
+      <h2 class="comparison__headline">Try it now.</h2>
+      <p class="comparison__sub">
+        Download the latest APK, install it, and describe your first workflow.
+        Everything runs on-device — no server, no account, no data leaves your phone.
+      </p>
+      <div class="install-steps">
+        <div class="install-step">
+          <div class="install-step__num">01</div>
+          <div class="install-step__text">
+            <strong>Download and install the APK</strong>
+            <a href="https://github.com/tukka25/gemma4good_android/releases" class="install-cta" target="_blank" rel="noopener">
+              Get latest release
+            </a>
+          </div>
+        </div>
+        <div class="install-step">
+          <div class="install-step__num">02</div>
+          <div class="install-step__text">
+            <strong>Open Iris and describe a workflow.</strong>
+            "Set up a morning alarm that texts my partner when I leave home"
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
   <!-- Install section -->
   <div id="install" class="install-section">
     <div class="install-section__inner">
@@ -330,13 +470,9 @@
           <div class="install-step__num">02</div>
           <div class="install-step__text">
             <strong>Download the Gemma model</strong>
-            <a href="/gemma4good_android/docs/download-model/" target="_blank" rel="noopener" style="display:inline-block; margin-top:8px; text-decoration:none; color:#7C6AFF;">
-              Download model page
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle; margin-left:6px;"><path d="M1 6h10M7 2l4 4-4 4"/></svg>
-            </a>
-            <p style="margin-top:8px; font-size:14px; color:#9ca3af;">
-              Or: <code style="font-size:13px; color:#e2e8f0;">kaggle datasets download -d ...</code> / <code style="font-size:13px; color:#e2e8f0;">huggingface-cli download google/gemma-4-E2B-it</code>
-            </p>
+            <code class="install-step__code">huggingface-cli download google/gemma-4-E2B-it</code>
+            or get it from the
+            <a href="https://github.com/tukka25/gemma4good_android/releases" target="_blank" rel="noopener" style="color:#7C6AFF;">releases page</a>
           </div>
         </div>
         <div class="install-step">
