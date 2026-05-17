@@ -52,6 +52,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
@@ -123,16 +124,6 @@ fun GenerateTabContent(
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
     val screenHeightDp = configuration.screenHeightDp.dp
-
-    // Model manager sheet
-    if (state.showModelManager) {
-        ModelManagerSheet(
-            state = state,
-            onDismiss = { viewModel.toggleModelManager() },
-            onDownload = { viewModel.downloadModel(it) },
-            onSelect = { viewModel.selectModel(it) }
-        )
-    }
 
     // Character translates from upper-center (idle) → dead-center (generating)
     val charTranslateY by animateDpAsState(
@@ -263,7 +254,7 @@ fun GenerateTabContent(
                 verticalArrangement = Arrangement.spacedBy(24.dp)
             ) {
                 if (state.inferenceState is InferenceState.MissingModel && state.workflowPreview == null) {
-                    MissingModelCard(onOpenManager = { viewModel.toggleModelManager() })
+                    MissingModelCard(onOpenManager = { viewModel.selectTab(3) })
                 }
                 IdleBottomContent(viewModel = viewModel, state = state)
             }
@@ -494,7 +485,7 @@ private fun ModelStatusPill(
             .clip(RoundedCornerShape(20.dp))
             .background(Color(0xFF080810).copy(alpha = 0.90f))
             .border(0.5.dp, GlassBorder, RoundedCornerShape(20.dp))
-            .clickable { viewModel.toggleModelManager() }
+            .clickable { viewModel.selectTab(3) }
             .padding(horizontal = 12.dp, vertical = 7.dp)
     ) {
         Row(
@@ -515,169 +506,6 @@ private fun ModelStatusPill(
                 color = TextPrimary
             )
         }
-    }
-}
-
-// ─── Model Manager Sheet ──────────────────────────────────────────────────
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ModelManagerSheet(
-    state: WorkflowGenerationUiState,
-    onDismiss: () -> Unit,
-    onDownload: (String) -> Unit,
-    onSelect: (String) -> Unit
-) {
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        containerColor = SurfaceDark,
-        contentColor = TextPrimary,
-        tonalElevation = 8.dp,
-        dragHandle = {
-            Box(
-                modifier = Modifier
-                    .padding(vertical = 12.dp)
-                    .size(width = 36.dp, height = 4.dp)
-                    .clip(CircleShape)
-                    .background(TextSecondary.copy(alpha = 0.3f))
-            )
-        }
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 40.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Text(
-                text = "Model Management",
-                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold)
-            )
-            Text(
-                text = "IrisApp runs completely offline. Download a Gemma 4 model to get started.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = TextSecondary
-            )
-
-            state.availableModels.forEach { model ->
-                ModelItemRow(
-                    model = model,
-                    isBusy = state.isBusy,
-                    onDownload = { onDownload(model.id) },
-                    onSelect = { onSelect(model.id) },
-                    inferenceState = state.inferenceState
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ModelItemRow(
-    model: ModelItemUiState,
-    isBusy: Boolean,
-    onDownload: () -> Unit,
-    onSelect: () -> Unit,
-    inferenceState: InferenceState
-) {
-    val downloadState = inferenceState as? InferenceState.Downloading
-    val isThisDownloading = downloadState != null && downloadState.modelId == model.fileName
-    val isAnyDownloading = downloadState != null
-    
-    GlassmorphicCard(
-        modifier = Modifier.fillMaxWidth(),
-        glowColor = if (model.isActive) CyanAccent else if (isThisDownloading) VioletAccent else null
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = model.label,
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    color = if (model.isActive) CyanAccent else if (isThisDownloading) VioletAccent else TextPrimary
-                )
-                Text(
-                    text = model.description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary
-                )
-                
-                if (isThisDownloading && downloadState != null) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "Downloading: ${"%.2f".format(downloadState.progress * 100f)}%",
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                        color = VioletAccent
-                    )
-                    Text(
-                        text = "${formatFileSize(downloadState.downloadedBytes)} / ${formatFileSize(downloadState.totalBytes)}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = TextSecondary
-                    )
-                    Text(
-                        text = "Speed: ${formatSpeed(downloadState.speedBytesPerSecond)} • ETA: ${formatDuration(downloadState.etaSeconds)}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = TextSecondary
-                    )
-                } else {
-                    Text(
-                        text = model.sizeLabel,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = VioletAccent,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-                }
-            }
-
-            if (model.isDownloaded) {
-                GradientButton(
-                    text = if (model.isActive) "Active" else "Use",
-                    enabled = !isBusy && !model.isActive && !isAnyDownloading,
-                    onClick = onSelect
-                )
-            } else {
-                OutlinedButton(
-                    onClick = onDownload,
-                    enabled = !isBusy && !isAnyDownloading,
-                    border = BorderStroke(1.dp, if (!isBusy && !isAnyDownloading) CyanAccent.copy(alpha = 0.5f) else TextSecondary.copy(alpha = 0.2f)),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = CyanAccent)
-                ) {
-                    Text(if (isThisDownloading) "Wait..." else "Download")
-                }
-            }
-        }
-    }
-}
-
-private fun formatFileSize(size: Long): String {
-    if (size <= 0) return "0 B"
-    val units = listOf("B", "KB", "MB", "GB", "TB")
-    val digitGroups = (Math.log10(size.toDouble()) / Math.log10(1024.0)).toInt()
-    return "%.2f %s".format(size / Math.pow(1024.0, digitGroups.toDouble()), units[digitGroups])
-}
-
-private fun formatSpeed(bytesPerSecond: Long): String {
-    if (bytesPerSecond <= 0) return "0 B/s"
-    val units = listOf("B/s", "KB/s", "MB/s", "GB/s")
-    val digitGroups = (Math.log10(bytesPerSecond.toDouble()) / Math.log10(1024.0)).toInt()
-    return "%.1f %s".format(bytesPerSecond / Math.pow(1024.0, digitGroups.toDouble()), units[digitGroups])
-}
-
-private fun formatDuration(seconds: Long): String {
-    if (seconds <= 0) return "calculating..."
-    val h = seconds / 3600
-    val m = (seconds % 3600) / 60
-    val s = seconds % 60
-    return when {
-        h > 0 -> "${h}h ${m}m"
-        m > 0 -> "${m}m ${s}s"
-        else -> "${s}s"
     }
 }
 
