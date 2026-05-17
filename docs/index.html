@@ -264,58 +264,12 @@
     <div class="leaderboard__inner">
       <div class="leaderboard__header">
         <div class="leaderboard__eyebrow">Benchmarks</div>
-        <h2 class="leaderboard__headline">How the 2B class stacks up.</h2>
+        <h2 class="leaderboard__headline">Gemma 4 E2B scores.</h2>
         <p class="leaderboard__sub">
-          Numbers from official model cards. Same benchmark, same conditions — compare directly.
-          Gemma 4 E2B highlighted.
+          Numbers from the official google/gemma-4-E2B-it model card (Google DeepMind, Mar 2026).
         </p>
       </div>
 
-      <!-- Shared benchmarks -->
-      <div class="leaderboard__table-label">Head-to-head — same benchmarks, same conditions</div>
-      <div class="leaderboard__table-wrap">
-        <table class="leaderboard__table">
-          <thead>
-            <tr>
-              <th>Benchmark</th>
-              <th>Qwen 2.5-3B</th>
-              <th>Mistral-3B</th>
-              <th>Phi-4-mini</th>
-              <th class="col--highlight">Gemma 4 E2B</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>MMLU</td>
-              <td>65.0%</td>
-              <td>60.8%</td>
-              <td>67.3%</td>
-              <td class="col--highlight">67.4%</td>
-            </tr>
-            <tr>
-              <td>MMLU-Pro</td>
-              <td>44.7%</td>
-              <td>35.3%</td>
-              <td>52.8%</td>
-              <td class="col--highlight">60.0%</td>
-            </tr>
-            <tr>
-              <td>GPQA Diamond</td>
-              <td>23.4%</td>
-              <td>24.4%</td>
-              <td>25.2%</td>
-              <td class="col--highlight">43.4%</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <p class="leaderboard__footnote">
-        Source: Phi-4-mini model card comparison table (Microsoft, Feb 2025).<br>
-        Gemma 4 numbers from google/gemma-4-E2B-it model card (Google DeepMind, Mar 2026).
-      </p>
-
-      <!-- Gemma 4 exclusive benchmarks -->
-      <div class="leaderboard__table-label leaderboard__table-label--gemma">Gemma 4 E2B — additional benchmarks</div>
       <div class="leaderboard__table-wrap">
         <table class="leaderboard__table">
           <thead>
@@ -350,8 +304,7 @@
         </table>
       </div>
       <p class="leaderboard__footnote">
-        These benchmarks are not reported by other models in the comparison.<br>
-        MMLU: 5-shot. GPQA Diamond: 0-shot CoT. LiveCodeBench: Pass@1-CoT.<br>
+        LiveCodeBench: Pass@1-CoT.<br>
         AIME = American Invitational Mathematics Examination.
       </p>
     </div>
@@ -376,8 +329,14 @@
         <div class="install-step">
           <div class="install-step__num">02</div>
           <div class="install-step__text">
-            <strong>Push the model to your device</strong>
-            <code class="install-step__code">adb push local_models/gemma-4-E2B-it.litertlm /sdcard/Android/data/com.irisapp/files/models/</code>
+            <strong>Download the Gemma model</strong>
+            <a href="/gemma4good_android/docs/download-model/" target="_blank" rel="noopener" style="display:inline-block; margin-top:8px; text-decoration:none; color:#7C6AFF;">
+              Download model page
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle; margin-left:6px;"><path d="M1 6h10M7 2l4 4-4 4"/></svg>
+            </a>
+            <p style="margin-top:8px; font-size:14px; color:#9ca3af;">
+              Or: <code style="font-size:13px; color:#e2e8f0;">kaggle datasets download -d ...</code> / <code style="font-size:13px; color:#e2e8f0;">huggingface-cli download google/gemma-4-E2B-it</code>
+            </p>
           </div>
         </div>
         <div class="install-step">

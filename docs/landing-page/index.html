@@ -24,6 +24,7 @@
     <div class="nav__links">
       <a href="#features">Features</a>
       <a href="#benchmarks">Benchmarks</a>
+      <a href="#demo">Demo</a>
       <a href="#model">Model</a>
       <a href="#install">Install</a>
       <a href="https://github.com/tukka25/gemma4good_android" class="nav__cta" target="_blank" rel="noopener">GitHub</a>
@@ -372,7 +373,7 @@
             <tr>
               <td>Voice / sound triggers</td>
               <td class="col--iris"><span class="yes">&#10003;</span> Wake word + Yamnet</td>
-              <td><span class="partial">&#8732;</span> Alexa / Google limited</td>
+              <td><span class="partial">&#8732;</span> Google AI Edge + Assistant</td>
               <td><span class="partial">&#8732;</span> Plugin required</td>
               <td><span class="partial">&#8732;</span> AutoVoice plugin</td>
             </tr>
@@ -433,6 +434,36 @@
       </p>
     </div>
   </section>
+
+  <!-- Demo / Download section -->
+  <section id="demo" class="comparison">
+    <div class="comparison__inner">
+      <div class="comparison__eyebrow">Demo</div>
+      <h2 class="comparison__headline">Try it now.</h2>
+      <p class="comparison__sub">
+        Download the latest APK, install it, and describe your first workflow.
+        Everything runs on-device — no server, no account, no data leaves your phone.
+      </p>
+      <div class="install-steps">
+        <div class="install-step">
+          <div class="install-step__num">01</div>
+          <div class="install-step__text">
+            <strong>Download and install the APK</strong>
+            <a href="https://github.com/tukka25/gemma4good_android/releases" class="install-cta" target="_blank" rel="noopener">
+              Get latest release
+            </a>
+          </div>
+        </div>
+        <div class="install-step">
+          <div class="install-step__num">02</div>
+          <div class="install-step__text">
+            <strong>Open Iris and describe a workflow.</strong>
+            "Set up a morning alarm that texts my partner when I leave home"
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
   <!-- Install section -->
   <div id="install" class="install-section">
     <div class="install-section__inner">
@@ -452,8 +483,10 @@
         <div class="install-step">
           <div class="install-step__num">02</div>
           <div class="install-step__text">
-            <strong>Push the model to your device</strong>
-            <code class="install-step__code">adb push local_models/gemma-4-E2B-it.litertlm /sdcard/Android/data/com.irisapp/files/models/</code>
+            <strong>Download the Gemma model</strong>
+            <code class="install-step__code">huggingface-cli download google/gemma-4-E2B-it</code>
+            or get it from the
+            <a href="https://github.com/tukka25/gemma4good_android/releases" target="_blank" rel="noopener" style="color:#7C6AFF;">releases page</a>
           </div>
         </div>
         <div class="install-step">

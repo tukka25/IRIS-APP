@@ -695,3 +695,18 @@ img, svg { display: block; max-width: 100%; }
   .leaderboard { padding: 64px 20px; }
   .leaderboard__table { min-width: 480px; }
 }
+
+/* ─── Demo section — release button layout ─────────────────── */
+#demo .install-step {
+  align-items: flex-start;
+}
+#demo .install-step__text {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+#demo .install-cta {
+  align-self: flex-start;
+  font-size: 0.85rem;
+  padding: 10px 20px;
+}
