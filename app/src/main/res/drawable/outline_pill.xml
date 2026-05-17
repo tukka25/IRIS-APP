@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Outline-only pill variant — used for secondary/action buttons (e.g., Run Again).
+  Slightly lighter fill to distinguish it from the glass_pill_background suggestion chips.
+  Uses ElectricCyan (#00F2FE) border to signal an actionable state.
+  Usage: GlanceModifier.background(ImageProvider(R.drawable.outline_pill))
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <!-- Very subtle cyan-tinted dark fill: gives depth without weight -->
+    <solid android:color="#0D0D1E" />
+    <!-- ElectricCyan border at 60% alpha — clearly tappable, not overwhelming -->
+    <stroke
+        android:width="1dp"
+        android:color="#9900F2FE" />
+    <corners android:radius="24dp" />
+</shape>

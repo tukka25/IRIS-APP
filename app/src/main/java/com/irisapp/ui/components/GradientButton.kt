@@ -53,6 +53,7 @@ fun GradientButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    fillWidth: Boolean = true,
     icon: @Composable (() -> Unit)? = null
 ) {
     val shape = RoundedCornerShape(100.dp)
@@ -85,8 +86,7 @@ fun GradientButton(
     )
 
     Box(
-        modifier = modifier
-            .fillMaxWidth()
+        modifier = (if (fillWidth) modifier.fillMaxWidth() else modifier)
             .graphicsLayer {
                 scaleX = pressScale
                 scaleY = pressScale
@@ -126,7 +126,7 @@ fun GradientButton(
                 enabled = enabled,
                 onClick = onClick
             )
-            .padding(horizontal = 28.dp, vertical = 15.dp),
+            .padding(horizontal = if (fillWidth) 28.dp else 16.dp, vertical = if (fillWidth) 15.dp else 9.dp),
         contentAlignment = Alignment.Center
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
