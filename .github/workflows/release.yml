@@ -1,4 +1,6 @@
 name: Build & Release
+permissions:
+  contents: write
 
 on:
   push:
@@ -14,6 +16,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      VARIANT: ${{ github.event.inputs.variant || (startsWith(github.ref, 'refs/tags/v') && 'release' || 'debug') }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -38,20 +42,20 @@ jobs:
           restore-keys: gradle-
 
       - name: Build
-        run: ./gradlew assemble${{ github.event.inputs.variant || 'debug' }}
+        run: ./gradlew "assemble${VARIANT^}"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: iris-${{ github.event.inputs.variant || 'debug' }}-apk
-          path: app/build/outputs/apk/${{ github.event.inputs.variant || 'debug' }}/*.apk
+          name: iris-${{ env.VARIANT }}-apk
+          path: app/build/outputs/apk/${{ env.VARIANT }}/*.apk
 
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ github.ref_name }}
-          files: app/build/outputs/apk/${{ github.event.inputs.variant || 'debug' }}/*.apk
+          files: app/build/outputs/apk/${{ env.VARIANT }}/*.apk
           generate_release_notes: true
           draft: true
         env:
