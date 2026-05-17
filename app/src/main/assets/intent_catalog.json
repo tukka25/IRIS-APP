@@ -71,7 +71,7 @@
             { "name": "text", "key": null, "type": "string", "required": true }
           ],
           "uri_template": "tg://msg?text={text}",
-          "example": { "text": "Hello from GemmaWorkflow" }
+          "example": { "text": "Hello from iris" }
         },
         {
           "id": "telegram.share_url",

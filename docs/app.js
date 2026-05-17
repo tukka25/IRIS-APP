@@ -1,5 +1,5 @@
 /**
- * GemmaWorkflow Landing Page — Scroll Animations
+ * iris Landing Page — Scroll Animations
  * Uses IntersectionObserver for fade-in reveal animations.
  * Respects prefers-reduced-motion.
  */
