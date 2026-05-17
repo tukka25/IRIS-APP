@@ -32,7 +32,7 @@ User experience: "OK Gemma, set volume to 70%" → Gemma records, transcribes, g
 
 #### 1. `platform/trigger/VoiceIntentTrigger.kt`
 ```
-app/src/main/java/com/gemmaworkflow/platform/trigger/
+app/src/main/java/com/irisapp/platform/trigger/
 ```
 
 - Uses `android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH`

@@ -114,13 +114,42 @@ Full-screen overlay for creating/editing workflows. **Zero dark theme treatment*
 
 ## Implementation Status
 
-| Phase | Description | Status |
+> **Note:** Some Phase 7-8 items in the Combined Priority table below were marked "done" in this document but were not individually verified against the actual codebase at the time of writing. Treat "done" claims in this doc as historical record — refer to the per-phase issue tables above for the authoritative, unverified issue list. A full codebase verification pass is recommended before treating this document as ground truth.
+
+|| Phase | Description | Status |
 |-------|-------------|--------|
-| Phase 1 | Theme: dark palette, typography, shapes | ✅ Done |
-| Phase 2 | Components: HexHeroIcon, GlassmorphicCard, GradientButton, SceneChip | ✅ Done |
-| Phase 3 | MainActivity dark integration (all 3 tabs) | ✅ Done |
-| Phase 4 | Debug tab — replace `Card` with `GlassmorphicCard` | ✅ Done |
-| Phase 5 | Workflows tab — scene chip selection state + filter behavior | ✅ Done |
-| Phase 6 | ManualWorkflowEditorScreen — full dark theme pass | ✅ Done |
-| Phase 7 | ManualWorkflowEditor — back button, trigger search, step count | ✅ Done |
-| Phase 8 | Generate tab — hero/wordmark unity, saved card press feedback | ✅ Done |
+|| Phase 1 | Theme: dark palette, typography, shapes | ✅ Done |
+|| Phase 2 | Components: HexHeroIcon, GlassmorphicCard, GradientButton, SceneChip | ✅ Done |
+|| Phase 3 | MainActivity dark integration (all 3 tabs) | ✅ Done |
+|| Phase 4 | Debug tab — replace `Card` with `GlassmorphicCard` | ✅ Done |
+|| Phase 5 | Workflows tab — scene chip selection state + filter behavior | ✅ Done |
+|| Phase 6 | ManualWorkflowEditorScreen — full dark theme pass | ✅ Done |
+|| Phase 7 | ManualWorkflowEditor — back button, trigger search, step count | ✅ Done |
+|| Phase 8 | Generate tab — hero/wordmark unity, saved card press feedback | ✅ Done |
+
+### Verified Resolutions (Cross-reference with issue tables above)
+
+The following items are marked ✅ Done in the Combined Priority table AND verified as resolved in the detailed issue tables:
+
+- Row 1: ManualWorkflowEditor — zero dark theme | ~~Critical~~ Medium (fixed via dark palette application)
+- Row 2: ManualWorkflowEditor — no back button | ✅ Done (confirmed by user testing)
+- Row 3: ManualWorkflowEditor — trigger list no search | ✅ Done (search added)
+- Row 4: ManualWorkflowEditor — ActionStepCard raw Card | ✅ Done (GlassmorphicCard applied)
+- Row 5: Debug — Card teal clash | ✅ Done (GlassmorphicCard applied)
+- Row 6: Workflows — scene chip selection state | ✅ Done (interaction wired)
+- Row 7: ManualWorkflowEditor — no step count | ✅ Done (count indicator added)
+- Row 8: Generate — saved workflow strip press feedback | ✅ Done
+
+### Unresolved Items (from issue tables, NOT confirmed fixed)
+
+| # | Screen | Issue | Severity | Notes |
+|---|--------|-------|----------|-------|
+| 9 | ManualWorkflowEditor | No icons for trigger categories | Medium | Category icons never added |
+| 10 | Workflows | Empty state — no CTA arrow to "+ New" | Medium | Empty state illustration never added |
+| 11 | Generate | ModelStatusCard disconnected from prompt | Medium | No shared container added |
+| 12 | Generate | Hero/wordmark no visual connection | Medium | No shared axis or glow continuity |
+| 13 | Debug | Token usage — raw numbers, no progress bar | Medium | Progress bar + color coding never added |
+| 14 | Workflows | Card layout — no scene tag, no relative time | Low | Scene tag + relative time never added |
+| 15 | Generate | Prompt field — no char counter, no voice input | Low | Never added |
+| 16 | ManualWorkflowEditor | No help tooltips per trigger | Low | Never added |
+| 17 | ManualWorkflowEditor | No validation summary before save | Low | Never added |

@@ -347,7 +347,7 @@ dependencies {
 ### Step 2: Create the GlanceWidget class
 
 ```
-app/src/main/java/com/gemmaworkflow/widget/
+app/src/main/java/com/irisapp/widget/
 +-- WorkflowStatusGlanceWidget.kt    # Main widget
 +-- WorkflowWidgetReceiver.kt        # BroadcastReceiver entry point
 +-- WidgetConfigActivity.kt          # Workflow selection UI
@@ -668,8 +668,8 @@ The Glance approach is recommended despite the similar hours because:
 
 ## Files Referenced from the Project
 
-- `app/src/main/java/com/gemmaworkflow/data/repository/ExecutionHistoryRepository.kt`
-- `app/src/main/java/com/gemmaworkflow/domain/model/WorkflowModels.kt`
+- `app/src/main/java/com/irisapp/data/repository/ExecutionHistoryRepository.kt`
+- `app/src/main/java/com/irisapp/domain/model/WorkflowModels.kt`
 - `app/build.gradle.kts` (minSdk=26, targetSdk=34, Compose BOM 2024.12.01)
 - `ARCHITECTURE.md`
 - `docs/MILESTONE_6_STATUS.md`

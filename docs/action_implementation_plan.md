@@ -1,22 +1,24 @@
 # Action Implementation Plan — P1 to P4
-Based on Easer reference: `docs/easer_action_catalog.md`
+
+> **Status:** Historical planning document. The action catalog is now defined in `action_catalog.json` and executed via `ApiExecutor` classes in `com.irisapp.platform.*`. This document reflects the original 3-file BuiltIn executor pattern that preceded the current architecture and is retained for historical reference.
 
 ---
 
-## Architecture Summary
+## Current Architecture (action_catalog.json + ApiExecutors)
 
-Each new action follows a 3-file pattern:
+Actions are now defined declaratively in `assets/action_catalog.json` and executed by
+platform-specific `*ApiExecutor` classes under `com.irisapp.platform.*`. The original
+3-file `BuiltIn` + `WorkflowRunner` dispatch pattern described below is superseded.
 
+Current execution path:
 ```
-platform/<category>/
-  <Category>ApiExecutor.kt     # Silent execution logic + ExecutionResult
-domain/catalog/
-  ActionSpecRegistry.kt        # +1 ActionSpec entry (BuiltIn execution)
-domain/runner/
-  WorkflowRunner.kt            # +1 if-block dispatching to the executor
+WorkflowRunner.executeStep()
+  → ActionSpecRegistry.get(id)          # looks up action_catalog.json
+  → platform.<category>.<Category>ApiExecutor.execute(params)
 ```
 
-**Current dispatching style** — all BuiltIn actions are handled via explicit `if (step.id == "...")` blocks in `WorkflowRunner.executeStep()`. There is no polymorphic dispatch.
+Each ApiExecutor is a simple `execute(context: Context, params: Struct): ExecutionResult`
+suspend function. No if-block dispatch in WorkflowRunner.
 
 ---
 
@@ -344,7 +346,7 @@ AndroidManifest.xml                 → +WRITE_SECURE_SETTINGS, +NET_ADMIN (syst
 ## File Manifest
 
 ```
-app/src/main/java/com/gemmaworkflow/platform/
+app/src/main/java/com/irisapp/platform/
 
 media/
   MediaControlApiExecutor.kt          [NEW] — play/pause, next, previous
