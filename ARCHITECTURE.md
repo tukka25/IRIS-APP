@@ -1,339 +1,276 @@
 # IrisApp Architecture And Technology Plan
 
+**Last updated:** 2026-05-17
+
+---
+
 ## Purpose
 
-IrisApp is a hackathon Android app that turns a natural-language request into a runnable cross-app workflow. The strongest demo path is:
+IrisApp is an Android app that turns a natural-language request into a runnable cross-app workflow using an on-device SLM (Gemma 4 2B via LiteRT-LM).
 
-```text
-User prompt -> on-device planner -> validated JSON workflow -> save -> run now or attach trigger
+```
+User prompt -> RetoWorkflowPlanner (3-stage) -> validated JSON workflow -> save -> trigger -> execute
 ```
 
-The app should prove three things:
+The app proves three things:
 
 - A small local model (LiteRT-LM with GPU acceleration) can convert plain English into structured automation.
 - The generated plan can be validated before execution.
-- Android can execute useful cross-app actions through intents, URL schemes, and triggers.
-- On-device inference runs on phone GPU via LiteRT-LM, not CPU-bound llama.cpp.
+- Android can execute cross-app actions through intents, URL schemes, and system APIs.
 
-## Hackathon Scope
-
-### MVP
-
-- Android app built with Kotlin and Jetpack Compose.
-- Prompt input screen with a mock planner and a LiteRT-LM GPU planner option.
-- JSON workflow preview.
-- Workflow parser and allowlist validator.
-- Workflow library using local persistence.
-- Manual "Run Now" execution for a small set of Android-real actions.
-- NFC trigger proof of concept or Tasker-assisted trigger setup.
-- Demo fallback that works even if on-device inference is slow.
-
-### Not MVP
-
-- Full app marketplace of actions.
-- Silent background automation across every app.
-- Play Store-ready AccessibilityService automation.
-- Location triggers, app-open triggers, and Termux scripting unless the MVP is already stable.
-- iOS/macOS-only apps such as Things, Bear, Drafts, and Scriptable as Android demo targets.
+---
 
 ## System Architecture
 
-```text
+```
 +------------------------------------------------------------------+
 |                         Android App                              |
 |                                                                  |
-|   +-------------+    +---------------+    +-------------------+   |
-|   | Home Screen |    | Workflow List |    | Workflow Detail   |   |
-|   +------+------+    +-------+-------+    +---------+---------+   |
-|          |                   |                      |             |
-|          +-------------------+----------+-----------+             |
-|                                         |                         |
-|                         +---------------v---------------+         |
-|                         | WorkflowViewModel             |         |
-|                         | StateFlow + UI events         |         |
-|                         +---------------+---------------+         |
-|                                         |                         |
-|        +----------------+---------------+---------------+         |
-|        |                |                               |         |
+|   +-------------+    +---------------+    +-------------------+  |
+|   | Home Screen |    | Workflow List |    | Workflow Detail   |  |
+|   +------+------+    +-------+-------+    +---------+---------+  |
+|          |                   |                      |            |
+|          +-------------------+----------+-----------+            |
+|                                         |                        |
+|                         +---------------v---------------+        |
+|                         | WorkflowGenerationViewModel   |        |
+|                         | StateFlow + UI events         |        |
+|                         +---------------+---------------+        |
+|                                         |                        |
+|        +----------------+---------------+---------------+        |
+|        |                |                               |        |
 | +------v------+  +------v--------+              +-------v------+  |
-| | Planner     |  | Workflow      |              | Runner       |  |
-| | Service     |  | Store         |              | Intents/URLs |  |
-| +------+------+  | Room/DataStore|              +-------+------+  |
+| | RetoWorkflow |  | Workflow     |              | Runner        |  |
+| | Planner      |  | Repository   |              | Intents/APIs  |  |
+| +------+------+  | (JSON files)  |              +-------+------+  |
 |        |         +---------------+                      |         |
 | +------v------+  +---------------+              +-------v------+  |
-| | Mock Planner|  | Parser/Router |              | Android OS   |  |
-| | Llama       |  | JSON allowlist |              | Apps/Tasker  |  |
+| | PromptBuilder|  | Parser/Router |              | Android OS   |  |
+| | RequestAnalysis|  | Validator    |              | Apps/Services|  |
 | +------+------+  +---------------+              +--------------+  |
 |        |                                                         |
 | +------v------+                                                  |
-| | LitertLmEngine |                                                  |
-| | LiteRT-LM API  |                                                  |
-| | .litertlm model|                                                  |
+| | InferenceManager                                               |
+| | LitertLmEngine (LiteRT-LM Kotlin API)                          |
+| | Backend.GPU() — OpenCL/Vulkan on device GPU                    |
+| | Model: gemma-4-E2B-it.litertlm                                 |
 | +-------------+                                                  |
 +------------------------------------------------------------------+
 ```
 
+---
+
 ## Core Runtime Flow
 
-1. User enters a request on the Home screen.
-2. `PromptBuilder` creates a compact system prompt containing the JSON schema, supported actions, and trigger types.
-3. `PlannerService` calls the 4-stage planner pipeline using the loaded LiteRT-LM engine:
-   - **Stage 1:** `RequestAnalysisAgent` — extracts goal, trigger hint, app categories.
-   - **Stage 2:** `CapabilityResolverAgent` — grounds request against `ActionSpecRegistry` + `PackageManager`.
-   - **Stage 3:** `ActionPlanAgent` — selects action IDs and fills params.
-   - **Stage 4:** `JsonBuildingAgent` — produces final validated JSON.
+1. User enters a request on the Home/Generate screen.
+2. `PromptBuilder` creates a compact system prompt containing the JSON schema, supported action IDs, and trigger types.
+3. `RetoWorkflowPlanner` calls the 3-stage pipeline using the loaded LiteRT-LM engine:
+   - **Stage 1 — Analysis:** `RequestAnalysis` extracts goal, trigger hint, app categories.
+   - **Stage 2 — Grounding:** `ActionSpecRegistry` + `PackageManager` ground against available capabilities.
+   - **Stage 3 — Action Plan:** Selects action IDs and fills typed parameters → outputs strict JSON.
 4. `WorkflowJsonParser` extracts and decodes the returned JSON into typed Kotlin models.
-5. `WorkflowValidator` validates every action, parameter, URL, and trigger against `ActionSpecRegistry`.
-6. The UI shows the workflow preview (step list + params) and raw JSON.
-7. User saves the workflow — stored as JSON via `JsonFileStorage` (file-based, not Room).
-8. User taps "Run Now" or attaches a trigger (NFC, Time, Share Sheet).
-9. `WorkflowRunner` dispatches steps sequentially — either via `IntentFactory` (AndroidIntent), `ChromeCustomTabOpener` (CustomTab), or platform executors (Clipboard, Calendar, Alarm).
+5. `WorkflowValidator` validates every action, parameter, URL, and trigger against `ActionSpecRegistry`. On failure, retries once via the planner.
+6. The UI shows a workflow preview (step list + params) and raw JSON.
+7. User saves the workflow — stored as JSON via `JsonFileStorage` (file-based).
+8. User taps "Run Now" or attaches a trigger (NFC, Time, Share Sheet, Battery, WiFi, etc.).
+9. `WorkflowRunner` dispatches steps sequentially — via `IntentFactory` (AndroidIntent), `ChromeCustomTabOpener` (CustomTab), or direct platform executors (Calendar, Alarm, Clipboard, etc.).
 10. `ExecutionHistoryRepository` appends `ExecutionLogEntry` to the on-disk history log.
+
+---
 
 ## Technology Choices
 
 | Area | Choice | Reason |
-|------|--------|--------|
-| Language | Kotlin | Native Android language with coroutines, sealed classes, and null safety. |
-| UI | Jetpack Compose + Material 3 | Fast hackathon UI iteration and modern Android patterns. |
-| State | ViewModel + StateFlow | Simple observable UI state without overbuilding. |
-| Architecture | MVVM with small MVI-style events | Predictable UI flow and easy testing. |
-| Dependency injection | Manual providers first, Hilt later | Manual DI is faster while the app is small. |
-| Persistence | Room | Reliable local storage for workflows and history. |
-| Preferences | DataStore | Store selected backend, model path, and demo settings. |
-| JSON | kotlinx.serialization | Typed decoding for workflow data and planner output. |
-|| Inference | LiteRT-LM Kotlin API (Google) | On-device LLM inference with first-class GPU acceleration via OpenCL/Vulkan. No JNI bridge needed. |
-|| Model format | .litertlm | LiteRT-LM native model format. Convert from HuggingFace or use pre-converted models from litert-community. |
-|| Model target | Gemma 3 1B IT .litertlm | Small enough for phone demo, GPU-accelerated via LiteRT-LM. |
-|| Build | Gradle Kotlin DSL (no CMake) | Pure Kotlin build — LiteRT-LM ships as an AAR from Google Maven. |
-| Primary actions | Android intents and URL schemes | Best chance of working across installed apps. |
-| Triggers | Manual run, NFC, optional Tasker plugin | Keeps demo focused and avoids heavy permissions early. |
+|---|---|---|
+| Language | Kotlin | Native Android with coroutines, sealed classes, null safety |
+| UI | Jetpack Compose + Material 3 | Fast iteration, modern Android patterns |
+| State | ViewModel + StateFlow | Simple observable state without overbuilding |
+| Architecture | MVVM with MVI-style events | Predictable UI flow and easy testing |
+| Dependency injection | Manual providers | Fast iteration while the app is small |
+| Persistence | JSON file storage (`JsonFileStorage`) | No Room dependency; workflows stored as JSON in `filesDir/workflows/` |
+| Preferences | DataStore | Model path, selected backend, widget config |
+| JSON | kotlinx.serialization | Typed decoding for workflow data and planner output |
+| Inference | LiteRT-LM Kotlin API (Google) | On-device LLM with first-class GPU acceleration via OpenCL/Vulkan |
+| Model format | `.litertlm` | LiteRT-LM native format; pre-converted Gemma models from HuggingFace litert-community |
+| Model target | Gemma 4 2B IT `.litertlm` | Fits on device, GPU-accelerated via LiteRT-LM |
+| Build | Gradle Kotlin DSL | Pure Kotlin build — LiteRT-LM ships as an AAR from Google Maven |
+| Marketplace | Firebase Realtime Database | Anonymous workflow sharing via deep-link |
+| Widget | Jetpack Glance | Modern Compose-based widget (minSdk 26) |
+
+---
 
 ## Package Structure
 
-```text
-app/src/main/java/com/gemmaworkflow/
-+-- app/
-|   +-- IrisAppApp.kt
-|   +-- AppContainer.kt
-+-- core/
-|   +-- catalog/
-|   +-- error/
-|   +-- model/
-|   +-- permissions/
-+-- ui/
-|   +-- MainActivity.kt
-|   +-- navigation/
-|   |   +-- AppNavGraph.kt
-|   +-- home/
-|   |   +-- HomeScreen.kt
-|   |   +-- HomeViewModel.kt
-|   |   +-- HomeUiState.kt
-|   +-- workflows/
-|   |   +-- WorkflowListScreen.kt
-|   |   +-- WorkflowDetailScreen.kt
-|   +-- triggers/
-|   |   +-- TriggerSetupScreen.kt
-|   +-- history/
-|   +-- components/
-|   |   +-- PromptInput.kt
-|   |   +-- WorkflowCard.kt
-|   |   +-- ActionRow.kt
-|   |   +-- JsonPreview.kt
-|   +-- theme/
-+-- data/
-|   +-- local/
-|   |   +-- database/
-|   |   +-- dao/
-|   |   +-- entity/
-|   +-- repository/
-|   +-- settings/
-+-- domain/
-|   +-- planner/
-|   |   +-- PlannerService.kt
-|   |   +-- PlannerEngine.kt
-|   |   +-- PromptBuilder.kt
-|   +-- parser/
-|   |   +-- WorkflowJsonParser.kt
-|   +-- safety/
-|   |   +-- ActionCatalog.kt
-|   |   +-- SafeActionRouter.kt
-|   +-- runner/
-|       +-- WorkflowRunner.kt
-|       +-- RunnerResultMapper.kt
-|   +-- triggers/
-+-- platform/
-|   +-- dispatch/
-|   |   +-- IntentDispatcher.kt
-|   |   +-- UrlDispatcher.kt
-||   +-- inference/
-||   |   +-- litert/
-||   |       +-- LitertLmEngine.kt
-||   |       +-- ModelFileLocator.kt
-|   +-- logging/
-|   +-- nfc/
-|   |   +-- NfcTriggerWriter.kt
-|   |   +-- NfcWorkflowReceiver.kt
-|   +-- tasker/
-|       +-- TaskerPluginEditActivity.kt
-|       +-- TaskerPluginFireReceiver.kt
-
-app/src/main/assets/
-+-- grammars/
-|   +-- planner-json.gbnf
-+-- models/
-|   +-- gemma3-1b-it.litertlm
-
-LiteRT-LM/                (cloned sibling repo for GPU libs & tools)
-+-- prebuilt/android_arm64/
-
-app/src/test/java/com/gemmaworkflow/
-+-- domain/
-|   +-- parser/
-|   +-- runner/
-|   +-- safety/
-
-app/src/androidTest/java/com/gemmaworkflow/
-+-- data/local/
-+-- ui/
 ```
+app/src/main/java/com/irisapp/
+├── app/           IrisApp.kt         ← onCreate: registerAll, reschedule
+├── data/
+│   ├── local/storage/   JsonFileStorage.kt
+│   └── repository/       WorkflowRepository, ExecutionHistoryRepository,
+│                         MarketplaceRepository, WorkflowShareRepository
+├── domain/
+│   ├── catalog/     ActionSpecRegistry.kt   ← 64 ActionSpecs
+│   ├── model/       WorkflowModels, SharedContent
+│   ├── parser/      WorkflowJsonParser.kt
+│   ├── planner/     PromptBuilder, RequestAnalysis, RetoWorkflowPlanner
+│   ├── runner/      WorkflowRunner, IntentFactory, FallbackParamMapper
+│   ├── safety/      WorkflowValidator.kt
+│   └── triggers/    TriggerCatalog.kt
+├── platform/
+│   ├── alarm/      ← AlarmManager scheduling, BootReceiver, TimeTriggerReceiver
+│   ├── app/        ← LaunchAppService (FGS), LaunchAppApiExecutor
+│   ├── bluetooth/  ← BluetoothApiExecutor
+│   ├── calendar/   ← CalendarApiExecutor
+│   ├── capability/ ← ChromeCustomTabOpener, ClipboardApiExecutor,
+│   │                 IntentDiscoveryEngine, PackageCapabilityScanner
+│   ├── cellular/   ← CellularApiExecutor
+│   ├── command/    ← CommandApiExecutor
+│   ├── display/    ← BrightnessApiExecutor, RotationApiExecutor
+│   ├── hotspot/    ← HotspotApiExecutor
+│   ├── http/       ← HttpRequestApiExecutor
+│   ├── inference/  ← InferenceManager, ModelFileLocator, litert/LitertLmEngine
+│   ├── intent/     ← GenericIntentApiExecutor
+│   ├── location/   ← GeofenceManager, GeofenceBroadcastReceiver
+│   ├── media/      ← MediaControlApiExecutor
+│   ├── nfc/        ← DeepLinkRouter, NfcTriggerHandler, NfcSetupScreen
+│   ├── notification/ ← NotificationApiExecutor
+│   ├── share/      ← ShareSheetTriggerHandler
+│   ├── sms/        ← SmsTriggerManager, SmsTriggerReceiver, SmsNotificationListener
+│   ├── sound/      ← YamnetClassifier, SoundEventTriggerService
+│   ├── sync/       ← SyncApiExecutor
+│   ├── tools/      ← Tool, ToolRegistry, ToolInitializer, ToolAliasRegistry
+│   │   └── impl/   ← ClipboardTools, DeviceTools, DomainSearchTools,
+│   │                 ExecutionTools, NotificationTools, ReasoningTools,
+│   │                 ReminderTools, SearchTools, SettingsTools, TemporalTools
+│   │   └── reto/   ← RetoOrchestrator, CapabilityBinder, SlotGroundingPlanner,
+│   │                 RequirementBuilder, ResolverRegistry, ToolMetadataRegistry
+│   ├── trigger/    ← TriggerRegistry, Battery/Charger/WiFi/Bluetooth/AirplaneMode/
+│   │                 Dnd/Sleep/App/Voice trigger managers and receivers
+│   ├── volume/     ← RingerModeApiExecutor, VolumeApiExecutor
+│   └── wifi/        ← WifiApiExecutor
+├── ui/
+│   ├── MainActivity.kt              ← PermissionDialog, deep-link routing
+│   ├── components/                  ← AmbientBackground, BlobPersona, GlassmorphicCard,
+│   │                                 GradientButton, LivingInputConsole, SceneChip
+│   ├── home/                        ← GenerateScreen, ManualWorkflowEditorScreen,
+│   │                                 WorkflowGenerationUiState, WorkflowGenerationViewModel,
+│   │                                 ImportWorkflowScreen, Trigger setup screens
+│   ├── marketplace/                 ← MarketplaceScreen, MarketplaceViewModel
+│   ├── nfc/                         ← NfcSetupScreen (write state machine)
+│   ├── theme/                       ← IrisTheme
+│   └── trigger/                     ← TimeTriggerConfirmationActivity,
+│                                     TimeTriggerNotification, TimeTriggerPicker
+└── widget/                          ← WorkflowWidgetGlance, WorkflowWidgetReceiver,
+                                        WorkflowWidgetConfigActivity, IrisWidgetStateRepository,
+                                        WidgetPreferences, TriggerWorkflowAction, SlmExecutionService
+```
+
+---
 
 ## Data Contracts
 
-### Planner Output
-
-The model should produce JSON only:
+### Planner Output (RetoWorkflowPlanner JSON)
 
 ```json
 {
-  "name": "Focus session",
-  "trigger": {
-    "type": "manual"
-  },
+  "name": "Focus Session",
+  "summary": "Sets phone to silent and opens a focus playlist.",
+  "trigger": { "type": "time", "hour": 9, "minute": 0, "days": ["MON","TUE","WED","THU","FRI"] },
   "actions": [
-    {
-      "app": "spotify",
-      "action": "play_search",
-      "params": {
-        "query": "deep focus playlist"
-      }
-    },
-    {
-      "app": "obsidian",
-      "action": "create_note",
-      "params": {
-        "title": "Deep work",
-        "content": "Focus session started."
-      }
-    }
+    { "id": "ringer_mode.set", "params": { "mode": "silent" } },
+    { "id": "launch_app", "params": { "package_name": "com.spotify.music" } }
   ]
 }
 ```
 
-### Kotlin Model Shape
+### Kotlin Model Shapes
 
 ```kotlin
 @Serializable
 data class PlannedWorkflow(
     val name: String,
+    val summary: String = "",
     val trigger: TriggerConfig = TriggerConfig.Manual,
-    val actions: List<WorkflowStep>
+    val actions: List<WorkflowStep> = emptyList()
 )
 
 @Serializable
-sealed interface TriggerConfig {
-    @Serializable data object Manual : TriggerConfig
-    @Serializable data class Nfc(val tagId: String? = null) : TriggerConfig
-    @Serializable data class Time(val hour: Int, val minute: Int) : TriggerConfig
+sealed class TriggerConfig {
+    data object Manual : TriggerConfig()
+    data class Time(val hour: Int, val minute: Int, val days: List<String> = emptyList()) : TriggerConfig()
+    data class Nfc(val tagId: String? = null) : TriggerConfig()
+    data class ShareSheet(val contentTypes: List<String> = emptyList()) : TriggerConfig()
+    data class Battery(val threshold: Int = 20, val condition: String = "below") : TriggerConfig()
+    // ... 15+ trigger variants
 }
 
 @Serializable
 data class WorkflowStep(
-    val app: String,
-    val action: String,
-    val params: Map<String, String> = emptyMap()
+    val id: String,       // ActionSpec id e.g. "ringer_mode.set"
+    val params: Map<String, String> = emptyMap(),
+    val requiresConfirmation: Boolean = false
+)
+
+@Serializable
+data class ExecutionResult(
+    val stepId: String,
+    val success: Boolean,
+    val message: String,
+    val output: String = ""
 )
 ```
 
-For the hackathon, keep the persisted workflow entity simple:
+### ExecutionLogEntry (persisted)
 
 ```kotlin
-@Entity(tableName = "workflows")
-data class WorkflowEntity(
-    @PrimaryKey val id: String,
-    val name: String,
-    val triggerJson: String,
-    val actionsJson: String,
-    val rawPlannerJson: String,
-    val createdAtMillis: Long
+@Serializable
+data class ExecutionLogEntry(
+    val workflowName: String,
+    val timestampMillis: Long,
+    val results: List<ExecutionResult>,
+    val allSuccess: Boolean
 )
 ```
 
-## Action Catalog
+---
 
-| App | Action | Dispatch path |
-|-----|--------|---------------|
-| Browser | `open_url` | Chrome Custom Tab |
-| Maps | `open_place` | `ACTION_VIEW` + geo: URI |
-| Share | `share_text` | ClipboardManager |
-| Share | `share_image` | ClipboardManager |
-| SMS | `compose` | `ACTION_SENDTO` |
-| Alarm | `set_alarm` | `AlarmManager.setExactAndAllowWhileIdle()` |
-| Clipboard | `copy_text` | `ClipboardManager.setPrimaryClip()` |
-| Calendar | `create_event` | `ContentResolver.insert(CalendarContract)` |
+## Action Execution System
 
-> **ExecutionSpec variants:** `AndroidIntent` (generic Intent), `CustomTab` (Chrome Custom Tabs), `BuiltIn` (direct platform API — clipboard, calendar, alarm).
+### Execution Paths
 
-## Planner Layer
+| ExecutionSpec variant | Description |
+|---|---|
+| `AndroidIntent` | Generic `Intent` built via `IntentFactory` — `startActivity()` dispatch |
+| `CustomTab` | Chrome Custom Tabs via `ChromeCustomTabOpener` — in-app browser |
+| `BuiltIn` | Direct platform API — `ClipboardApiExecutor`, `CalendarApiExecutor`, `AlarmApiExecutor`, etc. |
 
-### Interfaces
+### IntentFactory Dispatch
+
+`IntentFactory` converts validated `WorkflowStep` params into an `Intent` or direct API call:
 
 ```kotlin
-interface PlannerEngine {
-    suspend fun generate(prompt: String): String
-}
+fun buildExecutableIntent(step: WorkflowStep, params: Map<String, String>): Intent?
+fun resolveActivity(intent: Intent): ResolveInfo?
 
-class PlannerService(
-    private val promptBuilder: PromptBuilder,
-    private val parser: WorkflowJsonParser,
-    private val router: SafeActionRouter,
-    private val engine: PlannerEngine
-) {
-    suspend fun plan(userRequest: String): PlannedWorkflow {
-        val raw = engine.generate(promptBuilder.build(userRequest))
-        val workflow = parser.parse(raw)
-        return router.validate(workflow)
-    }
-}
+// Per-action dispatch in WorkflowRunner:
+is "calendar.create_event" -> CalendarApiExecutor.execute(context, params)
+is "clipboard.copy_text"   -> ClipboardApiExecutor.execute(context, params)
+is "browser.open_url"      -> ChromeCustomTabOpener.open(context, url)
+else                       -> IntentFactory.buildExecutableIntent(step, params)?.let { startActivity(it) }
 ```
 
-### Mock Planner
-
-The mock planner is required, not optional. It gives the team a stable demo while JNI and model performance are still moving.
-
-### LiteRT-LM Planner
-
-Use the LiteRT-LM path after the mock flow works end to end:
-
-- Push a `.litertlm` model to the device (pre-converted Gemma models available on HuggingFace litert-community).
-- Use `LitertLmEngine` which wraps LiteRT-LM's Kotlin API — no JNI bridge needed.
-- GPU acceleration via OpenCL/Vulkan through `Backend.GPU()`.
-- Generate on `Dispatchers.Default` with coroutines.
-- Keep prompt and output small.
-- Cap generation with sampler config (topK, topP, temperature).
-- Show model load and generation errors in the UI.
+---
 
 ## Inference Layer
 
-LiteRT-LM uses a pure Kotlin API — no CMake, no JNI, no NDK. The `Engine` class
-handles model loading, GPU backend selection, and conversation management.
+LiteRT-LM uses a pure Kotlin API — no CMake, no JNI, no NDK. `InferenceManager` wraps `LitertLmEngine` as a singleton.
 
-Engine initialization (call on background thread):
+Engine initialization (background thread):
 
 ```kotlin
 val engine = LitertLmEngine()
 engine.initialize(
-    modelPath = "/path/to/model.litertlm",
+    modelPath = "/path/to/gemma-4-E2B-it.litertlm",
     cacheDir = context.cacheDir.absolutePath,
     backend = Backend.GPU()
 )
@@ -347,82 +284,72 @@ val response = engine.generate("Your prompt here")
 engine.generateStream(prompt).collect { token -> ... }
 ```
 
-LiteRT-LM rules:
-
-- Always close the engine (`engine.close()`) in ViewModel `onCleared()`.
+Rules:
+- Always close the engine (`engine.close()`) in `ViewModel.onCleared()` or `IrisApp.onTerminate()`.
 - Cache directory (`cacheDir`) speeds up subsequent model loads.
-- GPU requires `<uses-native-library>` entries in AndroidManifest.xml for OpenCL and Vulkan.
-- Do not reload the model for every prompt — reuse the engine instance.
+- GPU requires `<uses-native-library>` entries for OpenCL and Vulkan in AndroidManifest.xml.
+- Do not reload the model for every prompt — reuse the `InferenceManager` singleton.
 - Log timing to Logcat for demo tuning.
+
+---
 
 ## Trigger Architecture
 
-### Manual Run
+All triggers follow the same registration/execution pattern:
 
-Manual run is the first trigger and must always work.
+```
+App.onCreate()
+  → TriggerRegistry.init(this)
+  → BatteryTriggerManager.registerAll(this)    // restore active triggers
+  → TimeTriggerScheduler.rescheduleAll(this)  // restore scheduled alarms
 
-```text
-Workflow Detail -> Run Now -> WorkflowRunner -> dispatch steps -> history
+WorkflowGenerationViewModel.saveWorkflow()
+  → is TriggerConfig.Nfc    -> NfcTriggerHandler.registerWorkflow(ctx, name, trigger)
+  → is TriggerConfig.Time   -> TimeTriggerScheduler.schedule(ctx, name, trigger)
+  → is TriggerConfig.Battery -> BatteryTriggerManager.registerWorkflow(ctx, name, trigger)
+  → ...
+
+Trigger fires
+  → BroadcastReceiver / Service / Activity
+  → TriggerRegistry.fire(context, workflowName)
+  → WorkflowRunner.run(workflow, startIndex=0)
+  → confirmation? → notification → TriggerRegistry.confirmAndResume()
+  → ExecutionResult per step
+  → ExecutionHistoryRepository.append()
 ```
 
-### NFC
-
-NFC is the best physical demo trigger:
-
-- Write an NDEF record containing a deep link like `gemmaworkflow://run/{workflowId}`.
-- Add an Android intent filter for the deep link.
-- When the tag is scanned, route into the app and run the matching workflow.
-- Keep a foreground write screen for writing the tag.
-
-This path is more controllable than background NFC automation and more demo-friendly.
-
-### Tasker
-
-Treat Tasker as assisted automation, not as a guaranteed silent profile creator. The safer architecture is to expose IrisApp as a Tasker/Locale plugin:
-
-- `TaskerPluginEditActivity` lets Tasker configure which workflow should run.
-- `TaskerPluginFireReceiver` receives Tasker's fire intent and starts the workflow.
-- Tasker owns the profile trigger; IrisApp owns workflow execution.
-
-If profile creation/import is attempted, it should be a separate spike because it depends on Tasker's supported import/configuration behavior.
+---
 
 ## Permissions
 
-| Capability | Permission or setting | MVP status |
-|------------|-----------------------|------------|
-| Internet | None required for local model | Not needed unless downloading model. |
-| NFC | `android.permission.NFC` | Needed for NFC demo. |
-| Exact alarms | `SCHEDULE_EXACT_ALARM` | Defer. |
-| Location triggers | Fine/background location | Defer. |
-| Accessibility fallback | Accessibility service user approval | Defer. |
-| Package visibility | `<queries>` manifest entries | Needed for checking installed demo apps. |
+| Permission | Purpose | Grant type |
+|---|---|---|
+| `POST_NOTIFICATIONS` | Workflow/trigger notifications | Runtime (Android 13+) |
+| `RECORD_AUDIO` | Voice trigger, YAMNet sound classifier | Runtime |
+| `ACCESS_FINE_LOCATION` | WiFi SSID, geofence | Runtime |
+| `ACCESS_BACKGROUND_LOCATION` | Geofence arrive/leave | Runtime (Android 10+) |
+| `BLUETOOTH_CONNECT` | Bluetooth trigger/action | Runtime (Android 12+) |
+| `READ_CONTACTS` | SMS trigger | Runtime |
+| `READ_CALENDAR` / `WRITE_CALENDAR` | `calendar.create_event` | Runtime |
+| `SCHEDULE_EXACT_ALARM` | `AlarmManager.setExactAndAllowWhileIdle()` | User-granted per app |
+| `FOREGROUND_SERVICE` | Sound Event classifier | Manifest |
+| `FOREGROUND_SERVICE_SPECIAL_USE` (subtype: `appLaunch`) | `LaunchAppService` FGS | Manifest (Android 14+) |
+| `INTERNET` | HTTP requests, Firebase, model downloads | Manifest |
+| `RECEIVE_BOOT_COMPLETED` | Reschedule time triggers after reboot | Manifest |
+| `QUERY_ALL_PACKAGES` | List apps for `launch_app` | Manifest |
+| `MODIFY_AUDIO_SETTINGS` | Ringer mode | Manifest |
+| `WRITE_SETTINGS` | Brightness, rotation, hotspot, airplane mode | Manual (Settings only) |
+| `READ_MEDIA_AUDIO` / `IMAGES` / `VIDEO` | Media file access | Runtime (Android 13+) |
 
-## Build Variants
-
-Use two planner modes:
-
-- `mock`: no native model required; stable for UI and runner demos.
-- `llama`: loads LiteRT-LM with GPU acceleration.
-
-This can be a runtime setting first. A dedicated Gradle flavor is useful later if model assets make builds too large.
+---
 
 ## Testing Strategy
 
 | Layer | Test type | Goal |
-|-------|-----------|------|
-| `PromptBuilder` | Unit tests | Prompt includes supported actions and schema. |
-| `WorkflowJsonParser` | Unit tests | Accept valid JSON, reject invalid or partial output. |
-| `SafeActionRouter` | Unit tests | Reject unknown apps, unsafe URLs, missing params. |
-| `WorkflowRepository` | Room instrumentation or Robolectric | Save/load/delete works. |
-| `WorkflowRunner` | Fake dispatchers | Steps run in order and errors are captured. |
-| UI | Manual device pass | Demo path is smooth. |
-| Native | Device smoke test | Model loads on GPU and returns valid JSON. |
-
-## Demo Reliability Rules
-
-- Build mock mode first.
-- Keep one known-good prompt in the app.
-- Keep one known-good saved workflow seeded or easy to create.
-- Test all target app intents on the physical demo phone.
-- Record a backup video after the first full successful run.
-- Keep the model response visible, but never depend on live model quality for the only demo path.
+|---|---|---|
+| `WorkflowJsonParser` | Unit tests | Accept valid JSON, reject invalid or partial output |
+| `WorkflowValidator` | Unit tests | Reject unknown actions, unsafe URLs, missing params |
+| `WorkflowRunner` | Fake dispatchers | Steps run in order, errors captured, confirmation gate fires |
+| `InferenceManager` | Device smoke test | Model loads on GPU, returns valid JSON |
+| UI | Manual device pass | Demo path is smooth |
+| Trigger system | Manual test per trigger | Each trigger fires correctly and restores on reboot |
