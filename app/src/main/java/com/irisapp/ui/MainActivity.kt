@@ -485,6 +485,7 @@ private fun WorkflowGenerationScreen(
                         is TriggerConfig.Manual -> viewModel.showTimeTriggerSetup(detail)
                         is TriggerConfig.ShareSheet -> viewModel.showShareSheetSetup(detail)
                         is TriggerConfig.SoundEvent -> viewModel.showSoundEventTriggerSetup(detail)
+                        is TriggerConfig.Nfc -> viewModel.showNfcSetup(detail.name)
                         else -> { /* other triggers not yet supported */ }
                     }
                 },
@@ -539,6 +540,20 @@ private fun WorkflowGenerationScreen(
             },
             onDismiss = { viewModel.clearSharedContent() }
         )
+        return
+    }
+
+    // Show NFC tag setup screen
+    if (state.showNfcSetup) {
+        AmbientBackground(modifier = Modifier.fillMaxSize()) {
+            NfcSetupScreen(
+                workflowIdToWrite = state.nfcWriteWorkflowId,
+                onWorkflowSelected = { },
+                onWriteSuccess = { viewModel.hideNfcSetup() },
+                onWriteError = { },
+                onTagScanned = { }
+            )
+        }
         return
     }
 
@@ -1542,6 +1557,14 @@ private fun WorkflowDetailScreen(
         if (showShareSheetSetupButton) {
             GradientOutlinedButton(
                 text = "\uD83D\uDCE4 Set up Share Sheet",
+                onClick = onSetupTrigger,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        if (triggerConfig is TriggerConfig.Nfc) {
+            GradientOutlinedButton(
+                text = "\uD83D\uDD17 Write / Verify NFC Tag",
                 onClick = onSetupTrigger,
                 modifier = Modifier.fillMaxWidth()
             )
