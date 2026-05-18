@@ -4,6 +4,8 @@
 > **Goal:** On-device SLM turns natural language into executable cross-app workflows.
 > **Package:** `com.irisapp`
 
+![IrisApp Card](media/Card.jpg)
+
 ---
 
 ## Architecture
