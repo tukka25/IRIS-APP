@@ -512,6 +512,7 @@ private fun PreviewBottomSheet(
         }
 
         if (isOwn) {
+            // Own entry: show Delete button (removes from marketplace) and Import button (installs locally)
             Button(
                 onClick = onDelete,
                 modifier = Modifier.fillMaxWidth(),
@@ -521,7 +522,21 @@ private fun PreviewBottomSheet(
             ) {
                 Icon(imageVector = Icons.Default.Delete, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Delete my workflow")
+                Text("Remove from marketplace")
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Button(
+                onClick = onImport,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = CyanAccent)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Download,
+                    contentDescription = null,
+                    tint = BackgroundDark
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Install locally", color = BackgroundDark)
             }
         } else {
             Button(

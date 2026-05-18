@@ -662,11 +662,25 @@ class WorkflowGenerationViewModel(application: Application) : AndroidViewModel(a
         runWorkflow(workflow)
     }
 
-    /**
+/**
      * User dismissed the NFC scan confirmation.
      */
     fun dismissNfcScan() {
         _uiState.update { it.copy(nfcScanConfirmation = null, nfcScanError = null) }
+    }
+
+    /**
+     * Reload saved workflows from disk.
+     * Called after a marketplace import so the Routines tab reflects new entries.
+     */
+    fun reloadSavedWorkflows() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val saved = workflowRepo.loadAll()
+            val (summaries, activity) = buildHistoryState(saved)
+            _uiState.update {
+                it.copy(savedWorkflows = saved, workflowSummaries = summaries, recentActivity = activity)
+            }
+        }
     }
 
     /** Show the NFC tag setup screen for a given workflow. */
