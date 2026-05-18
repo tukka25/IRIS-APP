@@ -196,7 +196,7 @@
           <div class="feature__list-item">AppWidget with Jetpack Glance — live, interactive</div>
           <div class="feature__list-item">Chrome Custom Tabs for in-app browser experience</div>
           <div class="feature__list-item">ContentResolver for calendar, clipboard, SMS</div>
-          <div class="feature__list-item">ActionSpecRegistry — 20+ validated actions</div>
+          <div class="feature__list-item">ActionSpecRegistry — 35+ validated actions</div>
         </div>
       </div>
       <div class="feature__preview">
@@ -234,9 +234,9 @@
         <h2 class="model-section__headline">Gemma 4 2B. Your phone, your GPU.</h2>
         <p class="model-section__body">
           LiteRT-LM loads the Gemma 4 2B model and runs inference entirely
-          on-device using the GPU backend. The planner pipeline — request
-          analysis, capability grounding, action planning, JSON output —
-          all executes locally. No tokens, no latency spikes, no cloud dependency.
+on-device using the GPU backend. The planner runs Gemma 4 E2B through a 4-phase pipeline —
+          analysis, capability grounding, action planning, and JSON generation — all locally.
+          No tokens, no latency spikes, no cloud dependency.
         </p>
       </div>
       <div class="model-stats">
@@ -253,7 +253,7 @@
           <div class="stat__label">Cloud calls</div>
         </div>
         <div class="stat">
-          <div class="stat__value">20+</div>
+          <div class="stat__value">35+</div>
           <div class="stat__label">Validated actions</div>
         </div>
       </div>
@@ -379,7 +379,7 @@
             </tr>
             <tr>
               <td>Cross-app actions (SMS, calendar, maps)</td>
-              <td class="col--iris"><span class="yes">&#10003;</span> 20+ actions validated</td>
+              <td class="col--iris"><span class="yes">&#10003;</span> 35+ actions validated</td>
               <td><span class="yes">&#10003;</span> Many web services</td>
               <td><span class="yes">&#10003;</span> Android actions</td>
               <td><span class="yes">&#10003;</span> Android actions</td>
@@ -470,7 +470,7 @@
           <div class="install-step__num">02</div>
           <div class="install-step__text">
             <strong>Download the Gemma model</strong>
-            <code class="install-step__code">huggingface-cli download google/gemma-4-E2B-it</code>
+            <code class="install-step__code">huggingface-cli download litert-community/gemma-4-E2B-it-litert-lm</code>
             or get it from the
             <a href="https://github.com/tukka25/gemma4good_android/releases" target="_blank" rel="noopener" style="color:#7C6AFF;">releases page</a>
           </div>
