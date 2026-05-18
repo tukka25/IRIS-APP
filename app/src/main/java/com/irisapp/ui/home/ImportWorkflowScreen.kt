@@ -7,6 +7,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.font.FontWeight
 import com.irisapp.data.repository.WorkflowShareRepository
 import kotlinx.coroutines.launch
 
@@ -62,18 +63,19 @@ fun ImportWorkflowScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(20.dp)
             .statusBarsPadding()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp)
             .navigationBarsPadding(),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        Spacer(modifier = Modifier.height(16.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
         ) {
-            Text("Import Workflow", style = MaterialTheme.typography.headlineSmall)
+            Text("Import Workflow", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = com.irisapp.ui.theme.TextPrimary)
             OutlinedButton(onClick = onCancel) {
                 Text("Cancel")
             }
