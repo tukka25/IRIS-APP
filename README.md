@@ -48,27 +48,28 @@ User prompt
 
 ---
 
-## Action Catalog (64 actions)
+## Action Catalog (35+ actions)
 
 | Category | Actions |
 |---|---|
-| **Communication** | `sms.compose`, `whatsapp.send_text`, `phone.dial`, `telegram.send_text` |
-| **Calendar** | `calendar.create_event`, `calendar.find_free_slot` |
-| **Alarm / Timer** | `alarm.set_alarm`, `alarm.set_timer`, `alarm.cancel_alarm` |
-| **Notes** | `note.create`, `google_keep.create_note` |
-| **Media** | `media.play_pause`, `media.next_track`, `media.previous_track`, `media.play_from_search`, `youtube.open` |
+| **Communication** | `sms.compose`, `whatsapp.send_text`, `phone.dial` |
+| **Calendar** | `calendar.create_event` |
+| **Alarm / Timer** | `alarm.set_alarm`, `alarm.set_timer` |
+| **Location** | `maps.open_place`, `maps.navigate` |
+| **Media** | `media.play_pause`, `media.next_track`, `media.previous_track`, `media.play_from_search`, `spotify.search_and_play` |
 | **Volume** | `volume.set`, `ringer_mode.set` |
 | **Display** | `brightness.set`, `rotation.lock` |
 | **Network** | `wifi.toggle`, `bluetooth.toggle`, `hotspot.toggle`, `cellular.toggle`, `airplane_mode.toggle` |
 | **Browser** | `browser.open_url`, `browser.search` |
 | **App control** | `launch_app`, `app.open` |
-| **Clipboard** | `clipboard.copy_text`, `clipboard.copy_image` |
+| **Clipboard** | `clipboard.copy_text` |
 | **Sharing** | `share.share_text`, `share.share_image` |
 | **HTTP** | `http_request` |
 | **Data** | `command.exec`, `intent.send`, `sync.toggle` |
 | **Notifications** | `notification.send`, `toast.show` |
+| **Productivity** | `internal.reminder.create` |
 
-Silent actions (no UI): `calendar.create_event`, `alarm.set_alarm`, `clipboard.copy_text`, `clipboard.copy_image`, `share.share_text`, `share.share_image`, `http_request`, `sync.toggle`, `toast.show`, `notification.send` (with permission).
+Silent actions (no UI): `calendar.create_event`, `alarm.set_alarm`, `clipboard.copy_text`, `share.share_text`, `share.share_image`, `http_request`, `sync.toggle`, `toast.show`, `notification.send` (with permission).
 
 ---
 
@@ -113,7 +114,7 @@ app/src/main/java/com/irisapp/
 │       └── WorkflowShareRepository.kt    ← Firebase RTDB share via deep-link
 ├── domain/
 │   ├── catalog/
-│   │   └── ActionSpecRegistry.kt    ← 64 ActionSpecs
+│   │   └── ActionSpecRegistry.kt    ← 35+ ActionSpecs
 │   ├── model/
 │   │   ├── SharedContent.kt         ← sealed Text/Image
 │   │   └── WorkflowModels.kt        ← PlannedWorkflow, WorkflowStep, TriggerConfig, ExecutionResult
@@ -133,6 +134,7 @@ app/src/main/java/com/irisapp/
 │       └── TriggerCatalog.kt        ← TriggerRegistry + registerAll
 ├── platform/
 │   ├── alarm/    AlarmApiExecutor, AlarmReceiver, BootReceiver,
+│   │              AlarmDismissReceiver, AlarmFireReceiver, AlarmSnoozeReceiver,
 │   │              TimeTriggerReceiver, TimeTriggerScheduler, AlarmTriggerManager
 │   ├── app/      LaunchAppApiExecutor, LaunchAppService.kt (FGS with appLaunch subtype)
 │   ├── bluetooth/  BluetoothApiExecutor
@@ -158,14 +160,17 @@ app/src/main/java/com/irisapp/
 │   ├── sync/        SyncApiExecutor
 │   ├── tools/       Tool, ToolRegistry, ToolInitializer, ToolAliasRegistry
 │   │   └── impl/   ClipboardTools, DeviceTools, DomainSearchTools, ExecutionTools,
-│   │               NotificationTools, ReasoningTools, ReminderTools, SearchTools,
+│   │               ReasoningTools, ReminderTools, SearchTools,
 │   │               SettingsTools, TemporalTools
 │   │   └── reto/   RetoOrchestrator, CapabilityBinder, SlotGroundingPlanner,
 │   │               RequirementBuilder, ResolverRegistry, ToolMetadataRegistry
-│   ├── trigger/    TriggerRegistry, BatteryTriggerManager, ChargerTriggerManager,
+│   ├── trigger/    TriggerRegistry, BatteryTriggerManager, BatteryTriggerReceiver,
+│   │               ChargerTriggerManager, ChargerTriggerReceiver,
 │   │               WiFiTriggerManager, BluetoothTriggerManager, AirplaneModeTriggerManager,
 │   │               DndTriggerManager, SleepTriggerManager,
-│   │               AppMonitorAccessibilityService, VoiceTriggerHandler, VoiceIntentTrigger
+│   │               AppMonitorAccessibilityService,
+│   │               voice/  VoiceTriggerHandler, VoiceIntentTrigger, VoiceTriggerFab,
+│   │               sound/ SoundEventTriggerService, SoundEventTriggerRegistry
 │   ├── volume/     RingerModeApiExecutor, VolumeApiExecutor
 │   └── wifi/       WifiApiExecutor
 ├── ui/

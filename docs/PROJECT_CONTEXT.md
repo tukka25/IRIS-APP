@@ -1,8 +1,8 @@
 # IrisApp — Project Context
 
-**Last updated:** 2026-05-17
-**Branch:** `8-milestone-7-nfc-trigger-tag-write-scan-execute`
-**Status:** NFC tag write/scan/execute milestone (milestone 7) development branch
+**Last updated:** 2026-05-19
+**Branch:** `main`
+**Status:** Active development
 
 ---
 
@@ -51,7 +51,7 @@ app/src/main/java/com/irisapp/
 │       └── WorkflowShareRepository.kt  ← upload/fetch via Firebase deep-link sharing
 ├── domain/
 │   ├── catalog/
-│   │   └── ActionSpecRegistry.kt    ← 64 actions
+│   │   └── ActionSpecRegistry.kt    ← 35+ actions
 │   ├── model/
 │   │   ├── SharedContent.kt         ← sealed Text/Image for share intent
 │   │   └── WorkflowModels.kt         ← PlannedWorkflow, WorkflowStep, TriggerConfig, etc.
@@ -72,6 +72,7 @@ app/src/main/java/com/irisapp/
 ├── platform/
 │   ├── airplane/    AirplaneModeApiExecutor.kt
 │   ├── alarm/       AlarmApiExecutor.kt, AlarmReceiver.kt, BootReceiver.kt,
+│   │                AlarmDismissReceiver.kt, AlarmFireReceiver.kt, AlarmSnoozeReceiver.kt,
 │   │                TimeTriggerScheduler.kt, TimeTriggerReceiver.kt, AlarmTriggerManager.kt
 │   ├── app/         LaunchAppService.kt        ← FGS with appLaunch subtype (milestone 7)
 │   │                LaunchAppApiExecutor.kt
@@ -103,20 +104,23 @@ app/src/main/java/com/irisapp/
 │   │   ├── Tool.kt, ToolRegistry.kt, ToolInitializer.kt, ToolAliasRegistry.kt
 │   │   └── impl/
 │   │       ├── ClipboardTools.kt, DeviceTools.kt, DomainSearchTools.kt
-│   │       ├── ExecutionTools.kt, NotificationTools.kt, ReasoningTools.kt
+│   │       ├── ExecutionTools.kt, ReasoningTools.kt
 │   │       ├── ReminderTools.kt, SearchTools.kt, SettingsTools.kt, TemporalTools.kt
-│   │   └── reto/
-│   │       ├── RetoOrchestrator.kt, CapabilityBinder.kt, SlotGroundingPlanner.kt
-│   │       ├── RequirementBuilder.kt, ResolverRegistry.kt, ToolMetadataRegistry.kt
+│   │       └── reto/
+│   │           ├── RetoOrchestrator.kt, CapabilityBinder.kt, SlotGroundingPlanner.kt
+│   │           ├── RequirementBuilder.kt, ResolverRegistry.kt, ToolMetadataRegistry.kt
 │   ├── trigger/
 │   │   ├── TriggerRegistry.kt         ← fire() / confirmAndResume() / dismissConfirmation()
-│   │   ├── AirplaneModeTriggerManager.kt, BatteryTriggerManager.kt
-│   │   ├── BluetoothTriggerManager.kt, ChargerTriggerManager.kt
-│   │   ├── DndTriggerManager.kt, SleepTriggerManager.kt, WiFiTriggerManager.kt
+│   │   ├── BatteryTriggerManager.kt, BatteryTriggerReceiver.kt
+│   │   ├── ChargerTriggerManager.kt, ChargerTriggerReceiver.kt
+│   │   ├── BluetoothTriggerManager.kt, DndTriggerManager.kt, SleepTriggerManager.kt, WiFiTriggerManager.kt
 │   │   ├── AppMonitorAccessibilityService.kt
-│   │   └── voice/
-│   │       ├── VoiceTriggerHandler.kt, VoiceIntentTrigger.kt
-│   │       └── VoiceTriggerFab.kt
+│   │   ├── voice/
+│   │   │   ├── VoiceTriggerHandler.kt, VoiceIntentTrigger.kt, VoiceTriggerFab.kt
+│   │   │   └── VoiceRecognitionContract.kt
+│   │   └── sound/
+│   │       ├── SoundEventTriggerService.kt, SoundEventTriggerRegistry.kt
+│   │       └── YamnetClassifier.kt
 │   ├── volume/      RingerModeApiExecutor.kt, VolumeApiExecutor.kt
 │   └── wifi/        WifiApiExecutor.kt
 ├── ui/
@@ -225,14 +229,20 @@ Supported permissions include: contacts, SMS, call log, camera, microphone, stor
 
 ## ActionSpec Registry
 
-64 actions in `ActionSpecRegistry.kt`. Key categories:
+**35+ actions** in `ActionSpecRegistry.kt`. Key categories:
 - **Communication:** `sms.compose`, `whatsapp.send_text`, `phone.dial`
-- **Productivity:** `calendar.create_event`, `alarm.set_alarm`, `alarm.set_timer`, `note.create`
-- **Media:** `media.play_pause`, `media.next_track`, `media.previous_track`, `media.play_from_search`
+- **Calendar:** `calendar.create_event`
+- **Alarm:** `alarm.set_alarm`, `alarm.set_timer`
+- **Location:** `maps.open_place`, `maps.navigate`
+- **Media:** `media.play_pause`, `media.next_track`, `media.previous_track`, `media.play_from_search`, `spotify.search_and_play`
 - **System:** `volume.set`, `ringer_mode.set`, `brightness.set`, `rotation.lock`
 - **App control:** `launch_app`, `app.open`, `browser.open_url`, `browser.search`
-- **Data:** `clipboard.copy_text`, `http_request`, `command.run`, `intent.send`
-- **Device:** `wifi.toggle`, `bluetooth.toggle`, `hotspot.toggle`, `cellular.toggle`, `airplane_mode.toggle`
+- **Clipboard:** `clipboard.copy_text`
+- **Sharing:** `share.share_text`, `share.share_image`
+- **HTTP:** `http_request`
+- **Data:** `command.exec`, `intent.send`, `sync.toggle`
+- **Notifications:** `notification.send`, `toast.show`
+- **Productivity:** `internal.reminder.create`
 
 The model may only output action IDs from this registry — it cannot invent Android APIs.
 
