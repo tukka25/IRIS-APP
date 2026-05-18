@@ -17,7 +17,9 @@ data class MarketplaceUiState(
     val publishWorkflows: List<PlannedWorkflow> = emptyList(),
     val selectedPublishWorkflow: PlannedWorkflow? = null,
     val publishTags: String = "",
-    val publishSuccess: Boolean = false
+    val publishSuccess: Boolean = false,
+    /** Set to true by the ViewModel after a successful import; observed by MainActivity to refresh workflows. */
+    val importCompleted: Boolean = false
 )
 
 /** Preview data shown in the bottom sheet before import. */

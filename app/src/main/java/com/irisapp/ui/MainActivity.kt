@@ -62,6 +62,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.AccountTree
 import androidx.compose.material.icons.filled.AutoAwesome
@@ -152,6 +153,7 @@ import com.irisapp.ui.theme.SurfaceDark
 import com.irisapp.ui.theme.SurfaceVariantDark
 import com.irisapp.ui.theme.TextPrimary
 import com.irisapp.ui.theme.TextSecondary
+import com.irisapp.ui.theme.TextTertiary
 import com.irisapp.ui.theme.VioletAccent
 import kotlinx.coroutines.launch
 import com.irisapp.domain.catalog.ActionSpecRegistry
@@ -431,15 +433,27 @@ private fun WorkflowGenerationScreen(
     marketplaceViewModel: MarketplaceViewModel
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val marketplaceState by marketplaceViewModel.state.collectAsStateWithLifecycle()
+
+    // Observe marketplace import completions and refresh the routines list
+    LaunchedEffect(marketplaceState.importCompleted) {
+        if (marketplaceState.importCompleted) {
+            viewModel.reloadSavedWorkflows()
+            marketplaceViewModel.dismissImportCompleted()
+        }
+    }
 
     // Handle system back button — intercept to dismiss overlays before default finish
     BackHandler(enabled = true) {
         when {
             state.editingWorkflow != null -> viewModel.cancelEditWorkflow()
-            state.selectedWorkflowDetail != null -> viewModel.clearWorkflowDetail()
+            state.showNfcSetup -> viewModel.hideNfcSetup()
             state.timeTriggerSetupWorkflow != null -> viewModel.cancelTimeTriggerSetup()
             state.shareSheetSetupWorkflow != null -> viewModel.cancelShareSheetSetup()
             state.soundEventTriggerSetupWorkflow != null -> viewModel.cancelSoundEventTriggerSetup()
+            state.sharedContent != null -> viewModel.clearSharedContent()
+            state.pendingImportShareId != null -> viewModel.clearPendingImport()
+            state.selectedWorkflowDetail != null -> viewModel.clearWorkflowDetail()
             else -> { /* let Activity finish normally */ }
         }
     }
@@ -470,29 +484,6 @@ private fun WorkflowGenerationScreen(
             request = request,
             onGrant = viewModel::grantPendingPermissions,
             onDismiss = viewModel::dismissPending)
-    }
-
-    state.selectedWorkflowDetail?.let { detail ->
-        AmbientBackground(modifier = Modifier.fillMaxSize()) {
-            WorkflowDetailScreen(
-                workflow = detail,
-                isBusy = state.isBusy,
-                onBack = viewModel::clearWorkflowDetail,
-                onRun = { viewModel.runWorkflow(detail) },
-                onSetupTrigger = {
-                    when (detail.trigger) {
-                        is TriggerConfig.Time -> viewModel.showTimeTriggerSetup(detail)
-                        is TriggerConfig.Manual -> viewModel.showTimeTriggerSetup(detail)
-                        is TriggerConfig.ShareSheet -> viewModel.showShareSheetSetup(detail)
-                        is TriggerConfig.SoundEvent -> viewModel.showSoundEventTriggerSetup(detail)
-                        is TriggerConfig.Nfc -> viewModel.showNfcSetup(detail.name)
-                        else -> { /* other triggers not yet supported */ }
-                    }
-                },
-                onEdit = { viewModel.openEditWorkflowEditor(detail) }
-            )
-        }
-        return
     }
 
     // Show time trigger setup screen
@@ -564,6 +555,29 @@ private fun WorkflowGenerationScreen(
                 shareId = shareId,
                 onConfirm = viewModel::confirmImport,
                 onCancel = viewModel::clearPendingImport
+            )
+        }
+        return
+    }
+
+    state.selectedWorkflowDetail?.let { detail ->
+        AmbientBackground(modifier = Modifier.fillMaxSize()) {
+            WorkflowDetailScreen(
+                workflow = detail,
+                isBusy = state.isBusy,
+                onBack = viewModel::clearWorkflowDetail,
+                onRun = { viewModel.runWorkflow(detail) },
+                onSetupTrigger = {
+                    when (detail.trigger) {
+                        is TriggerConfig.Time -> viewModel.showTimeTriggerSetup(detail)
+                        is TriggerConfig.Manual -> viewModel.showTimeTriggerSetup(detail)
+                        is TriggerConfig.ShareSheet -> viewModel.showShareSheetSetup(detail)
+                        is TriggerConfig.SoundEvent -> viewModel.showSoundEventTriggerSetup(detail)
+                        is TriggerConfig.Nfc -> viewModel.showNfcSetup(detail.name)
+                        else -> { /* other triggers not yet supported */ }
+                    }
+                },
+                onEdit = { viewModel.openEditWorkflowEditor(detail) }
             )
         }
         return
@@ -1451,6 +1465,66 @@ private fun stepIcon(actionId: String): String = when {
     else -> "\u25B6"                                      // play arrow
 }
 
+/** Returns a unicode icon for a trigger config, matching the text-emoji style used in the UI. */
+private fun triggerIcon(trigger: com.irisapp.domain.model.TriggerConfig): String = when (trigger) {
+    is com.irisapp.domain.model.TriggerConfig.Manual -> "\uD83D\uDD04"       // manual
+    is com.irisapp.domain.model.TriggerConfig.Time -> "\u23F0"              // alarm clock
+    is com.irisapp.domain.model.TriggerConfig.Nfc -> "\uD83D\uDD17"         // NFC
+    is com.irisapp.domain.model.TriggerConfig.Voice -> "\uD83C\uDF99"       // music note (voice)
+    is com.irisapp.domain.model.TriggerConfig.SoundEvent -> "\uD83C\uDFA4"  // speaker
+    is com.irisapp.domain.model.TriggerConfig.Battery -> "\uD83D\uDD0B"      // battery
+    is com.irisapp.domain.model.TriggerConfig.Charger -> "\uD83D\uDD0C"      // plug
+    is com.irisapp.domain.model.TriggerConfig.WiFi -> "\uD83D\uDCF6"         // wifi
+    is com.irisapp.domain.model.TriggerConfig.Bluetooth -> "\uD83D\uDD0D"   // bluetooth
+    is com.irisapp.domain.model.TriggerConfig.Geofence -> "\uD83D\uDCCD"    // pin
+    is com.irisapp.domain.model.TriggerConfig.ShareSheet -> "\uD83D\uDCE4" // inbox tray
+    is com.irisapp.domain.model.TriggerConfig.SleepProxy -> "\uD83D\uDDA4"  // zzZ
+    is com.irisapp.domain.model.TriggerConfig.AppOpened -> "\uD83D\uDCCB"   // abacus (app)
+    is com.irisapp.domain.model.TriggerConfig.AppClosed -> "\u274C"          // X
+    is com.irisapp.domain.model.TriggerConfig.SmsReceived -> "\uD83D\uDCF7" // phone
+    is com.irisapp.domain.model.TriggerConfig.EmailReceived -> "\uD83D\uDCE7" // envelope
+    is com.irisapp.domain.model.TriggerConfig.AlarmStopped -> "\u23F9\uFE0F" // stop
+    is com.irisapp.domain.model.TriggerConfig.AirplaneMode -> "\u2708\uFE0F" // airplane
+    is com.irisapp.domain.model.TriggerConfig.DoNotDisturb -> "\uD83D\uDD34" // red circle
+    else -> "\u26A1"                                      // lightning
+}
+
+/** Returns a one-line summary description for a trigger. */
+private fun triggerSummary(trigger: com.irisapp.domain.model.TriggerConfig): String = when (trigger) {
+    is com.irisapp.domain.model.TriggerConfig.Time -> {
+        val isRepeating = trigger.repeatDays.isNotEmpty()
+        if (isRepeating) "Every day at ${trigger.hour}:${trigger.minute.toString().padStart(2, '0')}"
+        else "One-time at ${trigger.hour}:${trigger.minute.toString().padStart(2, '0')}"
+    }
+    is com.irisapp.domain.model.TriggerConfig.Nfc -> "Tap tag to run"
+    is com.irisapp.domain.model.TriggerConfig.Voice -> "Say \"Hey Iris\""
+    is com.irisapp.domain.model.TriggerConfig.SoundEvent -> trigger.soundClasses.joinToString(", ")
+    is com.irisapp.domain.model.TriggerConfig.ShareSheet -> "When app shares content"
+    is com.irisapp.domain.model.TriggerConfig.Manual -> "Tap Run to start"
+    is com.irisapp.domain.model.TriggerConfig.Battery -> "${trigger.levelThreshold}% ${trigger.condition.name.lowercase().replaceFirstChar { it.uppercase() }}"
+    is com.irisapp.domain.model.TriggerConfig.Geofence -> "At ${trigger.latitude}, ${trigger.longitude} (radius ${trigger.radiusMeters}m)"
+    is com.irisapp.domain.model.TriggerConfig.AppOpened -> "App opens: ${trigger.appPackagePatterns.joinToString(", ")}"
+    is com.irisapp.domain.model.TriggerConfig.AppClosed -> "App closes: ${trigger.appPackagePatterns.joinToString(", ")}"
+    is com.irisapp.domain.model.TriggerConfig.SmsReceived -> "From ${trigger.senderPattern}"
+    is com.irisapp.domain.model.TriggerConfig.EmailReceived -> "From ${trigger.senderPattern}"
+    is com.irisapp.domain.model.TriggerConfig.AlarmStopped -> "When alarm stops"
+    is com.irisapp.domain.model.TriggerConfig.SleepProxy -> "When sleep starts"
+    is com.irisapp.domain.model.TriggerConfig.DoNotDisturb -> "When DND state changes"
+    is com.irisapp.domain.model.TriggerConfig.AirplaneMode -> "When airplane mode changes"
+    is com.irisapp.domain.model.TriggerConfig.WiFi -> when (trigger.connectionState) {
+        true -> "When WiFi connects${trigger.ssid?.let { " to $it" } ?: ""}"
+        false -> "When WiFi disconnects"
+        null -> "When WiFi state changes"
+    }
+    is com.irisapp.domain.model.TriggerConfig.Bluetooth -> when (trigger.connectionState) {
+        true -> "When Bluetooth connects"
+        false -> "When Bluetooth disconnects"
+        null -> "When Bluetooth state changes"
+    }
+    is com.irisapp.domain.model.TriggerConfig.Charger -> "When charger ${if (trigger.connectionType.name == "ANY") "connected/disconnected" else trigger.connectionType.name.lowercase()}"
+    else -> ""
+}
+
 /**
  * Detail screen composable shown when the user taps a saved workflow.
  * Displays the workflow title, summary, trigger, and a scrollable list of steps
@@ -1468,28 +1542,34 @@ private fun WorkflowDetailScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(20.dp)
             .statusBarsPadding()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp)
             .navigationBarsPadding(),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        Spacer(modifier = Modifier.height(16.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            IconButton(onClick = onBack) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back",
+                    tint = TextPrimary
+                )
+            }
             Text(
                 "Routine Detail",
-                style = MaterialTheme.typography.headlineMedium.copy(
+                style = MaterialTheme.typography.titleLarge.copy(
                     fontWeight = FontWeight(700),
                     color = TextPrimary
-                )
+                ),
+                modifier = Modifier.weight(1f)
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                GradientOutlinedButton(text = "Edit", onClick = onEdit)
-                GradientOutlinedButton(text = "Back", onClick = onBack)
-            }
+            GradientOutlinedButton(text = "Edit", onClick = onEdit)
         }
 
         GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
@@ -1498,11 +1578,31 @@ private fun WorkflowDetailScreen(
                 if (workflow.summary.isNotBlank()) {
                     Text(workflow.summary, style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
                 }
-                Text("Trigger: ${triggerLabel(workflow)}", style = MaterialTheme.typography.bodySmall, color = CyanAccent)
             }
         }
 
         Text("Steps", style = MaterialTheme.typography.titleSmall.copy(color = TextPrimary, fontWeight = FontWeight(700)))
+
+        // Trigger step
+        val triggerLabel = triggerLabel(workflow)
+        val triggerDesc = triggerSummary(workflow.trigger)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(GlassSurface, RoundedCornerShape(8.dp))
+                .padding(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(triggerIcon(workflow.trigger), style = MaterialTheme.typography.titleMedium)
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Trigger: $triggerLabel", style = MaterialTheme.typography.bodyMedium, color = TextPrimary)
+                if (triggerDesc.isNotBlank()) {
+                    Text(triggerDesc, style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                }
+            }
+        }
+
         workflow.actions.forEach { step ->
             val spec = ActionSpecRegistry.find(step.id)
             val icon = stepIcon(step.id)

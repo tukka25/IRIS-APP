@@ -167,7 +167,8 @@ class MarketplaceViewModel(application: Application) : AndroidViewModel(applicat
                     selectedEntry = null,
                     showImportConfirm = false,
                     isLoading = false,
-                    error = null
+                    error = null,
+                    importCompleted = true
                 )
             } else {
                 _state.value = _state.value.copy(
@@ -199,5 +200,10 @@ class MarketplaceViewModel(application: Application) : AndroidViewModel(applicat
 
     fun dismissPublishSuccess() {
         _state.value = _state.value.copy(publishSuccess = false)
+    }
+
+    /** Called by MainActivity after it has processed the importCompleted event. */
+    fun dismissImportCompleted() {
+        _state.value = _state.value.copy(importCompleted = false)
     }
 }
